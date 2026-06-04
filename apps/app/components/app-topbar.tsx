@@ -139,7 +139,7 @@ export function AppTopbar() {
               <Settings className="size-4" /> Settings
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem render={<Link href="/login" />}>
               <LogOut className="size-4" /> Log out
             </DropdownMenuItem>
           </DropdownMenuContent>

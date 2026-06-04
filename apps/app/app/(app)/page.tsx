@@ -1,3 +1,5 @@
+"use client"
+
 import type * as React from "react"
 import Link from "next/link"
 import {
@@ -7,12 +9,10 @@ import {
   FileText,
   FolderKanban,
   MessageSquare,
-  Plus,
   Users,
 } from "lucide-react"
 
 import { Avatar, AvatarFallback } from "@workspace/ui/components/avatar"
-import { Button } from "@workspace/ui/components/button"
 import {
   Card,
   CardAction,
@@ -24,22 +24,23 @@ import {
 
 import { CaseMixChart, ConsultationsChart, ConversionFunnelChart, RevenueChart } from "@/components/charts"
 import { KpiCard } from "@/components/kpi-card"
+import { NewLeadDialog } from "@/components/leads/new-lead-dialog"
 import { PageHeader } from "@/components/page-header"
 import { StatusPill } from "@/components/status-pill"
+import { ToastButton } from "@/components/toast-button"
 import {
   ACTIVITY,
   CASE_TYPE_MIX,
-  CONSULTATIONS,
   CONSULTATIONS_BY_MONTH,
   CONVERSION_FUNNEL,
   DEADLINES,
-  KPIS,
   REVENUE_BY_MONTH,
   staffById,
   staffName,
 } from "@/data"
-import type { Activity } from "@/data/types"
-import { formatDateTime } from "@/lib/format"
+import { useStore } from "@/data/store"
+import type { Activity, Kpi } from "@/data/types"
+import { formatCurrency, formatDateTime } from "@/lib/format"
 import { consultationStatusBadge, deadlineBadge } from "@/lib/status"
 
 const ACTIVITY_ICON: Record<Activity["kind"], React.ComponentType<{ className?: string }>> = {
@@ -52,36 +53,44 @@ const ACTIVITY_ICON: Record<Activity["kind"], React.ComponentType<{ className?: 
 }
 
 export default function DashboardPage() {
-  const upcoming = CONSULTATIONS.filter((c) =>
-    ["scheduled", "paid", "rescheduled"].includes(c.status),
-  )
+  const { leads, consultations, clients, cases, invoices } = useStore()
+
+  const upcoming = consultations
+    .filter((c) => ["scheduled", "paid", "rescheduled"].includes(c.status))
     .slice()
     .sort((a, b) => a.startAt.localeCompare(b.startAt))
-    .slice(0, 5)
 
-  const deadlines = DEADLINES.slice()
-    .sort((a, b) => a.dueInDays - b.dueInDays)
-    .slice(0, 5)
+  const overdue = invoices.filter((i) => i.status === "overdue").reduce((sum, i) => sum + i.remaining, 0)
+  const redFlags = cases.filter((c) => c.redFlag !== "none").length
+  const openLeads = leads.filter((l) => !["retained", "lost", "not_qualified"].includes(l.status)).length
+  const eaOut = leads.filter((l) => l.status === "ea_sent").length
+
+  const kpis: Kpi[] = [
+    { label: "Leads in pipeline", value: String(openLeads), delta: 12.5, hint: "active leads" },
+    { label: "Upcoming consultations", value: String(upcoming.length), delta: 20, hint: "scheduled & paid" },
+    { label: "Pending retainers (EA out)", value: String(eaOut), delta: -8.3, hint: "awaiting signature" },
+    { label: "Retained clients", value: String(clients.length), delta: 9.1, hint: "active engagements" },
+    { label: "Overdue balance", value: formatCurrency(overdue), delta: 4.2, hint: "across clients" },
+    { label: "Red-flag cases", value: String(redFlags), delta: 0, hint: "need attention" },
+  ]
+
+  const deadlines = DEADLINES.slice().sort((a, b) => a.dueInDays - b.dueInDays).slice(0, 5)
 
   return (
     <>
       <PageHeader title="Dashboard" description="Firm-wide snapshot of leads, cases, and revenue.">
-        <Button variant="outline" size="sm">
+        <ToastButton variant="outline" size="sm" message="Dashboard exported" description="Downloaded as PDF.">
           <Download className="size-4" /> Export
-        </Button>
-        <Button size="sm" render={<Link href="/leads" />}>
-          <Plus className="size-4" /> New lead
-        </Button>
+        </ToastButton>
+        <NewLeadDialog />
       </PageHeader>
 
-      {/* KPIs */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
-        {KPIS.map((kpi) => (
+        {kpis.map((kpi) => (
           <KpiCard key={kpi.label} kpi={kpi} />
         ))}
       </div>
 
-      {/* Trend charts */}
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
@@ -103,7 +112,6 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Funnel + mix */}
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
@@ -125,9 +133,7 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Operational lists */}
       <div className="grid gap-4 lg:grid-cols-3">
-        {/* Upcoming consultations */}
         <Card>
           <CardHeader>
             <CardTitle>Upcoming consultations</CardTitle>
@@ -138,26 +144,29 @@ export default function DashboardPage() {
             </CardAction>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
-            {upcoming.map((c) => (
-              <div key={c.id} className="flex items-center gap-3">
-                <Avatar className="size-8 rounded-md">
-                  <AvatarFallback className="rounded-md text-xs">
-                    {staffById(c.attorneyId)?.initials ?? "?"}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{c.leadName}</p>
-                  <p className="text-muted-foreground truncate text-xs">
-                    {staffName(c.attorneyId)} · {formatDateTime(c.startAt)}
-                  </p>
+            {upcoming.length === 0 ? (
+              <p className="text-muted-foreground text-sm">No upcoming consultations.</p>
+            ) : (
+              upcoming.slice(0, 5).map((c) => (
+                <div key={c.id} className="flex items-center gap-3">
+                  <Avatar className="size-8 rounded-md">
+                    <AvatarFallback className="rounded-md text-xs">
+                      {staffById(c.attorneyId)?.initials ?? "?"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{c.leadName}</p>
+                    <p className="text-muted-foreground truncate text-xs">
+                      {staffName(c.attorneyId)} · {formatDateTime(c.startAt)}
+                    </p>
+                  </div>
+                  <StatusPill {...consultationStatusBadge(c.status)} />
                 </div>
-                <StatusPill {...consultationStatusBadge(c.status)} />
-              </div>
-            ))}
+              ))
+            )}
           </CardContent>
         </Card>
 
-        {/* Needs attention */}
         <Card>
           <CardHeader>
             <CardTitle>Needs attention</CardTitle>
@@ -182,7 +191,6 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Recent activity */}
         <Card>
           <CardHeader>
             <CardTitle>Recent activity</CardTitle>
