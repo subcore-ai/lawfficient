@@ -1,0 +1,78 @@
+# 22 · Admin & Settings
+
+> **Module:** `admin` · **Status:** Draft · **Use cases:** UC23, UC24, UC25 · **Primary roles:** Admin
+
+## Purpose
+
+Firm configuration: user & role management, template management (quote letters & engagement
+agreements), integration configuration, and firm-level settings. The control plane behind the
+[role model](02-roles-and-permissions.md).
+
+## Use cases
+
+- **UC25 — User Account Management.** Invite users by email + role; manage roles & permissions
+  (edit/create/delete role — delete only when unassigned); toggle per-module access; changes
+  propagate immediately.
+- **UC23 — Managing Quote Letter Attachments.** Central store of PDF quote-letter templates;
+  upload/remove/update; immediate availability; **delete recovery**.
+- **UC24 — Managing Engagement Agreement Templates.** Edit EA templates: §1 intro (static),
+  §2 Scope of Services (**conditional by case type**), §3 terms (static); configure §2
+  conditional logic; alert if a required section is missing.
+
+## Functional requirements
+
+- **FR-admin-1** — Invite users (email + role); resend/revoke invites; enable/disable users.
+- **FR-admin-2** — Manage roles: edit permissions, create role, delete role (only if no users
+  assigned); per-module access toggles; immediate propagation.
+- **FR-admin-3** — **Quote-letter template** management (upload/replace/remove PDFs) with delete
+  recovery and immediate availability (UC23).
+- **FR-admin-4** — **Engagement-agreement template** management with static/conditional sections
+  and case-type conditional logic; validate required sections before save (UC24).
+- **FR-admin-5** — **Integration configuration** ([21-integrations](21-integrations.md)):
+  connect/configure/monitor providers; credentials stored encrypted.
+- **FR-admin-6** — **Firm settings**: profile, case-type catalog & expected-completion
+  timeframes, packet-stage SLAs, consultation types/prices, notification defaults (as far as
+  these are configurable — see open questions).
+- **FR-admin-7** — All admin actions are **audit-logged** (NFR §4.3), including deletions with
+  user + IP.
+
+## Data model
+
+- **User**, **Role**, **Pod** — see [02-roles-and-permissions](02-roles-and-permissions.md).
+- **Template** — see [14-retention-engagement](14-retention-engagement.md) (`kind`, `sections`/
+  `file`, `conditionalRules`, `isActive`, `archivedAt`).
+- **FirmSettings** — `id`, `name`, `caseTypes[]{name, expectedCompletionDays, requiresFilingFee,
+  requiresDeclaration}`, `packetStageSlas[]`, `consultationTypes[]{name, price, paid}`,
+  `notificationDefaults`.
+- **AuditLog** — see [02-roles-and-permissions](02-roles-and-permissions.md).
+
+## Screens
+
+- `/settings` — settings home (firm profile, navigation to sub-sections).
+- `/settings/users` — user list, invite, enable/disable.
+- `/settings/roles` — role list, permission editor, create/delete.
+- `/settings/templates` — quote-letter & EA template management.
+- `/settings/integrations` — provider configuration ([21](21-integrations.md)).
+- `/settings/case-types` — case-type catalog, SLAs, timeframes.
+- `/settings/audit-log` — critical-action audit trail.
+
+## Acceptance criteria
+
+- [ ] Admin invites a user by email + role; the invite is sent and the user can activate.
+- [ ] A role's permissions can be edited and propagate immediately; an assigned role can't be deleted.
+- [ ] Quote-letter PDFs can be uploaded/replaced/removed; a deleted template is recoverable.
+- [ ] EA templates edit static §1/§3 and conditional §2 (by case type); save blocks on a missing
+      required section.
+- [ ] Integrations can be connected/monitored; credentials are encrypted.
+- [ ] Every admin action (incl. deletes) is audit-logged with user + IP.
+
+## Out of scope (v1) / future
+
+- Self-serve firm onboarding/billing (SaaS signup) for multi-tenant.
+- Granular field-level permission editor (start at module level).
+
+## Open questions
+
+- Which settings are firm-configurable vs. system-fixed (packet SLAs, case-type timeframes)?
+- Multi-tenant: are templates/settings per-firm with platform defaults?
+- Template editing model: rich structured editor vs. PDF upload per kind.
