@@ -95,8 +95,13 @@ consultation notes that drive qualification and retention.
 - Public self-service client booking page.
 - Round-the-clock availability sync to external calendars.
 
-## Open questions
+## Decisions (v1)
 
-- Calendar source of truth: internal availability or external calendar sync?
-- Cancellation-fee amounts/policy and which appointment types incur them.
-- Exact named consultation types and their prices.
+Resolved in [03-architecture-and-scope](03-architecture-and-scope.md):
+
+- **Scheduling:** manual date/time booking with time zone in v1. Per-attorney availability rules
+  and Google/Outlook two-way sync are fast-follow.
+- **Cancellation policy is per-tenant** (fee on/off & amount, rebooking/approval limits),
+  configured in Settings; the 3-cancellation approval gate (UC12b) is the default behavior.
+- **Consultation types and prices are firm-configurable** (seeded defaults), set in Settings.
+- Payments via Stripe (see [17-billing-payments](17-billing-payments.md)).

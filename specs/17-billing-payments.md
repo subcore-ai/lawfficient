@@ -98,7 +98,12 @@ and monthly-payment-client reports for firm finance.
 - In-app time tracking for billable hours (source marks "future").
 - Trust/IOLTA accounting.
 
-## Open questions
+## Decisions (v1)
 
-- Payment processor(s) and whether card vaulting is processor-hosted (PCI scope).
-- Are UC34–36 read from MyCase during migration or native once live? (See [21](21-integrations.md).)
+Resolved in [03-architecture-and-scope](03-architecture-and-scope.md):
+
+- **Stripe** processes payments; card vaulting is **Stripe-hosted** (Elements/Checkout) to keep
+  PCI scope at SAQ-A. Payment plans use Stripe subscriptions/invoices; split payments use multiple
+  PaymentIntents; webhooks drive status, receipts, and overdue tracking.
+- **Revenue / overdue / monthly-client reports (UC34–36) are computed from native data** — the
+  MyCase read path applies only during the (fast-follow) migration.

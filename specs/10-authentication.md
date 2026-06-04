@@ -51,10 +51,11 @@ authorizes against. Pairs with [02-roles-and-permissions](02-roles-and-permissio
 - SSO / SAML for enterprise firms.
 - Per-device session management UI.
 
-## Open questions
+## Decisions (v1)
 
-- Auth provider: build on Next.js (e.g. Auth.js), a Vercel Marketplace provider (Clerk),
-  or the firm's IdP? Affects MFA and session handling.
-- Is MFA enforced for any roles (e.g. Admin, AR) or fully optional?
-- In a multi-tenant deployment, how is the firm (tenant) resolved at login — subdomain, email
-  domain, or org picker?
+Resolved in [03-architecture-and-scope](03-architecture-and-scope.md):
+
+- **Supabase Auth** (email/password; TOTP MFA available but **optional** for all roles in v1).
+- The firm (tenant) is resolved from the user's profile (`profiles.firm_id`); subdomain/org
+  routing is a later enhancement.
+- Sessions and RLS policies key off `auth.uid()` → `firm_id` for tenant isolation.

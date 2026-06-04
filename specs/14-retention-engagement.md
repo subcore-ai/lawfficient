@@ -89,8 +89,13 @@ hand a signed-and-paid client to onboarding/case management.
 - In-house e-signature engine (may integrate a provider first).
 - Automated quote pricing from a rate card.
 
-## Open questions
+## Decisions (v1)
 
-- E-signature provider (build vs. integrate)?
-- Are quote-letter templates pure PDFs (UC23) while EA templates are structured/sectioned
-  (UC24)? Confirm both editing models.
+Resolved in [03-architecture-and-scope](03-architecture-and-scope.md):
+
+- **E-signature is deferred:** engagement agreements are generated in v1 and signed out-of-band
+  (the signed PDF is uploaded back). A provider (e.g. Dropbox Sign) is integrated as fast-follow.
+- **Template editing:** quote letters are **PDF uploads** (UC23); engagement agreements use a
+  **structured sectioned editor** — static §1/§3 with conditional §2 by case type (UC24).
+- Conversion to a retained client triggers a Stripe invoice/plan and provisions portal access
+  (the portal itself is fast-follow).

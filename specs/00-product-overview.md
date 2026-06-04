@@ -89,9 +89,12 @@ These are not in the source; proposed for product alignment.
 - % RFE/NOID deadlines met.
 - Monthly revenue captured; overdue balance & drop-off rate.
 
-## Open questions
+## Decisions (v1)
 
-- Tenancy model: single firm per deployment, or multi-tenant SaaS across firms? (Repo is set
-  up as a multi-tenant web app — confirm tenant = firm.)
-- Which payment processor(s) for cards/ACH/PayPal?
-- AI scope for v1 vs. "future" (which workflows are automated at launch).
+Resolved in [03-architecture-and-scope](03-architecture-and-scope.md):
+
+- **Tenancy:** multi-tenant SaaS, tenant = firm, isolated by `firm_id` via Supabase RLS.
+- **Payments:** Stripe (cards/ACH, card vaulting, payment plans, split payments).
+- **AI scope:** deferred — v1 ships rules/workflow automation; AI assistance comes later.
+- **v1 surface:** internal staff platform only. The client portal and the legal-tool
+  integrations (RingCentral, MyCase, Docketwise/Jotforms, USCIS) are fast-follow.

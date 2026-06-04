@@ -55,7 +55,7 @@ selection/order (`userId`, `widgets[]`).
 - Cross-firm benchmarking (multi-tenant aggregate analytics).
 - Fully free-form custom widget builder (start with a fixed widget catalog).
 
-## Open questions
+## Decisions (v1)
 
-- Default widget set per role?
-- Time-range control (today / 7d / 30d / custom) global or per-widget?
+- **Fixed widget catalog per role** in v1 (drag-to-customize is a later enhancement).
+- **Global time-range control** (Today / 7d / 30d / custom), applied across the dashboard.

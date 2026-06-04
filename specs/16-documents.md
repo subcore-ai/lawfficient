@@ -104,8 +104,13 @@ and per-client organization (Dropbox-linked). Closely related to
 - Native in-platform form rendering/printing (rely on Docketwise initially).
 - AI document classification (start rules + manual-review flag).
 
-## Open questions
+## Decisions (v1)
 
-- Storage: Dropbox as system-of-record vs. platform-native storage with Dropbox sync?
-- Docketwise/Jotforms API availability & auth model for v1.
-- Versioning granularity and retention policy for legal documents.
+Resolved in [03-architecture-and-scope](03-architecture-and-scope.md):
+
+- **Supabase Storage is the system of record** in v1 (per-firm isolation). Dropbox sync is
+  fast-follow.
+- **Docketwise + Jotforms** (USCIS form prep, UC37/39/41) are fast-follow; in v1 forms are
+  prepared outside the platform and the finished documents are uploaded back.
+- **Versioning** via Storage + a `document_versions` table; **retention is firm-configurable**
+  (default: keep all versions).

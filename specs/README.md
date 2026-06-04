@@ -7,8 +7,8 @@ specifications.
 
 ## How these specs are organized
 
-- **Cross-cutting** (`00`–`02`) — context every module depends on: product overview,
-  domain glossary, and the role/permission model.
+- **Cross-cutting** (`00`–`03`) — context every module depends on: product overview,
+  domain glossary, the role/permission model, and the architecture & v1-scope decisions.
 - **Modules** (`10`–`22`) — one spec per functional area of the product. Each maps to a set
   of use cases (UC#) from the source spec and describes purpose, roles, requirements, data
   model, screens, and acceptance criteria.
@@ -22,6 +22,7 @@ Each module spec follows the same template (see [`_template.md`](_template.md)).
 | 00 | [Product Overview](00-product-overview.md) | §1 Overview, §4 Non-functional |
 | 01 | [Glossary & Domain](01-glossary-and-domain.md) | §5 Appendix + immigration domain |
 | 02 | [Roles & Permissions](02-roles-and-permissions.md) | §2.1 Roles, UC1, UC25 |
+| 03 | [Architecture & v1 Scope](03-architecture-and-scope.md) | Cross-cutting decisions, stack, scope |
 | 10 | [Authentication & Access](10-authentication.md) | UC1 |
 | 11 | [Dashboard](11-dashboard.md) | Feature §2.2.2 |
 | 12 | [Leads & CRM](12-leads-crm.md) | UC2–7, UC16, UC43 |
@@ -48,5 +49,6 @@ Each module spec follows the same template (see [`_template.md`](_template.md)).
 ## Source
 
 The authoritative source is the product spec PDF authored by Chinedu Chidolue and Raisen
-Esperanza. Where the source is ambiguous or marked "not yet available in the system," it is
-captured under **Open questions** rather than guessed.
+Esperanza. Cross-cutting gaps were resolved in the **2026-06-04 review** and recorded in
+[03-architecture-and-scope](03-architecture-and-scope.md); each module's **Decisions (v1)**
+section reflects those calls. Anything still genuinely undecided stays under **Open questions**.

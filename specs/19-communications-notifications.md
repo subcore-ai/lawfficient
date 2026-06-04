@@ -85,8 +85,11 @@ ongoing client requests. Many other modules emit through this one.
 - Marketing campaign automation (broadcast nurture sequences).
 - AI-drafted client replies (beyond simple auto-responses in the portal).
 
-## Open questions
+## Decisions (v1)
 
-- SMS provider (RingCentral SMS vs. a dedicated provider like Twilio)?
-- USCIS status-lookup mechanism (official API vs. scraping) and rate limits (UC26).
-- Quiet hours / send-time windows for SMS.
+Resolved in [03-architecture-and-scope](03-architecture-and-scope.md):
+
+- **SMS via Twilio, email via Resend**; in-app notifications stored natively.
+- **Monthly client updates (UC26) are manual in v1** — status is entered by staff and sent via a
+  template (Twilio/Resend); automated USCIS status lookup is fast-follow.
+- **Quiet hours** default to 8am–8pm client-local for SMS, **firm-configurable**.

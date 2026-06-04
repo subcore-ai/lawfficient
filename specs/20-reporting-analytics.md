@@ -68,7 +68,9 @@ filterable, exportable reports — drawing on data produced across all modules.
 - Ad-hoc custom report builder (start with a defined catalog + filters).
 - Cross-firm/benchmark analytics (multi-tenant aggregate).
 
-## Open questions
+## Decisions (v1)
 
-- Which reports are scheduled vs. on-demand, and on what cadence?
-- Warehouse/materialized views vs. live queries for heavy reports?
+- **Defined report catalog** (no custom builder in v1). Financial reports (revenue / overdue /
+  monthly) run on a **schedule** (1st & 15th per the spec) plus on-demand; others are on-demand.
+- Computed from **native data** with live queries in v1; materialized views/warehouse added if
+  report volume requires it.

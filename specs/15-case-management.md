@@ -140,8 +140,13 @@ drafting, QA sign-offs, RFE/NOID deadline management, and case-performance repor
 - Full Docketwise form auto-fill (see [16](16-documents.md)/[21](21-integrations.md)).
 - AI-generated declarations (drafting is human; AI assist is future).
 
-## Open questions
+## Decisions (v1)
 
-- Are packet stages/SLAs configurable per firm and per case type, or fixed defaults?
-- OCR engine for deadline extraction (UC30) — provider/approach.
-- Source of expected-completion timeframes per case type (config table?).
+Resolved in [03-architecture-and-scope](03-architecture-and-scope.md):
+
+- **Packet pipelines are fully custom per firm** — each tenant defines its own stages, per-stage
+  SLAs, and per-case-type completion timeframes in Settings (the spec's pipeline ships as a
+  starter template). The declaration lifecycle is likewise firm-configurable.
+- **RFE/NOID/denial due dates are entered manually** in v1 (OCR extraction, UC30, ships with the
+  document-AI fast-follow).
+- Expected-completion timeframes come from the firm's **case-type catalog** config.

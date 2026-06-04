@@ -88,8 +88,13 @@ Connect Lawfficient to the external systems an immigration firm depends on, and 
 - Bi-directional sync with tools the firm is migrating away from (one-time migration only).
 - A public integration marketplace.
 
-## Open questions
+## Decisions (v1)
 
-- API availability/auth for RingCentral, MyCase, Docketwise, Jotforms, and USCIS in v1.
-- USCIS lookup legality/mechanism and rate limits.
-- Which integrations are required at launch vs. fast-follow.
+Resolved in [03-architecture-and-scope](03-architecture-and-scope.md):
+
+- **No legal-tool integrations in v1.** RingCentral, MyCase migration, Docketwise + Jotforms, and
+  USCIS lookup are all **fast-follow**; the corresponding flows are manual in v1.
+- v1 infrastructure that is *not* deferred: **Stripe** (payments), **Twilio + Resend**
+  (messaging), and **Supabase** (data/auth/storage) — native platform services, not third-party
+  "integrations".
+- Integration credentials, when added, are stored encrypted and configured per firm in Settings.

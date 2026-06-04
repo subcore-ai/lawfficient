@@ -80,8 +80,13 @@ case workspace.
 - Native mobile app (mobile-friendly web first).
 - Client-to-client or multi-party case access.
 
-## Open questions
+## Decisions (v1)
 
-- Is the portal a separate Next.js app (`apps/portal`) or role-gated routes within `apps/app`?
-- Reuse of MyCase portal during migration vs. native portal at launch.
-- Auto-response policy and guardrails (what may the system answer without an LA?).
+Resolved in [03-architecture-and-scope](03-architecture-and-scope.md):
+
+- **The client portal is fast-follow, not v1.** When built it will be **native** (no MyCase
+  portal reuse).
+- Likely **role-gated routes within `apps/app`** (client role) sharing Supabase auth and
+  `@workspace/ui`; a separate `apps/portal` remains an option if isolation warrants it.
+- Auto-responses are limited to safe, non-legal acknowledgements; anything substantive escalates
+  to a Legal Assistant.

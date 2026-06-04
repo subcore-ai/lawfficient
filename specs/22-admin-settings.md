@@ -71,8 +71,13 @@ agreements), integration configuration, and firm-level settings. The control pla
 - Self-serve firm onboarding/billing (SaaS signup) for multi-tenant.
 - Granular field-level permission editor (start at module level).
 
-## Open questions
+## Decisions (v1)
 
-- Which settings are firm-configurable vs. system-fixed (packet SLAs, case-type timeframes)?
-- Multi-tenant: are templates/settings per-firm with platform defaults?
-- Template editing model: rich structured editor vs. PDF upload per kind.
+Resolved in [03-architecture-and-scope](03-architecture-and-scope.md):
+
+- **Firm-configurable** (per tenant, with seeded defaults): packet pipelines & SLAs, case-type
+  catalog & timeframes, consultation types & prices, cancellation policy, notification defaults,
+  quiet hours, and templates.
+- **Templates/settings are per-firm** with platform starter defaults.
+- **Template editing:** PDF upload for quote letters; structured sectioned editor for engagement
+  agreements (see [14-retention-engagement](14-retention-engagement.md)).

@@ -88,8 +88,12 @@ Indicative starting point; refined per-module.
 - [ ] A role with assigned users cannot be deleted.
 - [ ] File Clerk sees payment status but never invoice amounts.
 
-## Open questions
+## Decisions (v1)
 
-- Can a user hold multiple roles simultaneously, or exactly one role + optional lead flag?
-- Exact permission cells above are a starting proposal — confirm with firm management.
-- Is "Management" a distinct role or an attribute (e.g. `isManager`) layered on a base role?
+Resolved in [03-architecture-and-scope](03-architecture-and-scope.md):
+
+- **One base role per user** plus optional `isTeamLead` (pod visibility) and `isManager`
+  (firm-wide oversight) flags. The "… Team Lead" roles = base role + `isTeamLead`; "Management" =
+  `isManager`.
+- The permission matrix above is the **v1 baseline**; Admins can edit role permissions (UC25).
+- Authorization is enforced server-side and via **Supabase RLS** (tenant isolation by `firm_id`).

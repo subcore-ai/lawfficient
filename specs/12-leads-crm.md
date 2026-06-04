@@ -97,7 +97,12 @@ is the front door of the client lifecycle.
 - Automated lead scoring / AI prioritization.
 - Two-way social-DM inbox (capture source only at first).
 
-## Open questions
+## Decisions (v1)
 
-- Exact lead-assignment algorithm (round-robin, by language, by load?).
-- Which fields are required at first capture vs. enriched later?
+Resolved in [03-architecture-and-scope](03-architecture-and-scope.md):
+
+- **Lead assignment is manual** in v1 — new leads land in a shared queue and a lead/manager
+  assigns them. Automatic round-robin / load-balancing is fast-follow.
+- **Required at first capture:** first name, last name, and phone *or* email. Other intake fields
+  are enriched later.
+- Caller ID (UC2) is deferred with RingCentral; staff create/select records manually in v1.
