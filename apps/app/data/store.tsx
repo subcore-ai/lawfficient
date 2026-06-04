@@ -14,10 +14,12 @@ import {
   STAFF,
 } from "./index"
 import type {
+  AuditEntry,
   CaseType,
   Client,
   Consultation,
   DocItem,
+  EntityKind,
   ImmigrationCase,
   Invoice,
   Lead,
@@ -33,6 +35,26 @@ function nextId(prefix: string) {
   counter += 1
   return `${prefix}-${counter}`
 }
+
+// ---------------------------------------------------------------- Permissions
+
+export type Permission = "edit" | "delete" | "editFinancial" | "manageUsers"
+
+export function can(role: Role, action: Permission): boolean {
+  if (role === "admin") return true
+  switch (action) {
+    case "edit":
+      return role !== "file_clerk"
+    case "delete":
+      return role === "la_lead"
+    case "editFinancial":
+      return role === "accounts_receivable"
+    case "manageUsers":
+      return false
+  }
+}
+
+// ---------------------------------------------------------------- Inputs
 
 export type NewLeadInput = {
   firstName: string
@@ -69,6 +91,8 @@ export type NewDocumentInput = {
 
 export type NewUserInput = { name: string; email: string; role: Role }
 
+// ---------------------------------------------------------------- Store
+
 type Store = {
   leads: Lead[]
   consultations: Consultation[]
@@ -77,16 +101,30 @@ type Store = {
   invoices: Invoice[]
   documents: DocItem[]
   staff: StaffUser[]
+  auditLog: AuditEntry[]
+  currentRole: Role
+  setCurrentRole: (role: Role) => void
   addLead: (input: NewLeadInput) => Lead
-  updateLead: (id: string, patch: Partial<Lead>) => void
+  updateLead: (id: string, patch: Partial<Lead>, summary?: string) => void
   convertLead: (id: string) => void
   addConsultation: (input: NewConsultationInput) => Consultation
-  updateConsultation: (id: string, patch: Partial<Consultation>) => void
-  updateCase: (id: string, patch: Partial<ImmigrationCase>) => void
+  updateConsultation: (id: string, patch: Partial<Consultation>, summary?: string) => void
+  updateCase: (id: string, patch: Partial<ImmigrationCase>, summary?: string) => void
+  updateClient: (id: string, patch: Partial<Client>, summary?: string) => void
+  updateInvoice: (id: string, patch: Partial<Invoice>, summary?: string) => void
   addDocument: (input: NewDocumentInput) => DocItem
+  updateDocument: (id: string, patch: Partial<DocItem>, summary?: string) => void
   addStaff: (input: NewUserInput) => StaffUser
-  updateStaff: (id: string, patch: Partial<StaffUser>) => void
+  updateStaff: (id: string, patch: Partial<StaffUser>, summary?: string) => void
+  setArchived: (entity: EntityKind, id: string, archived: boolean, label: string) => void
+  addNote: (entity: EntityKind, id: string, label: string, text: string) => void
 }
+
+const SEED_AUDIT: AuditEntry[] = [
+  { id: "audit-1", entity: "case", entityId: "case4", label: "Mohammed Farah", action: "Flagged as Red Flag Client", byUserId: "system", at: "1 hr ago" },
+  { id: "audit-2", entity: "lead", entityId: "l3", label: "Liling Chen", action: "Booked a consultation", byUserId: "u9", at: "Yesterday" },
+  { id: "audit-3", entity: "client", entityId: "cl1", label: "Rosa Delgado", action: "Retainer payment received", byUserId: "u10", at: "2 days ago" },
+]
 
 const StoreContext = React.createContext<Store | null>(null)
 
@@ -101,11 +139,28 @@ export function MockStoreProvider({ children }: { children: React.ReactNode }) {
   const [consultations, setConsultations] = React.useState<Consultation[]>(CONSULTATIONS)
   const [clients, setClients] = React.useState<Client[]>(CLIENTS)
   const [cases, setCases] = React.useState<ImmigrationCase[]>(CASES)
-  const [invoices] = React.useState<Invoice[]>(INVOICES)
+  const [invoices, setInvoices] = React.useState<Invoice[]>(INVOICES)
   const [documents, setDocuments] = React.useState<DocItem[]>(DOCUMENTS)
   const [staff, setStaff] = React.useState<StaffUser[]>(STAFF)
+  const [auditLog, setAuditLog] = React.useState<AuditEntry[]>(SEED_AUDIT)
+  const [currentRole, setCurrentRole] = React.useState<Role>(CURRENT_USER.role)
+
+  const logAudit = React.useCallback(
+    (entity: EntityKind, entityId: string, label: string, action: string) => {
+      setAuditLog((prev) => [
+        { id: nextId("audit"), entity, entityId, label, action, byUserId: CURRENT_USER.id, at: "Just now" },
+        ...prev,
+      ])
+    },
+    [],
+  )
 
   const value = React.useMemo<Store>(() => {
+    const leadLabel = (id: string) => {
+      const l = leads.find((x) => x.id === id)
+      return l ? `${l.firstName} ${l.lastName}` : id
+    }
+
     return {
       leads,
       consultations,
@@ -114,6 +169,10 @@ export function MockStoreProvider({ children }: { children: React.ReactNode }) {
       invoices,
       documents,
       staff,
+      auditLog,
+      currentRole,
+      setCurrentRole,
+
       addLead: (input) => {
         const lead: Lead = {
           id: nextId("lead"),
@@ -121,43 +180,44 @@ export function MockStoreProvider({ children }: { children: React.ReactNode }) {
           qualification: "pending",
           createdAt: TODAY,
           lastActivity: TODAY,
-          hierarchy: undefined,
-          notes: undefined,
           ...input,
         }
         setLeads((prev) => [lead, ...prev])
+        logAudit("lead", lead.id, `${lead.firstName} ${lead.lastName}`, "Created lead")
         return lead
       },
-      updateLead: (id, patch) => {
-        setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, ...patch } : l)))
+      updateLead: (id, patch, summary = "Updated lead details") => {
+        setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, ...patch, lastActivity: TODAY } : l)))
+        logAudit("lead", id, leadLabel(id), summary)
       },
       convertLead: (id) => {
+        const lead = leads.find((l) => l.id === id)
         setLeads((prev) =>
           prev.map((l) =>
-            l.id === id ? { ...l, status: "retained", qualification: "qualified" } : l,
+            l.id === id ? { ...l, status: "retained", qualification: "qualified", lastActivity: TODAY } : l,
           ),
         )
-        setLeads((prev) => {
-          const lead = prev.find((l) => l.id === id)
-          if (lead) {
-            const la = STAFF.find((u) => u.role === "legal_assistant")
-            const client: Client = {
-              id: nextId("client"),
-              name: `${lead.firstName} ${lead.lastName}`,
-              caseType: lead.caseType ?? "Marriage-Based GC",
-              status: "active",
-              laId: la?.id ?? "u4",
-              dateHired: TODAY,
-              totalFees: 7500,
-              paid: 0,
-              balance: 7500,
-              paymentStatus: "current",
-            }
-            setClients((cs) => [client, ...cs])
+        if (lead) {
+          const la = STAFF.find((u) => u.role === "legal_assistant")
+          const name = `${lead.firstName} ${lead.lastName}`
+          const client: Client = {
+            id: nextId("client"),
+            name,
+            caseType: lead.caseType ?? "Marriage-Based GC",
+            status: "active",
+            laId: la?.id ?? "u4",
+            dateHired: TODAY,
+            totalFees: 7500,
+            paid: 0,
+            balance: 7500,
+            paymentStatus: "current",
           }
-          return prev
-        })
+          setClients((cs) => [client, ...cs])
+          logAudit("lead", id, name, "Converted to retained client")
+          logAudit("client", client.id, name, "Client created from lead")
+        }
       },
+
       addConsultation: (input) => {
         const consultation: Consultation = {
           id: nextId("consult"),
@@ -168,14 +228,33 @@ export function MockStoreProvider({ children }: { children: React.ReactNode }) {
           ...input,
         }
         setConsultations((prev) => [consultation, ...prev])
+        logAudit("consultation", consultation.id, consultation.leadName, "Booked consultation")
         return consultation
       },
-      updateConsultation: (id, patch) => {
+      updateConsultation: (id, patch, summary = "Updated consultation") => {
         setConsultations((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)))
+        const c = consultations.find((x) => x.id === id)
+        logAudit("consultation", id, c?.leadName ?? id, summary)
       },
-      updateCase: (id, patch) => {
+
+      updateCase: (id, patch, summary = "Updated case") => {
         setCases((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)))
+        const c = cases.find((x) => x.id === id)
+        logAudit("case", id, c?.clientName ?? id, summary)
       },
+
+      updateClient: (id, patch, summary = "Updated client") => {
+        setClients((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)))
+        const c = clients.find((x) => x.id === id)
+        logAudit("client", id, c?.name ?? id, summary)
+      },
+
+      updateInvoice: (id, patch, summary = "Updated invoice") => {
+        setInvoices((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch } : i)))
+        const i = invoices.find((x) => x.id === id)
+        logAudit("invoice", id, i ? `${i.number} · ${i.clientName}` : id, summary)
+      },
+
       addDocument: (input) => {
         const doc: DocItem = {
           id: nextId("doc"),
@@ -185,8 +264,15 @@ export function MockStoreProvider({ children }: { children: React.ReactNode }) {
           ...input,
         }
         setDocuments((prev) => [doc, ...prev])
+        logAudit("document", doc.id, doc.name, `Uploaded document for ${doc.clientName}`)
         return doc
       },
+      updateDocument: (id, patch, summary = "Updated document") => {
+        setDocuments((prev) => prev.map((d) => (d.id === id ? { ...d, ...patch } : d)))
+        const d = documents.find((x) => x.id === id)
+        logAudit("document", id, d?.name ?? id, summary)
+      },
+
       addStaff: (input) => {
         const user: StaffUser = {
           id: nextId("user"),
@@ -195,13 +281,32 @@ export function MockStoreProvider({ children }: { children: React.ReactNode }) {
           ...input,
         }
         setStaff((prev) => [...prev, user])
+        logAudit("user", user.id, user.name, "Invited user")
         return user
       },
-      updateStaff: (id, patch) => {
+      updateStaff: (id, patch, summary = "Updated user") => {
         setStaff((prev) => prev.map((u) => (u.id === id ? { ...u, ...patch } : u)))
+        const u = staff.find((x) => x.id === id)
+        logAudit("user", id, u?.name ?? id, summary)
+      },
+
+      setArchived: (entity, id, archived, label) => {
+        const flip = <T extends { id: string; archived?: boolean }>(rows: T[]) =>
+          rows.map((x) => (x.id === id ? { ...x, archived } : x))
+        if (entity === "lead") setLeads((p) => flip(p))
+        else if (entity === "consultation") setConsultations((p) => flip(p))
+        else if (entity === "client") setClients((p) => flip(p))
+        else if (entity === "case") setCases((p) => flip(p))
+        else if (entity === "invoice") setInvoices((p) => flip(p))
+        else if (entity === "document") setDocuments((p) => flip(p))
+        logAudit(entity, id, label, archived ? "Archived" : "Restored")
+      },
+
+      addNote: (entity, id, label, text) => {
+        logAudit(entity, id, label, `Note: ${text}`)
       },
     }
-  }, [leads, consultations, clients, cases, invoices, documents, staff])
+  }, [leads, consultations, clients, cases, invoices, documents, staff, auditLog, currentRole, logAudit])
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
 }

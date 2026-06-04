@@ -1,20 +1,23 @@
 "use client"
 
 import Link from "next/link"
-import { ArrowLeft, Mail, X } from "lucide-react"
+import { ArrowLeft, Mail, Pencil, X } from "lucide-react"
 
 import { Button } from "@workspace/ui/components/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card"
 import { Separator } from "@workspace/ui/components/separator"
 import { toast } from "@workspace/ui/components/sonner"
 
+import { ActivityTimeline } from "@/components/activity-timeline"
 import { ConfirmDialog } from "@/components/confirm-dialog"
+import { EditConsultationDialog } from "@/components/consultations/edit-consultation-dialog"
 import {
   PaymentDialog,
   ReceiptDialog,
   RescheduleDialog,
 } from "@/components/consultations/consultation-dialogs"
 import { DetailList, DetailRow } from "@/components/detail-list"
+import { EntityRowActions } from "@/components/entity-row-actions"
 import { StatusPill } from "@/components/status-pill"
 import { ToastButton } from "@/components/toast-button"
 import { staffName } from "@/data"
@@ -58,31 +61,43 @@ export function ConsultationDetail({ id }: { id: string }) {
             <StatusPill {...consultationStatusBadge(c.status)} />
             <StatusPill label={c.type} tone="neutral" />
             {c.caseType ? <StatusPill label={c.caseType} tone="info" /> : null}
+            {c.archived ? <StatusPill label="Archived" tone="neutral" /> : null}
           </div>
         </div>
-        {active ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <ToastButton variant="outline" size="sm" message="Confirmation resent" description={`Emailed to ${c.leadName}.`}>
-              <Mail className="size-4" /> Resend confirmation
-            </ToastButton>
-            <RescheduleDialog consultation={c} />
-            <ConfirmDialog
-              trigger={
-                <Button variant="destructive" size="sm">
-                  <X className="size-4" /> Cancel
-                </Button>
-              }
-              title="Cancel this consultation?"
-              description="The client and attorney will be notified and the slot freed up."
-              confirmLabel="Cancel consultation"
-              destructive
-              onConfirm={() => {
-                updateConsultation(c.id, { status: "canceled" })
-                toast.success("Consultation canceled", { description: "Notifications sent." })
-              }}
-            />
-          </div>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          {active ? (
+            <>
+              <ToastButton variant="outline" size="sm" message="Confirmation resent" description={`Emailed to ${c.leadName}.`}>
+                <Mail className="size-4" /> Resend
+              </ToastButton>
+              <RescheduleDialog consultation={c} />
+              <ConfirmDialog
+                trigger={
+                  <Button variant="destructive" size="sm">
+                    <X className="size-4" /> Cancel
+                  </Button>
+                }
+                title="Cancel this consultation?"
+                description="The client and attorney will be notified and the slot freed up."
+                confirmLabel="Cancel consultation"
+                destructive
+                onConfirm={() => {
+                  updateConsultation(c.id, { status: "canceled" }, "Canceled consultation")
+                  toast.success("Consultation canceled", { description: "Notifications sent." })
+                }}
+              />
+            </>
+          ) : null}
+          <EditConsultationDialog
+            consultation={c}
+            trigger={
+              <Button variant="outline" size="sm">
+                <Pencil className="size-4" /> Edit
+              </Button>
+            }
+          />
+          <EntityRowActions entity="consultation" id={c.id} label={c.leadName} archived={c.archived} />
+        </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
@@ -112,31 +127,42 @@ export function ConsultationDetail({ id }: { id: string }) {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Payment</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
-            <div>
-              <div className="text-2xl font-semibold tabular-nums">
-                {c.amount ? formatCurrency(c.amount) : "—"}
+        <div className="flex flex-col gap-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Payment</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              <div>
+                <div className="text-2xl font-semibold tabular-nums">
+                  {c.amount ? formatCurrency(c.amount) : "—"}
+                </div>
+                <div className="text-muted-foreground text-xs">
+                  {c.paid ? "Paid in full" : c.amount ? "Payment due" : "Unpaid consultation"}
+                </div>
               </div>
-              <div className="text-muted-foreground text-xs">
-                {c.paid ? "Paid in full" : c.amount ? "Payment due" : "Unpaid consultation"}
-              </div>
-            </div>
-            {c.paid ? (
-              <ReceiptDialog consultation={c} />
-            ) : c.status === "canceled" ? (
-              <p className="text-muted-foreground text-sm">Consultation canceled.</p>
-            ) : (
-              <div className="flex flex-col gap-2">
-                <PaymentDialog consultation={c} />
-                <PaymentDialog consultation={c} split />
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              {c.paid ? (
+                <ReceiptDialog consultation={c} />
+              ) : c.status === "canceled" ? (
+                <p className="text-muted-foreground text-sm">Consultation canceled.</p>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <PaymentDialog consultation={c} />
+                  <PaymentDialog consultation={c} split />
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Activity</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ActivityTimeline entity="consultation" id={c.id} label={c.leadName} />
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </>
   )

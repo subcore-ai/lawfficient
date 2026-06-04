@@ -1,6 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@workspace/ui/components/card"
 
 import { PageHeader } from "@/components/page-header"
+import { AuditLogCard } from "@/components/settings/audit-log-card"
 import {
   ConfigureIntegrationDialog,
   EditRoleDialog,
@@ -117,6 +118,8 @@ export default function SettingsPage() {
           ))}
         </CardContent>
       </Card>
+
+      <AuditLogCard />
     </>
   )
 }

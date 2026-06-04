@@ -1,5 +1,7 @@
 "use client"
 
+import * as React from "react"
+
 import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card"
 import {
   Table,
@@ -9,33 +11,43 @@ import {
   TableHeader,
   TableRow,
 } from "@workspace/ui/components/table"
+import { cn } from "@workspace/ui/lib/utils"
 
+import { EditDocumentDialog } from "@/components/documents/edit-document-dialog"
+import { EntityRowActions } from "@/components/entity-row-actions"
+import { InlineSelect } from "@/components/inline-select"
 import { ProgressBar } from "@/components/progress-bar"
+import { DOC_STATUS_OPTIONS } from "@/components/select-field"
+import { ShowArchivedToggle } from "@/components/show-archived-toggle"
 import { StatStrip } from "@/components/stat-strip"
-import { StatusPill, type Tone } from "@/components/status-pill"
 import { staffName } from "@/data"
 import { useStore } from "@/data/store"
 import type { DocItem } from "@/data/types"
 import { formatDate } from "@/lib/format"
 
-const DOC_STATUS: Record<DocItem["status"], { label: string; tone: Tone }> = {
-  pending: { label: "Pending", tone: "warning" },
-  submitted: { label: "Submitted", tone: "info" },
-  verified: { label: "Verified", tone: "success" },
-}
+const statusLabel = (v: string) => DOC_STATUS_OPTIONS.find((o) => o.value === v)?.label ?? v
 
 export function DocumentsView() {
-  const { documents, cases } = useStore()
-  const pending = documents.filter((d) => d.status === "pending").length
-  const verified = documents.filter((d) => d.status === "verified").length
-  const uscisMail = documents.filter((d) => d.docType === "RFE" || d.docType === "NOID").length
-  const checklists = cases.slice().sort((a, b) => a.checklistComplete - b.checklistComplete).slice(0, 4)
+  const { documents, cases, updateDocument } = useStore()
+  const [showArchived, setShowArchived] = React.useState(false)
+
+  const archivedCount = documents.filter((d) => d.archived).length
+  const active = documents.filter((d) => !d.archived)
+  const visible = documents.filter((d) => showArchived || !d.archived)
+  const pending = active.filter((d) => d.status === "pending").length
+  const verified = active.filter((d) => d.status === "verified").length
+  const uscisMail = active.filter((d) => d.docType === "RFE" || d.docType === "NOID").length
+  const checklists = cases
+    .filter((c) => !c.archived)
+    .slice()
+    .sort((a, b) => a.checklistComplete - b.checklistComplete)
+    .slice(0, 4)
 
   return (
     <>
       <StatStrip
         stats={[
-          { label: "Documents", value: documents.length },
+          { label: "Documents", value: active.length },
           { label: "Pending verification", value: pending, tone: pending ? "danger" : "default" },
           { label: "Verified", value: verified, tone: "success" },
           { label: "RFE / NOID received", value: uscisMail },
@@ -60,6 +72,10 @@ export function DocumentsView() {
         </CardContent>
       </Card>
 
+      <div className="flex justify-end">
+        <ShowArchivedToggle checked={showArchived} onChange={setShowArchived} count={archivedCount} />
+      </div>
+
       <div className="overflow-hidden rounded-lg ring-1 ring-foreground/10">
         <Table>
           <TableHeader>
@@ -70,11 +86,12 @@ export function DocumentsView() {
               <TableHead className="hidden xl:table-cell">Uploaded by</TableHead>
               <TableHead className="hidden sm:table-cell">Date</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead className="w-10" />
             </TableRow>
           </TableHeader>
           <TableBody>
-            {documents.map((d) => (
-              <TableRow key={d.id} className="hover:bg-muted/40">
+            {visible.map((d) => (
+              <TableRow key={d.id} className={cn("hover:bg-muted/40", d.archived && "opacity-50")}>
                 <TableCell>
                   <span className="font-medium">{d.name}</span>
                   <div className="text-muted-foreground text-xs md:hidden">{d.clientName}</div>
@@ -86,7 +103,23 @@ export function DocumentsView() {
                   {formatDate(d.uploadedAt)}
                 </TableCell>
                 <TableCell>
-                  <StatusPill {...DOC_STATUS[d.status]} />
+                  <InlineSelect
+                    value={d.status}
+                    options={DOC_STATUS_OPTIONS}
+                    ariaLabel="Status"
+                    onValueChange={(v) =>
+                      updateDocument(d.id, { status: v as DocItem["status"] }, `Status → ${statusLabel(v)}`)
+                    }
+                  />
+                </TableCell>
+                <TableCell>
+                  <EntityRowActions
+                    entity="document"
+                    id={d.id}
+                    label={d.name}
+                    archived={d.archived}
+                    editDialog={(p) => <EditDocumentDialog document={d} {...p} />}
+                  />
                 </TableCell>
               </TableRow>
             ))}

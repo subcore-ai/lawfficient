@@ -88,6 +88,7 @@ export type Lead = {
   createdAt: string
   lastActivity: string
   notes?: string
+  archived?: boolean
 }
 
 export type Interaction = {
@@ -123,6 +124,7 @@ export type Consultation = {
   timeZone: string
   caseType?: CaseType
   bookedById: string
+  archived?: boolean
 }
 
 // ---- Case management ----
@@ -160,6 +162,7 @@ export type ImmigrationCase = {
   expectedMailing: string
   checklistComplete: number // 0-100
   openDeadlines: number
+  archived?: boolean
 }
 
 export type Deadline = {
@@ -199,6 +202,7 @@ export type Client = {
   paid: number
   balance: number
   paymentStatus: "current" | "overdue" | "paid" | "payment_arrangement"
+  archived?: boolean
 }
 
 // ---- Billing ----
@@ -227,6 +231,7 @@ export type Invoice = {
   dueAt: string
   createdAt: string
   monthsBehind?: number
+  archived?: boolean
 }
 
 // ---- Documents ----
@@ -241,6 +246,7 @@ export type DocItem = {
   uploadedById: string
   uploadedAt: string
   status: "pending" | "submitted" | "verified"
+  archived?: boolean
 }
 
 // ---- Activity & notifications ----
@@ -250,6 +256,27 @@ export type Activity = {
   kind: "lead" | "consultation" | "payment" | "case" | "document" | "message"
   text: string
   byId?: string
+  at: string
+}
+
+// ---- Audit / change log ----
+
+export type EntityKind =
+  | "lead"
+  | "consultation"
+  | "client"
+  | "case"
+  | "invoice"
+  | "document"
+  | "user"
+
+export type AuditEntry = {
+  id: string
+  entity: EntityKind
+  entityId: string
+  label: string
+  action: string
+  byUserId: string
   at: string
 }
 

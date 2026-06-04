@@ -4,7 +4,6 @@ import * as React from "react"
 import Link from "next/link"
 import { Search } from "lucide-react"
 
-import { Avatar, AvatarFallback } from "@workspace/ui/components/avatar"
 import { Input } from "@workspace/ui/components/input"
 import {
   Select,
@@ -21,29 +20,38 @@ import {
   TableHeader,
   TableRow,
 } from "@workspace/ui/components/table"
+import { cn } from "@workspace/ui/lib/utils"
 
+import { EntityRowActions } from "@/components/entity-row-actions"
+import { InlineSelect } from "@/components/inline-select"
+import { EditLeadDialog } from "@/components/leads/edit-lead-dialog"
+import { ShowArchivedToggle } from "@/components/show-archived-toggle"
 import { StatusPill } from "@/components/status-pill"
-import { LEAD_STATUS_LABELS, PIPELINE, staffById, staffName } from "@/data"
+import { LEAD_STATUS_LABELS, PIPELINE, STAFF, staffName } from "@/data"
 import { useStore } from "@/data/store"
-import type { Lead } from "@/data/types"
+import type { LeadStatus } from "@/data/types"
 import { formatDate } from "@/lib/format"
-import { leadStatusBadge, qualificationBadge } from "@/lib/status"
+import { qualificationBadge } from "@/lib/status"
 
-const STATUS_OPTIONS = Object.entries(LEAD_STATUS_LABELS) as [Lead["status"], string][]
+const STATUS_OPTIONS = Object.entries(LEAD_STATUS_LABELS).map(([value, label]) => ({ value, label }))
+const SALES_OPTIONS = STAFF.filter((u) => u.role === "sales").map((u) => ({ value: u.id, label: u.name }))
 const SOURCES = ["WhatsApp", "Facebook", "Instagram", "Call Rails", "Website", "Referral"]
 
 export function LeadsTable() {
-  const { leads } = useStore()
+  const { leads, updateLead } = useStore()
   const [query, setQuery] = React.useState("")
   const [status, setStatus] = React.useState("all")
   const [source, setSource] = React.useState("all")
+  const [showArchived, setShowArchived] = React.useState(false)
 
+  const archivedCount = leads.filter((l) => l.archived).length
   const counts = PIPELINE.map((stage) => ({
     ...stage,
-    count: leads.filter((l) => l.status === stage.key).length,
+    count: leads.filter((l) => !l.archived && l.status === stage.key).length,
   }))
 
   const filtered = leads.filter((l) => {
+    if (!showArchived && l.archived) return false
     const haystack = `${l.firstName} ${l.lastName} ${l.email} ${l.phone} ${l.city}`.toLowerCase()
     return (
       (query === "" || haystack.includes(query.toLowerCase())) &&
@@ -80,9 +88,9 @@ export function LeadsTable() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All statuses</SelectItem>
-              {STATUS_OPTIONS.map(([value, label]) => (
-                <SelectItem key={value} value={value}>
-                  {label}
+              {STATUS_OPTIONS.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -101,9 +109,12 @@ export function LeadsTable() {
             </SelectContent>
           </Select>
         </div>
-        <span className="text-muted-foreground text-xs sm:ml-auto">
-          {filtered.length} of {leads.length}
-        </span>
+        <div className="flex items-center gap-3 sm:ml-auto">
+          <ShowArchivedToggle checked={showArchived} onChange={setShowArchived} count={archivedCount} />
+          <span className="text-muted-foreground text-xs">
+            {filtered.length} of {leads.length}
+          </span>
+        </div>
       </div>
 
       <div className="overflow-hidden rounded-lg ring-1 ring-foreground/10">
@@ -112,16 +123,16 @@ export function LeadsTable() {
             <TableRow className="bg-muted/40">
               <TableHead>Name</TableHead>
               <TableHead className="hidden md:table-cell">Source</TableHead>
-              <TableHead className="hidden lg:table-cell">Case type</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="hidden xl:table-cell">Qualification</TableHead>
               <TableHead className="hidden lg:table-cell">Assigned</TableHead>
               <TableHead className="hidden sm:table-cell">Created</TableHead>
+              <TableHead className="w-10" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {filtered.map((l) => (
-              <TableRow key={l.id} className="hover:bg-muted/40">
+              <TableRow key={l.id} className={cn("hover:bg-muted/40", l.archived && "opacity-50")}>
                 <TableCell>
                   <Link href={`/leads/${l.id}`} className="font-medium hover:underline">
                     {l.firstName} {l.lastName}
@@ -129,25 +140,38 @@ export function LeadsTable() {
                   <div className="text-muted-foreground text-xs">{l.email}</div>
                 </TableCell>
                 <TableCell className="text-muted-foreground hidden md:table-cell">{l.source}</TableCell>
-                <TableCell className="hidden lg:table-cell">{l.caseType ?? "—"}</TableCell>
                 <TableCell>
-                  <StatusPill {...leadStatusBadge(l.status)} />
+                  <InlineSelect
+                    value={l.status}
+                    options={STATUS_OPTIONS}
+                    ariaLabel="Status"
+                    onValueChange={(v) =>
+                      updateLead(l.id, { status: v as LeadStatus }, `Status → ${LEAD_STATUS_LABELS[v as LeadStatus]}`)
+                    }
+                  />
                 </TableCell>
                 <TableCell className="hidden xl:table-cell">
                   <StatusPill {...qualificationBadge(l.qualification)} />
                 </TableCell>
                 <TableCell className="hidden lg:table-cell">
-                  <div className="flex items-center gap-2">
-                    <Avatar className="size-6 rounded-md">
-                      <AvatarFallback className="rounded-md text-[10px]">
-                        {staffById(l.assignedToId)?.initials ?? "?"}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="text-sm">{staffName(l.assignedToId)}</span>
-                  </div>
+                  <InlineSelect
+                    value={l.assignedToId}
+                    options={SALES_OPTIONS}
+                    ariaLabel="Assignee"
+                    onValueChange={(v) => updateLead(l.id, { assignedToId: v }, `Reassigned to ${staffName(v)}`)}
+                  />
                 </TableCell>
                 <TableCell className="text-muted-foreground hidden text-sm sm:table-cell">
                   {formatDate(l.createdAt)}
+                </TableCell>
+                <TableCell>
+                  <EntityRowActions
+                    entity="lead"
+                    id={l.id}
+                    label={`${l.firstName} ${l.lastName}`}
+                    archived={l.archived}
+                    editDialog={(p) => <EditLeadDialog lead={l} {...p} />}
+                  />
                 </TableCell>
               </TableRow>
             ))}

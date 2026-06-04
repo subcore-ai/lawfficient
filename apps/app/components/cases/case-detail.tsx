@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { ArrowLeft, ArrowRight } from "lucide-react"
+import { ArrowLeft, ArrowRight, Pencil } from "lucide-react"
 
 import { Button } from "@workspace/ui/components/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card"
@@ -9,21 +9,29 @@ import { Separator } from "@workspace/ui/components/separator"
 import { toast } from "@workspace/ui/components/sonner"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/components/tabs"
 
+import { ActivityTimeline } from "@/components/activity-timeline"
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import { DeclarationTab } from "@/components/cases/declaration-tab"
 import { DocumentChecklist } from "@/components/cases/document-checklist"
+import { EditCaseDialog } from "@/components/cases/edit-case-dialog"
 import { QaChecklist } from "@/components/cases/qa-checklist"
 import { SignOffs } from "@/components/cases/sign-offs"
 import { SendUpdateDialog } from "@/components/cases/send-update-dialog"
 import { DetailList, DetailRow } from "@/components/detail-list"
+import { EntityRowActions } from "@/components/entity-row-actions"
+import { InlineSelect } from "@/components/inline-select"
 import { UploadDocumentDialog } from "@/components/documents/upload-document-dialog"
 import { ProgressBar } from "@/components/progress-bar"
+import { CASE_STATUS_OPTIONS } from "@/components/select-field"
 import { StageTracker } from "@/components/stage-tracker"
 import { StatusPill } from "@/components/status-pill"
 import { DEADLINES, PACKET_STAGES, staffName, TASKS } from "@/data"
 import { useStore } from "@/data/store"
+import type { CaseStatus } from "@/data/types"
 import { formatDate } from "@/lib/format"
-import { caseStatusBadge, deadlineBadge, priorityBadge, redFlagBadge } from "@/lib/status"
+import { deadlineBadge, priorityBadge, redFlagBadge } from "@/lib/status"
+
+const statusLabel = (v: string) => CASE_STATUS_OPTIONS.find((o) => o.value === v)?.label ?? v
 
 export function CaseDetail({ id }: { id: string }) {
   const { cases, updateCase } = useStore()
@@ -62,13 +70,27 @@ export function CaseDetail({ id }: { id: string }) {
           <h1 className="text-2xl font-semibold tracking-tight">{c.clientName}</h1>
           <div className="flex flex-wrap items-center gap-2">
             <StatusPill label={c.caseType} tone="neutral" />
-            <StatusPill {...caseStatusBadge(c.status)} />
+            <InlineSelect
+              value={c.status}
+              options={CASE_STATUS_OPTIONS}
+              ariaLabel="Status"
+              onValueChange={(v) => updateCase(c.id, { status: v as CaseStatus }, `Status → ${statusLabel(v)}`)}
+            />
             {flag ? <StatusPill {...flag} dot /> : null}
+            {c.archived ? <StatusPill label="Archived" tone="neutral" /> : null}
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <UploadDocumentDialog defaultClientName={c.clientName} defaultCaseType={c.caseType} caseId={c.id} />
           <SendUpdateDialog clientName={c.clientName} />
+          <EditCaseDialog
+            caseItem={c}
+            trigger={
+              <Button variant="outline" size="sm">
+                <Pencil className="size-4" /> Edit
+              </Button>
+            }
+          />
           {c.stage < 10 ? (
             <ConfirmDialog
               trigger={
@@ -80,13 +102,14 @@ export function CaseDetail({ id }: { id: string }) {
               description="Confirm the sign-off sheet is uploaded. The next owner will be notified and a task created."
               confirmLabel="Advance stage"
               onConfirm={() => {
-                updateCase(c.id, { stage: c.stage + 1 })
+                updateCase(c.id, { stage: c.stage + 1 }, `Advanced to stage ${c.stage + 1}`)
                 toast.success(`Advanced to stage ${c.stage + 1}`, {
                   description: "Next owner notified; a task was created.",
                 })
               }}
             />
           ) : null}
+          <EntityRowActions entity="case" id={c.id} label={c.clientName} archived={c.archived} />
         </div>
       </div>
 
@@ -168,14 +191,24 @@ export function CaseDetail({ id }: { id: string }) {
               ) : null}
             </div>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Packet stage</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <StageTracker stages={PACKET_STAGES} current={c.stage} />
-              </CardContent>
-            </Card>
+            <div className="flex flex-col gap-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Packet stage</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <StageTracker stages={PACKET_STAGES} current={c.stage} />
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Activity</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ActivityTimeline entity="case" id={c.id} label={c.clientName} seedDate={c.dateHired} />
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </TabsContent>
 
