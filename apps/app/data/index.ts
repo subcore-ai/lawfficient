@@ -4,6 +4,7 @@
 
 import type {
   Activity,
+  CaseType,
   Client,
   Consultation,
   DocItem,
@@ -271,3 +272,49 @@ export const CASE_TYPE_MIX: { name: string; value: number; fill: string }[] = [
   { name: "Family-Based", value: 14, fill: "var(--chart-4)" },
   { name: "Other", value: 8, fill: "var(--chart-5)" },
 ]
+
+// ---------------------------------------------------------------- Case workspace
+
+export const DECLARATION_STAGES = [
+  "Drafting",
+  "First QA review",
+  "Supplemental intake",
+  "Revision by creative writer",
+  "Second QA review",
+  "Upload for client review",
+  "Final QA review",
+  "Final approval & signature",
+  "Completed & uploaded",
+] as const
+
+export const QA_CHECKLIST: { label: string; ref?: string }[] = [
+  { label: "All USCIS forms are signed and dated" },
+  { label: "Filing fees / fee waivers are correct", ref: "Fee schedule" },
+  { label: "G-28 attached for the attorney of record" },
+  { label: "Evidence is indexed and tabbed" },
+  { label: "Addresses are consistent across all forms" },
+  { label: "Cover letter and table of contents included" },
+  { label: "Translations certified where required", ref: "8 CFR 103.2(b)(3)" },
+]
+
+const BASE_DOCS = [
+  "Government-issued photo ID",
+  "Passport bio page",
+  "Birth certificate",
+  "Proof of current address",
+  "Two passport photos",
+]
+
+const DOCS_BY_TYPE: Partial<Record<CaseType, string[]>> = {
+  "Marriage-Based GC": ["Marriage certificate", "Evidence of bona fide marriage", "Spouse's proof of status"],
+  "VAWA (AOS)": ["Evidence of abuse", "Affidavit of good moral character", "Proof of shared residence"],
+  "VAWA (Abeyance)": ["Evidence of abuse", "Affidavit of good moral character"],
+  "N-400 Naturalization": ["Green card (front & back)", "Travel history (5 years)", "Tax transcripts"],
+  "Removal of Conditions": ["Joint financial records", "Lease or mortgage", "Photos together over time"],
+  "Family-Based Petition": ["Proof of qualifying relationship", "Petitioner's proof of status"],
+  "NVC Case": ["Civil documents", "Affidavit of support (I-864)", "Police certificates"],
+}
+
+export function documentChecklistFor(caseType: CaseType): string[] {
+  return [...BASE_DOCS, ...(DOCS_BY_TYPE[caseType] ?? [])]
+}

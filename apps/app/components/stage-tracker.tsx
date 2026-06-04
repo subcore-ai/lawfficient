@@ -2,16 +2,22 @@ import { Check } from "lucide-react"
 
 import { cn } from "@workspace/ui/lib/utils"
 
-import { PACKET_STAGES } from "@/data"
-
-export function PacketStageTracker({ current }: { current: number }) {
+export function StageTracker({
+  stages,
+  current,
+  inProgressLabel = "In progress",
+}: {
+  stages: readonly string[]
+  current: number
+  inProgressLabel?: string
+}) {
   return (
     <ol className="flex flex-col">
-      {PACKET_STAGES.map((label, i) => {
+      {stages.map((label, i) => {
         const n = i + 1
         const done = n < current
         const active = n === current
-        const last = n === PACKET_STAGES.length
+        const last = n === stages.length
         return (
           <li key={i} className="flex gap-3">
             <div className="flex flex-col items-center">
@@ -25,9 +31,7 @@ export function PacketStageTracker({ current }: { current: number }) {
               >
                 {done ? <Check className="size-3.5" /> : n}
               </span>
-              {last ? null : (
-                <span className={cn("w-px flex-1", done ? "bg-primary" : "bg-border")} />
-              )}
+              {last ? null : <span className={cn("w-px flex-1", done ? "bg-primary" : "bg-border")} />}
             </div>
             <div className={cn("pb-4", last && "pb-0")}>
               <p
@@ -38,7 +42,7 @@ export function PacketStageTracker({ current }: { current: number }) {
               >
                 {label}
               </p>
-              {active ? <p className="text-primary text-xs">In progress</p> : null}
+              {active ? <p className="text-primary text-xs">{inProgressLabel}</p> : null}
             </div>
           </li>
         )
