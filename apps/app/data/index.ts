@@ -2,10 +2,12 @@
 // Deterministic (fixed dates/strings) so server and client renders match.
 // Reference date for the dataset: 2026-06-04.
 
+import { PACKET_STAGES } from "./types"
 import type {
   Activity,
   CaseType,
   Client,
+  PacketStage,
   Consultation,
   DocItem,
   Deadline,
@@ -318,3 +320,13 @@ const DOCS_BY_TYPE: Partial<Record<CaseType, string[]>> = {
 export function documentChecklistFor(caseType: CaseType): string[] {
   return [...BASE_DOCS, ...(DOCS_BY_TYPE[caseType] ?? [])]
 }
+
+// Firm-wide packet pipeline default (seeded from PACKET_STAGES + spec SLAs, UC19).
+// Per-case-type overrides will layer on later, falling back to this firm-wide default.
+const PACKET_SLA_DAYS = [20, 5, 3, 7, 2, 14, 2, 1, 1, 1]
+
+export const DEFAULT_PACKET_PIPELINE: PacketStage[] = PACKET_STAGES.map((name, i) => ({
+  id: `ps${i + 1}`,
+  name,
+  slaDays: PACKET_SLA_DAYS[i] ?? 1,
+}))

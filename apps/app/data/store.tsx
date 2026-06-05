@@ -8,6 +8,7 @@ import {
   CLIENTS,
   CONSULTATIONS,
   CURRENT_USER,
+  DEFAULT_PACKET_PIPELINE,
   DOCUMENTS,
   INVOICES,
   LEADS,
@@ -24,6 +25,7 @@ import type {
   Invoice,
   Lead,
   LeadSource,
+  PacketStage,
   Role,
   StaffUser,
 } from "./types"
@@ -118,6 +120,13 @@ type Store = {
   updateStaff: (id: string, patch: Partial<StaffUser>, summary?: string) => void
   setArchived: (entity: EntityKind, id: string, archived: boolean, label: string) => void
   addNote: (entity: EntityKind, id: string, label: string, text: string) => void
+  packetPipeline: PacketStage[]
+  pipelineFor: (caseType?: CaseType) => PacketStage[]
+  addPacketStage: () => void
+  updatePacketStage: (id: string, patch: Partial<PacketStage>) => void
+  removePacketStage: (id: string) => void
+  movePacketStage: (id: string, dir: -1 | 1) => void
+  resetPacketPipeline: () => void
 }
 
 const SEED_AUDIT: AuditEntry[] = [
@@ -144,6 +153,7 @@ export function MockStoreProvider({ children }: { children: React.ReactNode }) {
   const [staff, setStaff] = React.useState<StaffUser[]>(STAFF)
   const [auditLog, setAuditLog] = React.useState<AuditEntry[]>(SEED_AUDIT)
   const [currentRole, setCurrentRole] = React.useState<Role>(CURRENT_USER.role)
+  const [packetPipeline, setPacketPipeline] = React.useState<PacketStage[]>(DEFAULT_PACKET_PIPELINE)
 
   const logAudit = React.useCallback(
     (entity: EntityKind, entityId: string, label: string, action: string) => {
@@ -305,8 +315,29 @@ export function MockStoreProvider({ children }: { children: React.ReactNode }) {
       addNote: (entity, id, label, text) => {
         logAudit(entity, id, label, `Note: ${text}`)
       },
+
+      packetPipeline,
+      // Firm-wide pipeline for now; per-case-type overrides will branch here later.
+      pipelineFor: () => packetPipeline,
+      addPacketStage: () =>
+        setPacketPipeline((prev) => [...prev, { id: nextId("ps"), name: "New stage", slaDays: 1 }]),
+      updatePacketStage: (id, patch) =>
+        setPacketPipeline((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s))),
+      removePacketStage: (id) => setPacketPipeline((prev) => prev.filter((s) => s.id !== id)),
+      movePacketStage: (id, dir) =>
+        setPacketPipeline((prev) => {
+          const i = prev.findIndex((s) => s.id === id)
+          const j = i + dir
+          if (i < 0 || j < 0 || j >= prev.length) return prev
+          const next = prev.slice()
+          const a = next[i]!
+          next[i] = next[j]!
+          next[j] = a
+          return next
+        }),
+      resetPacketPipeline: () => setPacketPipeline(DEFAULT_PACKET_PIPELINE),
     }
-  }, [leads, consultations, clients, cases, invoices, documents, staff, auditLog, currentRole, logAudit])
+  }, [leads, consultations, clients, cases, invoices, documents, staff, auditLog, currentRole, packetPipeline, logAudit])
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
 }

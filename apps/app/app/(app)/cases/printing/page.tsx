@@ -17,13 +17,13 @@ import {
 import { PageHeader } from "@/components/page-header"
 import { StatStrip } from "@/components/stat-strip"
 import { StatusPill } from "@/components/status-pill"
-import { PACKET_STAGES, staffName } from "@/data"
+import { staffName } from "@/data"
 import { useStore } from "@/data/store"
 
 export default function PrintingQueuePage() {
-  const { cases, updateCase } = useStore()
+  const { cases, updateCase, packetPipeline } = useStore()
   const queue = cases.filter((c) => c.stage >= 6).slice().sort((a, b) => b.stage - a.stage)
-  const mailed = queue.filter((c) => c.stage >= 10).length
+  const mailed = queue.filter((c) => c.stage >= packetPipeline.length).length
 
   return (
     <>
@@ -68,7 +68,7 @@ export default function PrintingQueuePage() {
               </TableRow>
             ) : (
               queue.map((c) => {
-                const isMailed = c.stage >= 10
+                const isMailed = c.stage >= packetPipeline.length
                 return (
                   <TableRow key={c.id} className="hover:bg-muted/40">
                     <TableCell>
@@ -78,8 +78,8 @@ export default function PrintingQueuePage() {
                     </TableCell>
                     <TableCell className="hidden md:table-cell">{c.caseType}</TableCell>
                     <TableCell>
-                      <div className="text-sm">Stage {c.stage}/10</div>
-                      <div className="text-muted-foreground text-xs">{PACKET_STAGES[c.stage - 1] ?? ""}</div>
+                      <div className="text-sm">Stage {c.stage}/{packetPipeline.length}</div>
+                      <div className="text-muted-foreground text-xs">{packetPipeline[c.stage - 1]?.name ?? ""}</div>
                     </TableCell>
                     <TableCell className="hidden text-sm lg:table-cell">{staffName(c.laId)}</TableCell>
                     <TableCell>
@@ -99,7 +99,7 @@ export default function PrintingQueuePage() {
                           variant="outline"
                           size="sm"
                           onClick={() => {
-                            updateCase(c.id, { stage: 10, status: "filed" })
+                            updateCase(c.id, { stage: packetPipeline.length, status: "filed" })
                             toast.success("Packet mailed to USCIS", {
                               description: `Tracking number saved for ${c.clientName}.`,
                             })

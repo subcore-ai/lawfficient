@@ -85,8 +85,9 @@ custom/ad-hoc report builder.
 
 Tenants configure (with seeded starter defaults where noted), via Admin → Settings:
 
-- **Packet pipelines**: stages, per-stage SLAs, and per-case-type completion timeframes —
-  **fully custom per firm** (not a fixed shared pipeline).
+- **Packet pipelines**: ordered stages + per-stage SLA days, **firm-configurable** in Settings.
+  v1 ships **one firm-wide pipeline** (seeded from the 10-stage default); **per-case-type
+  pipelines** are a planned extension that inherit the firm-wide pipeline as the **default**.
 - **Case-type catalog** (names, filing-fee applicability, declaration requirement, timeframes).
 - **Consultation types & prices**.
 - **Cancellation policy** (fee on/off & amount, rebooking/approval limits) — **per tenant**.

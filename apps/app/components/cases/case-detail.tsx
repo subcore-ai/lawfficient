@@ -25,7 +25,7 @@ import { ProgressBar } from "@/components/progress-bar"
 import { CASE_STATUS_OPTIONS } from "@/components/select-field"
 import { StageTracker } from "@/components/stage-tracker"
 import { StatusPill } from "@/components/status-pill"
-import { DEADLINES, PACKET_STAGES, staffName, TASKS } from "@/data"
+import { DEADLINES, staffName, TASKS } from "@/data"
 import { useStore } from "@/data/store"
 import type { CaseStatus } from "@/data/types"
 import { formatDate } from "@/lib/format"
@@ -34,7 +34,7 @@ import { deadlineBadge, priorityBadge, redFlagBadge } from "@/lib/status"
 const statusLabel = (v: string) => CASE_STATUS_OPTIONS.find((o) => o.value === v)?.label ?? v
 
 export function CaseDetail({ id }: { id: string }) {
-  const { cases, updateCase } = useStore()
+  const { cases, updateCase, pipelineFor } = useStore()
   const c = cases.find((x) => x.id === id)
 
   if (!c) {
@@ -51,6 +51,7 @@ export function CaseDetail({ id }: { id: string }) {
     )
   }
 
+  const pipeline = pipelineFor(c.caseType)
   const tasks = TASKS.filter((t) => t.caseId === c.id)
   const deadlines = DEADLINES.filter((d) => d.caseId === c.id)
   const flag = redFlagBadge(c.redFlag)
@@ -91,7 +92,7 @@ export function CaseDetail({ id }: { id: string }) {
               </Button>
             }
           />
-          {c.stage < 10 ? (
+          {c.stage < pipeline.length ? (
             <ConfirmDialog
               trigger={
                 <Button size="sm">
@@ -137,7 +138,7 @@ export function CaseDetail({ id }: { id: string }) {
                     <DetailRow label="Attorney">{staffName(c.attorneyId)}</DetailRow>
                     <DetailRow label="Date hired">{formatDate(c.dateHired)}</DetailRow>
                     <DetailRow label="Expected mailing">{formatDate(c.expectedMailing)}</DetailRow>
-                    <DetailRow label="Packet stage">Stage {c.stage} of 10</DetailRow>
+                    <DetailRow label="Packet stage">Stage {c.stage} of {pipeline.length}</DetailRow>
                   </DetailList>
                   <Separator className="my-5" />
                   <div className="flex items-center justify-between text-sm">
@@ -197,7 +198,7 @@ export function CaseDetail({ id }: { id: string }) {
                   <CardTitle>Packet stage</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <StageTracker stages={PACKET_STAGES} current={c.stage} />
+                  <StageTracker stages={pipeline.map((s) => s.name)} current={c.stage} />
                 </CardContent>
               </Card>
               <Card>

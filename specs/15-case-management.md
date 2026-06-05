@@ -93,6 +93,10 @@ drafting, QA sign-offs, RFE/NOID deadline management, and case-performance repor
   red-flag summary (feeds [20-reporting](20-reporting-analytics.md)).
 - **FR-cases-14** — Reassignment mid-stage updates the responsible owner everywhere.
 - **FR-cases-15** — Custom fields on cases and packets (NFR maintainability).
+- **FR-cases-16** — The **packet pipeline** (ordered stages + per-stage SLA days) is
+  **firm-configurable** in Settings; the stage tracker, cases list, and printing queue render
+  from the firm's pipeline. v1 edits a single **firm-wide** pipeline; a **per-case-type** override
+  layer is planned, inheriting the firm-wide pipeline as the default.
 
 ## Data model
 
@@ -144,9 +148,11 @@ drafting, QA sign-offs, RFE/NOID deadline management, and case-performance repor
 
 Resolved in [03-architecture-and-scope](03-architecture-and-scope.md):
 
-- **Packet pipelines are fully custom per firm** — each tenant defines its own stages, per-stage
-  SLAs, and per-case-type completion timeframes in Settings (the spec's pipeline ships as a
-  starter template). The declaration lifecycle is likewise firm-configurable.
+- **Packet pipelines are firm-configurable.** v1 ships **one firm-wide pipeline** — ordered
+  stages + per-stage SLA days, edited in **Settings → Packet pipeline**, seeded from the spec's
+  10-stage template. **Per-case-type pipelines** are a planned extension: a case type may define
+  its own pipeline, otherwise it inherits the firm-wide pipeline as the **default**. The
+  declaration lifecycle is likewise firm-configurable.
 - **RFE/NOID/denial due dates are entered manually** in v1 (OCR extraction, UC30, ships with the
   document-AI fast-follow).
 - Expected-completion timeframes come from the firm's **case-type catalog** config.

@@ -142,6 +142,8 @@ export const PACKET_STAGES = [
   "Packet mailed",
 ] as const
 
+export type PacketStage = { id: string; name: string; slaDays: number }
+
 export type RedFlag = "none" | "red_flag_client" | "red_flag_packet"
 
 export type CaseStatus = "onboarding" | "packet_prep" | "in_review" | "filed" | "rfe" | "approved"

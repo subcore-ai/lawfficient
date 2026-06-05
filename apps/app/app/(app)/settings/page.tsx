@@ -8,6 +8,7 @@ import {
   InviteUserDialog,
   ManageTemplateDialog,
 } from "@/components/settings/settings-dialogs"
+import { PacketPipelineSettings } from "@/components/settings/packet-pipeline-settings"
 import { UsersTable } from "@/components/settings/users-table"
 import { StatusPill } from "@/components/status-pill"
 import { ROLE_LABELS } from "@/data"
@@ -95,6 +96,8 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       </div>
+
+      <PacketPipelineSettings />
 
       <Card>
         <CardHeader>

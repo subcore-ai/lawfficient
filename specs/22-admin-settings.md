@@ -35,6 +35,10 @@ agreements), integration configuration, and firm-level settings. The control pla
   these are configurable — see open questions).
 - **FR-admin-7** — All admin actions are **audit-logged** (NFR §4.3), including deletions with
   user + IP.
+- **FR-admin-8** — **Packet pipeline editor**: add, rename, reorder, and remove packet stages and
+  set each stage's SLA (turnaround days), with a total expected-turnaround readout. v1 edits a
+  single **firm-wide** pipeline (the default); a **per-case-type** override layer is planned.
+  Admin-only; changes apply live to the stage tracker, cases list, and printing queue.
 
 ## Data model
 
@@ -42,7 +46,8 @@ agreements), integration configuration, and firm-level settings. The control pla
 - **Template** — see [14-retention-engagement](14-retention-engagement.md) (`kind`, `sections`/
   `file`, `conditionalRules`, `isActive`, `archivedAt`).
 - **FirmSettings** — `id`, `name`, `caseTypes[]{name, expectedCompletionDays, requiresFilingFee,
-  requiresDeclaration}`, `packetStageSlas[]`, `consultationTypes[]{name, price, paid}`,
+  requiresDeclaration}`, `packetPipeline[]{id, name, slaDays}` (firm-wide; per-case-type override
+  map planned), `consultationTypes[]{name, price, paid}`,
   `notificationDefaults`.
 - **AuditLog** — see [02-roles-and-permissions](02-roles-and-permissions.md).
 
@@ -54,6 +59,7 @@ agreements), integration configuration, and firm-level settings. The control pla
 - `/settings/templates` — quote-letter & EA template management.
 - `/settings/integrations` — provider configuration ([21](21-integrations.md)).
 - `/settings/case-types` — case-type catalog, SLAs, timeframes.
+- `/settings` *(Packet pipeline card)* — firm-wide packet stages & per-stage SLAs (per-case-type override planned).
 - `/settings/audit-log` — critical-action audit trail.
 
 ## Acceptance criteria
@@ -65,6 +71,8 @@ agreements), integration configuration, and firm-level settings. The control pla
       required section.
 - [ ] Integrations can be connected/monitored; credentials are encrypted.
 - [ ] Every admin action (incl. deletes) is audit-logged with user + IP.
+- [ ] An admin can add/rename/reorder/remove packet stages and set per-stage SLAs; the case stage
+      tracker, cases list, and printing queue reflect the change immediately.
 
 ## Out of scope (v1) / future
 
@@ -78,6 +86,9 @@ Resolved in [03-architecture-and-scope](03-architecture-and-scope.md):
 - **Firm-configurable** (per tenant, with seeded defaults): packet pipelines & SLAs, case-type
   catalog & timeframes, consultation types & prices, cancellation policy, notification defaults,
   quiet hours, and templates.
+- **Packet pipeline rollout:** v1 ships a single **firm-wide** editable pipeline (ordered stages
+  + per-stage SLA days); **per-case-type pipelines** layer on later, inheriting the firm-wide
+  pipeline as the **default**.
 - **Templates/settings are per-firm** with platform starter defaults.
 - **Template editing:** PDF upload for quote letters; structured sectioned editor for engagement
   agreements (see [14-retention-engagement](14-retention-engagement.md)).

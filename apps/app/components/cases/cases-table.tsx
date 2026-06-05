@@ -21,7 +21,7 @@ import { CASE_STATUS_OPTIONS } from "@/components/select-field"
 import { ShowArchivedToggle } from "@/components/show-archived-toggle"
 import { StatStrip } from "@/components/stat-strip"
 import { StatusPill } from "@/components/status-pill"
-import { DEADLINES, PACKET_STAGES, staffName } from "@/data"
+import { DEADLINES, staffName } from "@/data"
 import { useStore } from "@/data/store"
 import type { CaseStatus } from "@/data/types"
 import { redFlagBadge } from "@/lib/status"
@@ -29,7 +29,7 @@ import { redFlagBadge } from "@/lib/status"
 const statusLabel = (v: string) => CASE_STATUS_OPTIONS.find((o) => o.value === v)?.label ?? v
 
 export function CasesTable() {
-  const { cases, updateCase } = useStore()
+  const { cases, updateCase, packetPipeline } = useStore()
   const [showArchived, setShowArchived] = React.useState(false)
 
   const archivedCount = cases.filter((c) => c.archived).length
@@ -84,8 +84,8 @@ export function CasesTable() {
                   </TableCell>
                   <TableCell className="hidden lg:table-cell">{c.caseType}</TableCell>
                   <TableCell className="hidden md:table-cell">
-                    <div className="text-sm">Stage {c.stage}/10</div>
-                    <div className="text-muted-foreground text-xs">{PACKET_STAGES[c.stage - 1] ?? ""}</div>
+                    <div className="text-sm">Stage {c.stage}/{packetPipeline.length}</div>
+                    <div className="text-muted-foreground text-xs">{packetPipeline[c.stage - 1]?.name ?? ""}</div>
                   </TableCell>
                   <TableCell className="hidden xl:table-cell text-sm">{staffName(c.laId)}</TableCell>
                   <TableCell className="hidden lg:table-cell">
