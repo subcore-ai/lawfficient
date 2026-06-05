@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Building2, FileText, ListChecks, Plug, ScrollText, ShieldCheck, Users } from "lucide-react"
+import { Building2, FileText, ListChecks, Plug, ShieldCheck, Users } from "lucide-react"
 
 import { cn } from "@workspace/ui/lib/utils"
 
@@ -13,7 +13,6 @@ const ITEMS = [
   { href: "/settings/templates", label: "Templates", icon: FileText },
   { href: "/settings/pipeline", label: "Packet pipeline", icon: ListChecks },
   { href: "/settings/integrations", label: "Integrations", icon: Plug },
-  { href: "/settings/audit-log", label: "Audit log", icon: ScrollText },
 ]
 
 export function SettingsNav() {

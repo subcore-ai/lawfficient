@@ -60,7 +60,9 @@ agreements), integration configuration, and firm-level settings. The control pla
 - `/settings/integrations` — provider configuration ([21](21-integrations.md)).
 - `/settings/case-types` — case-type catalog, SLAs, timeframes.
 - `/settings/pipeline` — firm-wide packet stages & per-stage SLAs (per-case-type override planned).
-- `/settings/audit-log` — critical-action audit trail.
+
+The **audit log** is recorded by these admin actions but **viewed in
+[20-reporting](20-reporting-analytics.md)** (Reporting → Audit log tab), not under Settings.
 
 ## Acceptance criteria
 

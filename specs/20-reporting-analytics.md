@@ -42,6 +42,10 @@ filterable, exportable reports — drawing on data produced across all modules.
   monthly UC36) are generated, to AR + management.
 - **FR-reporting-6** — Reports respect role scope (a user only sees data they're permitted to).
 - **FR-reporting-7** — Surface key reports as **dashboard** widgets ([11-dashboard](11-dashboard.md)).
+- **FR-reporting-8** — Surface the firm-wide **audit log** (critical-action trail: edits, status
+  changes, archives, deletions with user + IP) as a tab in Reporting; filterable by entity, user,
+  and date. The logging mechanism lives in [02-roles-and-permissions](02-roles-and-permissions.md)
+  / [22-admin-settings](22-admin-settings.md); this is its read/oversight surface.
 
 ## Data model
 
@@ -52,7 +56,7 @@ filterable, exportable reports — drawing on data produced across all modules.
 
 ## Screens
 
-- `/reporting` — report catalog with filters and saved views.
+- `/reporting` — **Reports** tab (catalog, filters, saved views) + **Audit log** tab (firm-wide critical-action trail).
 - `/reporting/[key]` — a report: chart + table + export (PDF/CSV).
 - Financial reports cross-link from [17-billing](17-billing-payments.md).
 
@@ -62,6 +66,7 @@ filterable, exportable reports — drawing on data produced across all modules.
 - [ ] Conversion, revenue, consultation-trend, and case-performance reports render.
 - [ ] Scheduled financial reports notify AR + management on generation.
 - [ ] A user only sees report data permitted by their role.
+- [ ] The firm-wide audit log is viewable as a Reporting tab, newest first.
 
 ## Out of scope (v1) / future
 
