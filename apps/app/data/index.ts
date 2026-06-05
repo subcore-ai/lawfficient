@@ -25,18 +25,18 @@ export * from "./types"
 // ---------------------------------------------------------------- Staff
 
 export const STAFF: StaffUser[] = [
-  { id: "u1", name: "Ayesha Rahman", email: "ayesha@chidolulaw.com", role: "attorney", initials: "AR", status: "active" },
-  { id: "u2", name: "Marcus Bell", email: "marcus@chidolulaw.com", role: "attorney", initials: "MB", status: "active" },
-  { id: "u3", name: "Nadia Okoro", email: "nadia@chidolulaw.com", role: "la_lead", initials: "NO", podId: "pod-a", status: "active" },
-  { id: "u4", name: "Diego Santos", email: "diego@chidolulaw.com", role: "legal_assistant", initials: "DS", podId: "pod-a", status: "active" },
-  { id: "u5", name: "Priya Nair", email: "priya@chidolulaw.com", role: "legal_assistant", initials: "PN", podId: "pod-a", status: "active" },
-  { id: "u6", name: "Tomás Vega", email: "tomas@chidolulaw.com", role: "qa_lead", initials: "TV", status: "active" },
-  { id: "u7", name: "Lena Hoffmann", email: "lena@chidolulaw.com", role: "creative_writer", initials: "LH", status: "active" },
-  { id: "u8", name: "Carlos Mendez", email: "carlos@chidolulaw.com", role: "sales", initials: "CM", status: "active" },
-  { id: "u9", name: "Grace Kim", email: "grace@chidolulaw.com", role: "sales", initials: "GK", status: "active" },
-  { id: "u10", name: "Ruth Adeyemi", email: "ruth@chidolulaw.com", role: "accounts_receivable", initials: "RA", status: "active" },
-  { id: "u11", name: "Owen Park", email: "owen@chidolulaw.com", role: "file_clerk", initials: "OP", status: "active" },
-  { id: "u12", name: "Sofia Cruz", email: "sofia@chidolulaw.com", role: "admin", initials: "SC", status: "active" },
+  { id: "u1", name: "Ayesha Rahman", email: "ayesha@chidoluelaw.com", role: "attorney", initials: "AR", status: "active" },
+  { id: "u2", name: "Marcus Bell", email: "marcus@chidoluelaw.com", role: "attorney", initials: "MB", status: "active" },
+  { id: "u3", name: "Nadia Okoro", email: "nadia@chidoluelaw.com", role: "la_lead", initials: "NO", podId: "pod-a", status: "active" },
+  { id: "u4", name: "Diego Santos", email: "diego@chidoluelaw.com", role: "legal_assistant", initials: "DS", podId: "pod-a", status: "active" },
+  { id: "u5", name: "Priya Nair", email: "priya@chidoluelaw.com", role: "legal_assistant", initials: "PN", podId: "pod-a", status: "active" },
+  { id: "u6", name: "Tomás Vega", email: "tomas@chidoluelaw.com", role: "qa_lead", initials: "TV", status: "active" },
+  { id: "u7", name: "Lena Hoffmann", email: "lena@chidoluelaw.com", role: "creative_writer", initials: "LH", status: "active" },
+  { id: "u8", name: "Carlos Mendez", email: "carlos@chidoluelaw.com", role: "sales", initials: "CM", status: "active" },
+  { id: "u9", name: "Grace Kim", email: "grace@chidoluelaw.com", role: "sales", initials: "GK", status: "active" },
+  { id: "u10", name: "Ruth Adeyemi", email: "ruth@chidoluelaw.com", role: "accounts_receivable", initials: "RA", status: "active" },
+  { id: "u11", name: "Owen Park", email: "owen@chidoluelaw.com", role: "file_clerk", initials: "OP", status: "active" },
+  { id: "u12", name: "Sofia Cruz", email: "sofia@chidoluelaw.com", role: "admin", initials: "SC", status: "active" },
 ]
 
 // Signed-in user for the scaffold (Sofia Cruz, admin). Resolved by id so the
@@ -44,7 +44,7 @@ export const STAFF: StaffUser[] = [
 export const CURRENT_USER: StaffUser = STAFF.find((u) => u.id === "u12") ?? {
   id: "u12",
   name: "Sofia Cruz",
-  email: "sofia@chidolulaw.com",
+  email: "sofia@chidoluelaw.com",
   role: "admin",
   initials: "SC",
   status: "active",

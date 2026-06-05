@@ -22,10 +22,10 @@ export default function SettingsGeneralPage() {
       <CardContent className="flex flex-col gap-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Firm name">
-            <Input defaultValue="Chidolu Law Firm" />
+            <Input defaultValue="The Chidolue Law Firm" />
           </Field>
           <Field label="Contact email">
-            <Input type="email" defaultValue="office@chidolulaw.com" />
+            <Input type="email" defaultValue="office@chidoluelaw.com" />
           </Field>
           <Field label="Phone">
             <Input type="tel" defaultValue="(305) 555-0100" />

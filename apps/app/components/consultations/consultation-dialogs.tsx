@@ -185,7 +185,7 @@ export function ReceiptDialog({ consultation }: { consultation: Consultation }) 
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
           <DialogTitle>Receipt</DialogTitle>
-          <DialogDescription>Chidolu Law Firm</DialogDescription>
+          <DialogDescription>The Chidolue Law Firm</DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-2 py-4 text-sm">
           <Row label="Receipt #" value={`RC-${consultation.id.toUpperCase()}`} />

@@ -89,7 +89,7 @@ export function InviteUserDialog() {
               <Input name="name" required placeholder="Jordan Lee" />
             </Field>
             <Field label="Email">
-              <Input name="email" type="email" required placeholder="jordan@chidolulaw.com" />
+              <Input name="email" type="email" required placeholder="jordan@chidoluelaw.com" />
             </Field>
             <Field label="Role">
               <RoleSelect value={role} onChange={setRole} />

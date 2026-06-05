@@ -35,7 +35,7 @@ export default function LoginPage() {
       <CardContent>
         <form onSubmit={onSubmit} className="flex flex-col gap-4">
           <Field label="Email" htmlFor="email">
-            <Input id="email" type="email" required placeholder="you@firm.com" defaultValue="sofia@chidolulaw.com" />
+            <Input id="email" type="email" required placeholder="you@firm.com" defaultValue="sofia@chidoluelaw.com" />
           </Field>
           <Field label="Password" htmlFor="password">
             <Input id="password" type="password" required placeholder="••••••••" defaultValue="demo-password" />
