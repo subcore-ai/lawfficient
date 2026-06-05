@@ -20,7 +20,7 @@ export function SettingsNav() {
   const pathname = usePathname()
 
   return (
-    <nav className="flex gap-1 overflow-x-auto pb-1 md:w-52 md:shrink-0 md:flex-col md:overflow-visible md:pb-0">
+    <nav className="flex gap-1 overflow-x-auto pb-1 md:w-52 md:shrink-0 md:flex-col md:self-start md:overflow-visible md:pb-0">
       {ITEMS.map(({ href, label, icon: Icon }) => {
         const active = href === "/settings" ? pathname === href : pathname.startsWith(href)
         return (
