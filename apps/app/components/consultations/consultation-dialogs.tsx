@@ -70,7 +70,11 @@ export function RescheduleDialog({ consultation }: { consultation: Consultation 
               <Input name="time" type="time" required defaultValue={consultation.startAt.slice(11, 16)} />
             </Field>
             <Field label="Time zone" className="sm:col-span-2">
-              <Select value={zone} onValueChange={(v) => setZone(v ?? consultation.timeZone)}>
+              <Select
+                value={zone}
+                onValueChange={(v) => setZone(v ?? consultation.timeZone)}
+                items={ZONES.map((z) => ({ value: z, label: z }))}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Zone" />
                 </SelectTrigger>

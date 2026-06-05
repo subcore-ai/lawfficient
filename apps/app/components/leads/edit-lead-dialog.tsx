@@ -83,7 +83,11 @@ export function EditLeadDialog({
         <Input name="email" type="email" defaultValue={lead.email} />
       </Field>
       <Field label="Source">
-        <Select value={source} onValueChange={(v) => setSource(v ?? lead.source)}>
+        <Select
+          value={source}
+          onValueChange={(v) => setSource(v ?? lead.source)}
+          items={SOURCES.map((s) => ({ value: s, label: s }))}
+        >
           <SelectTrigger className="w-full">
             <SelectValue />
           </SelectTrigger>
@@ -97,7 +101,11 @@ export function EditLeadDialog({
         </Select>
       </Field>
       <Field label="Assigned to">
-        <Select value={assignee} onValueChange={(v) => setAssignee(v ?? lead.assignedToId)}>
+        <Select
+          value={assignee}
+          onValueChange={(v) => setAssignee(v ?? lead.assignedToId)}
+          items={SALES.map((u) => ({ value: u.id, label: u.name }))}
+        >
           <SelectTrigger className="w-full">
             <SelectValue />
           </SelectTrigger>
@@ -111,7 +119,11 @@ export function EditLeadDialog({
         </Select>
       </Field>
       <Field label="Case type">
-        <Select value={caseType} onValueChange={(v) => setCaseType(v ?? "none")}>
+        <Select
+          value={caseType}
+          onValueChange={(v) => setCaseType(v ?? "none")}
+          items={[{ value: "none", label: "Not set" }, ...CASE_TYPES.map((t) => ({ value: t, label: t }))]}
+        >
           <SelectTrigger className="w-full">
             <SelectValue />
           </SelectTrigger>
@@ -126,7 +138,15 @@ export function EditLeadDialog({
         </Select>
       </Field>
       <Field label="Case hierarchy">
-        <Select value={hierarchy} onValueChange={(v) => setHierarchy(v ?? "none")}>
+        <Select
+          value={hierarchy}
+          onValueChange={(v) => setHierarchy(v ?? "none")}
+          items={[
+            { value: "none", label: "Not set" },
+            { value: "HRC", label: "HRC" },
+            { value: "NHRC", label: "NHRC" },
+          ]}
+        >
           <SelectTrigger className="w-full">
             <SelectValue />
           </SelectTrigger>

@@ -25,7 +25,7 @@ export function SelectField({
 }) {
   return (
     <Field label={label} className={className}>
-      <Select value={value} onValueChange={(v) => onChange(v ?? value)}>
+      <Select value={value} onValueChange={(v) => onChange(v ?? value)} items={options}>
         <SelectTrigger className="w-full">
           <SelectValue />
         </SelectTrigger>

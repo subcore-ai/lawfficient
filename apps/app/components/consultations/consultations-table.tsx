@@ -62,7 +62,7 @@ export function ConsultationsTable() {
       />
 
       <div className="flex items-center gap-3">
-        <Select value={status} onValueChange={(v) => setStatus(v ?? "all")}>
+        <Select value={status} onValueChange={(v) => setStatus(v ?? "all")} items={FILTERS}>
           <SelectTrigger className="h-8" aria-label="Filter by status">
             <SelectValue placeholder="Status" />
           </SelectTrigger>

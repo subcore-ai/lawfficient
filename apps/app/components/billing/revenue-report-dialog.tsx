@@ -57,7 +57,14 @@ export function RevenueReportDialog() {
               <Input type="date" defaultValue="2026-06-30" />
             </Field>
             <Field label="Format" className="sm:col-span-2">
-              <Select value={format} onValueChange={(v) => setFormat(v ?? "CSV")}>
+              <Select
+                value={format}
+                onValueChange={(v) => setFormat(v ?? "CSV")}
+                items={[
+                  { value: "CSV", label: "CSV (Excel)" },
+                  { value: "PDF", label: "PDF" },
+                ]}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Format" />
                 </SelectTrigger>

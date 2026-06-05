@@ -54,7 +54,14 @@ export function ExportReportDialog({ title }: { title: string }) {
               <Input type="date" defaultValue="2026-06-30" />
             </Field>
             <Field label="Format" className="sm:col-span-2">
-              <Select value={format} onValueChange={(v) => setFormat(v ?? "PDF")}>
+              <Select
+                value={format}
+                onValueChange={(v) => setFormat(v ?? "PDF")}
+                items={[
+                  { value: "PDF", label: "PDF" },
+                  { value: "CSV", label: "CSV (Excel)" },
+                ]}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Format" />
                 </SelectTrigger>

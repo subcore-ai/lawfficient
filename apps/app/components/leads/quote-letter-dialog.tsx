@@ -60,7 +60,11 @@ export function QuoteLetterDialog({ lead }: { lead: Lead }) {
           <div className="flex flex-col gap-4 py-5">
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Case type">
-                <Select value={caseType} onValueChange={(v) => setCaseType(v ?? "VAWA (AOS)")}>
+                <Select
+                  value={caseType}
+                  onValueChange={(v) => setCaseType(v ?? "VAWA (AOS)")}
+                  items={CASE_TYPES.map((t) => ({ value: t, label: t }))}
+                >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Case type" />
                   </SelectTrigger>

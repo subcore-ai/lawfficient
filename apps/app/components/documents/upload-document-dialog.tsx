@@ -104,7 +104,11 @@ export function UploadDocumentDialog({
               <Input name="name" required placeholder="Affidavit of Support" />
             </Field>
             <Field label="Category">
-              <Select value={category} onValueChange={(v) => setCategory((v ?? "Client Upload") as DocItem["category"])}>
+              <Select
+                value={category}
+                onValueChange={(v) => setCategory((v ?? "Client Upload") as DocItem["category"])}
+                items={CATEGORIES.map((c) => ({ value: c, label: c }))}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Category" />
                 </SelectTrigger>
@@ -118,7 +122,11 @@ export function UploadDocumentDialog({
               </Select>
             </Field>
             <Field label="Document type">
-              <Select value={docType} onValueChange={(v) => setDocType((v ?? "Evidence") as DocItem["docType"])}>
+              <Select
+                value={docType}
+                onValueChange={(v) => setDocType((v ?? "Evidence") as DocItem["docType"])}
+                items={DOC_TYPES.map((t) => ({ value: t, label: t }))}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Type" />
                 </SelectTrigger>
@@ -132,7 +140,11 @@ export function UploadDocumentDialog({
               </Select>
             </Field>
             <Field label="Case type" className="sm:col-span-2">
-              <Select value={caseType} onValueChange={(v) => setCaseType(v ?? defaultCaseType)}>
+              <Select
+                value={caseType}
+                onValueChange={(v) => setCaseType(v ?? defaultCaseType)}
+                items={CASE_TYPES.map((t) => ({ value: t, label: t }))}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Case type" />
                 </SelectTrigger>

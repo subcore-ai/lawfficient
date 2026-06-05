@@ -110,7 +110,11 @@ export function BookConsultationDialog() {
               <Input name="email" type="email" placeholder="maria@email.com" />
             </Field>
             <Field label="Attorney">
-              <Select value={attorney} onValueChange={(v) => setAttorney(v ?? DEFAULT_ATTORNEY)}>
+              <Select
+                value={attorney}
+                onValueChange={(v) => setAttorney(v ?? DEFAULT_ATTORNEY)}
+                items={ATTORNEYS.map((a) => ({ value: a.id, label: a.name }))}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select attorney" />
                 </SelectTrigger>
@@ -124,7 +128,11 @@ export function BookConsultationDialog() {
               </Select>
             </Field>
             <Field label="Appointment type">
-              <Select value={type} onValueChange={(v) => setType(v ?? "Initial consultation")}>
+              <Select
+                value={type}
+                onValueChange={(v) => setType(v ?? "Initial consultation")}
+                items={TYPES.map((t) => ({ value: t, label: t }))}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
@@ -144,7 +152,7 @@ export function BookConsultationDialog() {
               <Input name="time" type="time" required />
             </Field>
             <Field label="Time zone">
-              <Select value={zone} onValueChange={(v) => setZone(v ?? "ET")}>
+              <Select value={zone} onValueChange={(v) => setZone(v ?? "ET")} items={ZONES.map((z) => ({ value: z, label: z }))}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Zone" />
                 </SelectTrigger>
@@ -158,7 +166,11 @@ export function BookConsultationDialog() {
               </Select>
             </Field>
             <Field label="Case type">
-              <Select value={caseType} onValueChange={(v) => setCaseType(v ?? "none")}>
+              <Select
+                value={caseType}
+                onValueChange={(v) => setCaseType(v ?? "none")}
+                items={[{ value: "none", label: "Not set" }, ...CASE_TYPES.map((t) => ({ value: t, label: t }))]}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Case type" />
                 </SelectTrigger>

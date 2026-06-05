@@ -36,7 +36,11 @@ const MODULES = ["Dashboard", "Leads", "Consultations", "Cases", "Documents", "B
 
 function RoleSelect({ value, onChange }: { value: Role; onChange: (r: Role) => void }) {
   return (
-    <Select value={value} onValueChange={(v) => onChange((v ?? "legal_assistant") as Role)}>
+    <Select
+      value={value}
+      onValueChange={(v) => onChange((v ?? "legal_assistant") as Role)}
+      items={ROLES.map((r) => ({ value: r, label: ROLE_LABELS[r] }))}
+    >
       <SelectTrigger className="w-full">
         <SelectValue placeholder="Role" />
       </SelectTrigger>
@@ -143,6 +147,11 @@ export function EditUserDialog({ user }: { user: StaffUser }) {
               <Select
                 value={status}
                 onValueChange={(v) => setStatus((v ?? "active") as StaffUser["status"])}
+                items={[
+                  { value: "active", label: "Active" },
+                  { value: "invited", label: "Invited" },
+                  { value: "disabled", label: "Disabled" },
+                ]}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Status" />

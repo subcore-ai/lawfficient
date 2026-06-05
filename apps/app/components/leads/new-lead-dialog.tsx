@@ -100,7 +100,11 @@ export function NewLeadDialog() {
               <Input name="email" type="email" required placeholder="maria@email.com" />
             </Field>
             <Field label="Source">
-              <Select value={source} onValueChange={(v) => setSource(v ?? "Website")}>
+              <Select
+                value={source}
+                onValueChange={(v) => setSource(v ?? "Website")}
+                items={SOURCES.map((s) => ({ value: s, label: s }))}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Source" />
                 </SelectTrigger>
@@ -114,7 +118,11 @@ export function NewLeadDialog() {
               </Select>
             </Field>
             <Field label="Case type">
-              <Select value={caseType} onValueChange={(v) => setCaseType(v ?? "none")}>
+              <Select
+                value={caseType}
+                onValueChange={(v) => setCaseType(v ?? "none")}
+                items={[{ value: "none", label: "Not set" }, ...CASE_TYPES.map((t) => ({ value: t, label: t }))]}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Case type" />
                 </SelectTrigger>
@@ -141,7 +149,11 @@ export function NewLeadDialog() {
               <Input name="state" placeholder="FL" />
             </Field>
             <Field label="Assign to" className="sm:col-span-2">
-              <Select value={assignee} onValueChange={(v) => setAssignee(v ?? DEFAULT_ASSIGNEE)}>
+              <Select
+                value={assignee}
+                onValueChange={(v) => setAssignee(v ?? DEFAULT_ASSIGNEE)}
+                items={SALES.map((u) => ({ value: u.id, label: u.name }))}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Assignee" />
                 </SelectTrigger>

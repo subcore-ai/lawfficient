@@ -82,7 +82,11 @@ export function LeadsTable() {
           />
         </div>
         <div className="flex items-center gap-2">
-          <Select value={status} onValueChange={(v) => setStatus(v ?? "all")}>
+          <Select
+            value={status}
+            onValueChange={(v) => setStatus(v ?? "all")}
+            items={[{ value: "all", label: "All statuses" }, ...STATUS_OPTIONS]}
+          >
             <SelectTrigger className="h-8" aria-label="Filter by status">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
@@ -95,7 +99,11 @@ export function LeadsTable() {
               ))}
             </SelectContent>
           </Select>
-          <Select value={source} onValueChange={(v) => setSource(v ?? "all")}>
+          <Select
+            value={source}
+            onValueChange={(v) => setSource(v ?? "all")}
+            items={[{ value: "all", label: "All sources" }, ...SOURCES.map((s) => ({ value: s, label: s }))]}
+          >
             <SelectTrigger className="h-8" aria-label="Filter by source">
               <SelectValue placeholder="Source" />
             </SelectTrigger>

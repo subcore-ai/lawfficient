@@ -68,7 +68,11 @@ export function ConvertLeadDialog({ lead }: { lead: Lead }) {
               <Input type="number" min={0} step={100} defaultValue={2500} />
             </Field>
             <Field label="Payment plan" className="sm:col-span-2">
-              <Select value={plan} onValueChange={(v) => setPlan(v ?? PLANS[1])}>
+              <Select
+                value={plan}
+                onValueChange={(v) => setPlan(v ?? PLANS[1])}
+                items={PLANS.map((p) => ({ value: p, label: p }))}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Plan" />
                 </SelectTrigger>

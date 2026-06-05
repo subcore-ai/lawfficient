@@ -26,7 +26,7 @@ export function InlineSelect({
   className?: string
 }) {
   return (
-    <Select value={value} onValueChange={(v) => onValueChange(v ?? value)} disabled={disabled}>
+    <Select value={value} onValueChange={(v) => onValueChange(v ?? value)} disabled={disabled} items={options}>
       <SelectTrigger
         size="sm"
         aria-label={ariaLabel}
