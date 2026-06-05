@@ -1,6 +1,6 @@
 "use client"
 
-import type * as React from "react"
+import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
@@ -28,6 +28,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  useSidebar,
 } from "@workspace/ui/components/sidebar"
 
 type NavItem = { title: string; href: string; icon: React.ComponentType<{ className?: string }> }
@@ -62,6 +63,13 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
 
 export function AppSidebar() {
   const pathname = usePathname()
+  const { setOpenMobile } = useSidebar()
+
+  // Close the mobile sidebar sheet after navigating to a new page.
+  React.useEffect(() => {
+    setOpenMobile(false)
+  }, [pathname, setOpenMobile])
+
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`)
 
