@@ -59,7 +59,7 @@ agreements), integration configuration, and firm-level settings. The control pla
 - `/settings/templates` — quote-letter & EA template management.
 - `/settings/integrations` — provider configuration ([21](21-integrations.md)).
 - `/settings/case-types` — case-type catalog, SLAs, timeframes.
-- `/settings` *(Packet pipeline card)* — firm-wide packet stages & per-stage SLAs (per-case-type override planned).
+- `/settings/pipeline` — firm-wide packet stages & per-stage SLAs (per-case-type override planned).
 - `/settings/audit-log` — critical-action audit trail.
 
 ## Acceptance criteria
