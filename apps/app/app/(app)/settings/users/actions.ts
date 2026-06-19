@@ -1,0 +1,258 @@
+"use server"
+
+import { headers } from "next/headers"
+import { revalidatePath } from "next/cache"
+
+import { getCurrentUser, type CurrentUser } from "@/lib/auth/session"
+import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
+import { parseInviteInput, parseRole } from "@/lib/users/validation"
+
+export type ActionResult = { ok: true } | { error: string }
+
+const USERS_PATH = "/settings/users"
+
+type AdminGate = { ok: true; user: CurrentUser } | { ok: false; error: string }
+
+// Every action funnels through this — signed-out callers and non-admins can't
+// manage users. RLS is the real enforcement; this gives a clean error first.
+async function requireAdmin(): Promise<AdminGate> {
+  const user = await getCurrentUser()
+  if (!user) return { ok: false, error: "You're not signed in." }
+  if (user.role !== "admin") return { ok: false, error: "Only admins can manage users." }
+  return { ok: true, user }
+}
+
+// A firm's *other* active admins — the friendly half of the last-admin guard.
+// The 0006 DB trigger is the hard backstop; this just avoids a raw error in the UI.
+async function otherActiveAdmins(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  firmId: string,
+  exceptUserId: string,
+): Promise<number> {
+  const { count } = await supabase
+    .from("profiles")
+    .select("id", { count: "exact", head: true })
+    .eq("firm_id", firmId)
+    .eq("role", "admin")
+    .eq("status", "active")
+    .neq("id", exceptUserId)
+  return count ?? 0
+}
+
+async function confirmUrl(): Promise<string | undefined> {
+  const origin = (await headers()).get("origin") ?? process.env.NEXT_PUBLIC_SITE_URL ?? ""
+  return origin ? `${origin}/auth/confirm` : undefined
+}
+
+export async function inviteUser(formData: FormData): Promise<ActionResult> {
+  const gate = await requireAdmin()
+  if (!gate.ok) return { error: gate.error }
+  const admin = gate.user
+
+  const parsed = parseInviteInput({
+    name: formData.get("name"),
+    email: formData.get("email"),
+    role: formData.get("role"),
+  })
+  if (!parsed.ok) return { error: parsed.error }
+  const { name, email, role } = parsed.value
+
+  const adminClient = createAdminClient()
+
+  // Create the auth user + send the invite email (Supabase SMTP; Mailpit locally).
+  const invited = await adminClient.auth.admin.inviteUserByEmail(email, {
+    data: { name },
+    redirectTo: await confirmUrl(),
+  })
+  if (invited.error || !invited.data.user) {
+    return { error: invited.error?.message ?? "Could not send the invite." }
+  }
+
+  // Bind to this firm + role + invited status via app_metadata (service-role only,
+  // never user_metadata). The 0005 trigger provisions the profile on this update.
+  const bound = await adminClient.auth.admin.updateUserById(invited.data.user.id, {
+    app_metadata: { firm_id: admin.firmId, role, status: "invited", name },
+  })
+  if (bound.error) {
+    // Undo the half-made invite so the address can be retried cleanly.
+    await adminClient.auth.admin.deleteUser(invited.data.user.id)
+    return { error: "Could not finish creating the invite. Please try again." }
+  }
+
+  const supabase = await createClient()
+  await supabase.from("audit_log").insert({
+    entity: "user",
+    entity_id: invited.data.user.id,
+    label: name,
+    action: "invited",
+    by_user_id: admin.id,
+  })
+
+  revalidatePath(USERS_PATH)
+  return { ok: true }
+}
+
+export async function resendInvite(userId: string): Promise<ActionResult> {
+  const gate = await requireAdmin()
+  if (!gate.ok) return { error: gate.error }
+  const admin = gate.user
+
+  const supabase = await createClient()
+  const { data: target } = await supabase
+    .from("profiles")
+    .select("id, email, name, role, status, pod_id")
+    .eq("id", userId)
+    .maybeSingle()
+  if (!target) return { error: "User not found." }
+  if (target.status !== "invited") return { error: "Only pending invites can be resent." }
+
+  // Supabase has no admin "resend invite"; re-issue by replacing the un-accepted
+  // placeholder. Safe — an invited user has no data of their own yet.
+  const adminClient = createAdminClient()
+  await adminClient.auth.admin.deleteUser(userId)
+
+  const invited = await adminClient.auth.admin.inviteUserByEmail(target.email, {
+    data: { name: target.name },
+    redirectTo: await confirmUrl(),
+  })
+  if (invited.error || !invited.data.user) return { error: "Could not resend the invite." }
+
+  await adminClient.auth.admin.updateUserById(invited.data.user.id, {
+    app_metadata: { firm_id: admin.firmId, role: target.role, status: "invited", name: target.name },
+  })
+  if (target.pod_id) {
+    await supabase.from("profiles").update({ pod_id: target.pod_id }).eq("id", invited.data.user.id)
+  }
+
+  await supabase.from("audit_log").insert({
+    entity: "user",
+    entity_id: invited.data.user.id,
+    label: target.name,
+    action: "invite_resent",
+    by_user_id: admin.id,
+  })
+
+  revalidatePath(USERS_PATH)
+  return { ok: true }
+}
+
+export async function revokeInvite(userId: string): Promise<ActionResult> {
+  const gate = await requireAdmin()
+  if (!gate.ok) return { error: gate.error }
+  const admin = gate.user
+
+  const supabase = await createClient()
+  const { data: target } = await supabase
+    .from("profiles")
+    .select("id, email, name, status")
+    .eq("id", userId)
+    .maybeSingle()
+  if (!target) return { error: "User not found." }
+  if (target.status !== "invited") return { error: "Only pending invites can be revoked." }
+
+  // Audit before the profile row cascades away with the auth user.
+  await supabase.from("audit_log").insert({
+    entity: "user",
+    entity_id: userId,
+    label: target.email || target.name,
+    action: "invite_revoked",
+    by_user_id: admin.id,
+  })
+
+  const adminClient = createAdminClient()
+  const { error } = await adminClient.auth.admin.deleteUser(userId)
+  if (error) return { error: "Could not revoke the invite. Please try again." }
+
+  revalidatePath(USERS_PATH)
+  return { ok: true }
+}
+
+export async function setUserStatus(
+  userId: string,
+  status: "active" | "disabled",
+): Promise<ActionResult> {
+  const gate = await requireAdmin()
+  if (!gate.ok) return { error: gate.error }
+  const admin = gate.user
+  if (userId === admin.id) return { error: "You can't change your own status." }
+
+  const supabase = await createClient()
+  const { data: target } = await supabase
+    .from("profiles")
+    .select("id, name, role, status, firm_id")
+    .eq("id", userId)
+    .maybeSingle()
+  if (!target) return { error: "User not found." }
+
+  if (status === "disabled" && target.role === "admin" && target.status === "active") {
+    if ((await otherActiveAdmins(supabase, target.firm_id, userId)) === 0) {
+      return { error: "You can't disable the last active admin." }
+    }
+  }
+
+  // Block (or restore) auth-level access. App access stops immediately via the
+  // status='active' gate; the ban also blocks sign-in and token refresh.
+  const adminClient = createAdminClient()
+  const ban = await adminClient.auth.admin.updateUserById(userId, {
+    ban_duration: status === "disabled" ? "876000h" : "none",
+  })
+  if (ban.error) return { error: "Could not update the account. Please try again." }
+
+  const { error } = await supabase.from("profiles").update({ status }).eq("id", userId)
+  if (error) return { error: error.message }
+
+  await supabase.from("audit_log").insert({
+    entity: "user",
+    entity_id: userId,
+    label: target.name,
+    action: status === "disabled" ? "disabled" : "enabled",
+    by_user_id: admin.id,
+  })
+
+  revalidatePath(USERS_PATH)
+  return { ok: true }
+}
+
+export async function updateUserProfile(
+  userId: string,
+  formData: FormData,
+): Promise<ActionResult> {
+  const gate = await requireAdmin()
+  if (!gate.ok) return { error: gate.error }
+  const admin = gate.user
+
+  const name = String(formData.get("name") ?? "").trim()
+  const role = parseRole(formData.get("role"))
+  if (!name) return { error: "Name is required." }
+  if (!role) return { error: "Choose a valid role." }
+
+  const supabase = await createClient()
+  const { data: target } = await supabase
+    .from("profiles")
+    .select("id, role, status, firm_id")
+    .eq("id", userId)
+    .maybeSingle()
+  if (!target) return { error: "User not found." }
+
+  // Demoting the firm's last active admin would lock everyone out of Settings.
+  if (target.role === "admin" && role !== "admin" && target.status === "active") {
+    if ((await otherActiveAdmins(supabase, target.firm_id, userId)) === 0) {
+      return { error: "You can't change the role of the last active admin." }
+    }
+  }
+
+  const { error } = await supabase.from("profiles").update({ name, role }).eq("id", userId)
+  if (error) return { error: error.message }
+
+  await supabase.from("audit_log").insert({
+    entity: "user",
+    entity_id: userId,
+    label: name,
+    action: "updated",
+    by_user_id: admin.id,
+  })
+
+  revalidatePath(USERS_PATH)
+  return { ok: true }
+}

@@ -1,5 +1,3 @@
-"use client"
-
 import { Avatar, AvatarFallback } from "@workspace/ui/components/avatar"
 import {
   Table,
@@ -10,10 +8,9 @@ import {
   TableRow,
 } from "@workspace/ui/components/table"
 
-import { EditUserDialog } from "@/components/settings/settings-dialogs"
+import { UserRowActions } from "@/components/settings/settings-dialogs"
 import { StatusPill, type Tone } from "@/components/status-pill"
 import { ROLE_LABELS } from "@/data"
-import { useStore } from "@/data/store"
 import type { StaffUser } from "@/data/types"
 
 const USER_STATUS: Record<StaffUser["status"], { label: string; tone: Tone }> = {
@@ -22,9 +19,15 @@ const USER_STATUS: Record<StaffUser["status"], { label: string; tone: Tone }> = 
   disabled: { label: "Disabled", tone: "neutral" },
 }
 
-export function UsersTable() {
-  const { staff } = useStore()
-
+export function UsersTable({
+  users,
+  currentUserId,
+  canManage,
+}: {
+  users: StaffUser[]
+  currentUserId: string
+  canManage: boolean
+}) {
   return (
     <Table>
       <TableHeader>
@@ -36,28 +39,36 @@ export function UsersTable() {
         </TableRow>
       </TableHeader>
       <TableBody>
-        {staff.map((u) => (
-          <TableRow key={u.id} className="hover:bg-muted/40">
-            <TableCell className="pl-4">
-              <div className="flex items-center gap-2.5">
-                <Avatar className="size-7 rounded-md">
-                  <AvatarFallback className="rounded-md text-[10px]">{u.initials}</AvatarFallback>
-                </Avatar>
-                <div>
-                  <div className="text-sm font-medium">{u.name}</div>
-                  <div className="text-muted-foreground text-xs">{u.email}</div>
-                </div>
-              </div>
-            </TableCell>
-            <TableCell className="hidden text-sm md:table-cell">{ROLE_LABELS[u.role]}</TableCell>
-            <TableCell>
-              <StatusPill {...USER_STATUS[u.status]} />
-            </TableCell>
-            <TableCell className="pr-4 text-right">
-              <EditUserDialog user={u} />
+        {users.length === 0 ? (
+          <TableRow>
+            <TableCell colSpan={4} className="text-muted-foreground py-8 text-center text-sm">
+              No team members yet.
             </TableCell>
           </TableRow>
-        ))}
+        ) : (
+          users.map((u) => (
+            <TableRow key={u.id} className="hover:bg-muted/40">
+              <TableCell className="pl-4">
+                <div className="flex items-center gap-2.5">
+                  <Avatar className="size-7 rounded-md">
+                    <AvatarFallback className="rounded-md text-[10px]">{u.initials}</AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <div className="text-sm font-medium">{u.name}</div>
+                    <div className="text-muted-foreground text-xs">{u.email}</div>
+                  </div>
+                </div>
+              </TableCell>
+              <TableCell className="hidden text-sm md:table-cell">{ROLE_LABELS[u.role]}</TableCell>
+              <TableCell>
+                <StatusPill {...USER_STATUS[u.status]} />
+              </TableCell>
+              <TableCell className="pr-4 text-right">
+                {canManage ? <UserRowActions user={u} currentUserId={currentUserId} /> : null}
+              </TableCell>
+            </TableRow>
+          ))
+        )}
       </TableBody>
     </Table>
   )

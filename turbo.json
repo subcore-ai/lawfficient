@@ -1,6 +1,7 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "ui": "tui",
+  "globalEnv": ["SUPABASE_SECRET_KEY"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
@@ -15,6 +16,9 @@
     },
     "typecheck": {
       "dependsOn": ["^typecheck"]
+    },
+    "test": {
+      "dependsOn": []
     },
     "dev": {
       "cache": false,

@@ -37,6 +37,7 @@ Each module spec follows the same template (see [`_template.md`](_template.md)).
 | 21 | [Integrations](21-integrations.md) | UC2, UC33 (migration), UC37, UC39 |
 | 22 | [Admin & Settings](22-admin-settings.md) | UC23, UC24, UC25 |
 | 23 | [Lead Ingestion & Source Connectors](23-lead-ingestion.md) | UC2, UC3, UC6, UC7, UC43 (multi-source contract) |
+| 24 | [User Management](24-user-management.md) | UC25, UC1 (activation) |
 
 ## Conventions
 

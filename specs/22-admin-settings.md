@@ -54,7 +54,7 @@ agreements), integration configuration, and firm-level settings. The control pla
 ## Screens
 
 - `/settings` — settings home (firm profile, navigation to sub-sections).
-- `/settings/users` — user list, invite, enable/disable.
+- `/settings/users` — user list, invite, enable/disable. Detailed in [24-user-management](24-user-management.md).
 - `/settings/roles` — role list, permission editor, create/delete.
 - `/settings/templates` — quote-letter & EA template management.
 - `/settings/integrations` — provider configuration ([21](21-integrations.md)).

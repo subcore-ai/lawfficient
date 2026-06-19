@@ -28,8 +28,14 @@ import { toast } from "@workspace/ui/components/sonner"
 
 import { Field } from "@/components/form-field"
 import { ROLE_LABELS } from "@/data"
-import { useStore } from "@/data/store"
 import type { Role, StaffUser } from "@/data/types"
+import {
+  inviteUser,
+  resendInvite,
+  revokeInvite,
+  setUserStatus,
+  updateUserProfile,
+} from "@/app/(app)/settings/users/actions"
 
 const ROLES = Object.keys(ROLE_LABELS) as Role[]
 const MODULES = ["Dashboard", "Leads", "Consultations", "Cases", "Documents", "Billing", "Reporting", "Admin"]
@@ -56,21 +62,24 @@ function RoleSelect({ value, onChange }: { value: Role; onChange: (r: Role) => v
 }
 
 export function InviteUserDialog() {
-  const { addStaff } = useStore()
   const [open, setOpen] = React.useState(false)
   const [role, setRole] = React.useState<Role>("legal_assistant")
+  const [pending, startTransition] = React.useTransition()
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    const form = e.currentTarget
-    const fd = new FormData(form)
-    const name = String(fd.get("name") ?? "").trim()
-    const email = String(fd.get("email") ?? "").trim()
-    addStaff({ name, email, role })
-    toast.success("Invite sent", { description: `${name} invited as ${ROLE_LABELS[role]}.` })
-    form.reset()
-    setRole("legal_assistant")
-    setOpen(false)
+    const fd = new FormData(e.currentTarget)
+    fd.set("role", role)
+    startTransition(async () => {
+      const res = await inviteUser(fd)
+      if ("error" in res) {
+        toast.error(res.error)
+        return
+      }
+      toast.success("Invite sent", { description: "An invitation email is on its way." })
+      setRole("legal_assistant")
+      setOpen(false)
+    })
   }
 
   return (
@@ -97,7 +106,9 @@ export function InviteUserDialog() {
           </div>
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
-            <Button type="submit">Send invite</Button>
+            <Button type="submit" disabled={pending}>
+              {pending ? "Sending…" : "Send invite"}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -105,23 +116,24 @@ export function InviteUserDialog() {
   )
 }
 
-export function EditUserDialog({ user }: { user: StaffUser }) {
-  const { updateStaff } = useStore()
+function ManageUserDialog({ user }: { user: StaffUser }) {
   const [open, setOpen] = React.useState(false)
   const [role, setRole] = React.useState<Role>(user.role)
-  const [status, setStatus] = React.useState<StaffUser["status"]>(user.status)
+  const [pending, startTransition] = React.useTransition()
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const fd = new FormData(e.currentTarget)
-    updateStaff(user.id, {
-      name: String(fd.get("name") ?? "").trim() || user.name,
-      email: String(fd.get("email") ?? "").trim() || user.email,
-      role,
-      status,
+    fd.set("role", role)
+    startTransition(async () => {
+      const res = await updateUserProfile(user.id, fd)
+      if ("error" in res) {
+        toast.error(res.error)
+        return
+      }
+      toast.success("User updated", { description: `${user.name}'s profile was saved.` })
+      setOpen(false)
     })
-    toast.success("User updated", { description: `${user.name}'s profile was saved.` })
-    setOpen(false)
   }
 
   return (
@@ -131,46 +143,105 @@ export function EditUserDialog({ user }: { user: StaffUser }) {
         <form onSubmit={onSubmit}>
           <DialogHeader>
             <DialogTitle>Manage user</DialogTitle>
-            <DialogDescription>Update profile, role, and status.</DialogDescription>
+            <DialogDescription>Update the display name and role.</DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-5 sm:grid-cols-2">
-            <Field label="Full name" className="sm:col-span-2">
-              <Input name="name" defaultValue={user.name} />
+          <div className="flex flex-col gap-4 py-5">
+            <Field label="Full name">
+              <Input name="name" defaultValue={user.name} required />
             </Field>
-            <Field label="Email" className="sm:col-span-2">
-              <Input name="email" type="email" defaultValue={user.email} />
+            <Field label="Email">
+              {/* Email changes are admin-only + re-verified — handled separately, not here. */}
+              <Input defaultValue={user.email} disabled />
             </Field>
             <Field label="Role">
               <RoleSelect value={role} onChange={setRole} />
             </Field>
-            <Field label="Status">
-              <Select
-                value={status}
-                onValueChange={(v) => setStatus((v ?? "active") as StaffUser["status"])}
-                items={[
-                  { value: "active", label: "Active" },
-                  { value: "invited", label: "Invited" },
-                  { value: "disabled", label: "Disabled" },
-                ]}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="invited">Invited</SelectItem>
-                  <SelectItem value="disabled">Disabled</SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
           </div>
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
-            <Button type="submit">Save changes</Button>
+            <Button type="submit" disabled={pending}>
+              {pending ? "Saving…" : "Save changes"}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
+  )
+}
+
+// Status-aware per-row controls: pending invites can be resent/revoked; active
+// users managed/disabled; disabled users re-enabled. Mutations run through the
+// server actions (admin-gated + audited); revalidatePath refreshes the table.
+export function UserRowActions({
+  user,
+  currentUserId,
+}: {
+  user: StaffUser
+  currentUserId: string
+}) {
+  const [pending, startTransition] = React.useTransition()
+
+  function run(action: () => Promise<{ ok: true } | { error: string }>, success: string) {
+    startTransition(async () => {
+      const res = await action()
+      if ("error" in res) toast.error(res.error)
+      else toast.success(success)
+    })
+  }
+
+  if (user.status === "invited") {
+    return (
+      <div className="flex justify-end gap-1">
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={pending}
+          onClick={() => run(() => resendInvite(user.id), "Invite resent")}
+        >
+          Resend
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={pending}
+          onClick={() => run(() => revokeInvite(user.id), "Invite revoked")}
+        >
+          Revoke
+        </Button>
+      </div>
+    )
+  }
+
+  if (user.status === "disabled") {
+    return (
+      <div className="flex justify-end gap-1">
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={pending}
+          onClick={() => run(() => setUserStatus(user.id, "active"), "User enabled")}
+        >
+          Enable
+        </Button>
+        <ManageUserDialog user={user} />
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex justify-end gap-1">
+      <ManageUserDialog user={user} />
+      {user.id !== currentUserId ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={pending}
+          onClick={() => run(() => setUserStatus(user.id, "disabled"), "User disabled")}
+        >
+          Disable
+        </Button>
+      ) : null}
+    </div>
   )
 }
 
