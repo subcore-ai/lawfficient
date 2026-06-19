@@ -28,7 +28,7 @@ begin
   values (
     new.id,
     v_firm,
-    coalesce(new.raw_app_meta_data ->> 'name', split_part(coalesce(new.email, ''), '@', 1), 'Staff User'),
+    coalesce(new.raw_app_meta_data ->> 'name', nullif(split_part(coalesce(new.email, ''), '@', 1), ''), 'Staff User'),
     coalesce(new.email, ''),
     coalesce((new.raw_app_meta_data ->> 'role')::public.staff_role, 'sales'),
     coalesce((new.raw_app_meta_data ->> 'status')::public.staff_status, 'active')

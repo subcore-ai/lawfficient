@@ -171,13 +171,9 @@ export function AppTopbar() {
               <Settings className="size-4" /> Settings
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <form action={signOut}>
-              <DropdownMenuItem
-                onClick={(event) => event.currentTarget.closest("form")?.requestSubmit()}
-              >
-                <LogOut className="size-4" /> Log out
-              </DropdownMenuItem>
-            </form>
+            <DropdownMenuItem onClick={() => React.startTransition(() => signOut())}>
+              <LogOut className="size-4" /> Log out
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
