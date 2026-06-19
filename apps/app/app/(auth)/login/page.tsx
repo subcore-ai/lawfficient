@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 
 import { Button } from "@workspace/ui/components/button"
 import {
@@ -17,14 +16,10 @@ import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 
 import { Field } from "@/components/form-field"
+import { signIn, type SignInState } from "../actions"
 
 export default function LoginPage() {
-  const router = useRouter()
-
-  function onSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    router.push("/")
-  }
+  const [state, formAction, pending] = React.useActionState<SignInState, FormData>(signIn, null)
 
   return (
     <Card className="w-full max-w-sm">
@@ -33,16 +28,21 @@ export default function LoginPage() {
         <CardDescription>Welcome back — sign in to your firm workspace.</CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={onSubmit} className="flex flex-col gap-4">
+        <form action={formAction} className="flex flex-col gap-4">
           <Field label="Email" htmlFor="email">
-            <Input id="email" type="email" required placeholder="you@firm.com" defaultValue="sofia@chidoluelaw.com" />
+            <Input id="email" name="email" type="email" required placeholder="you@firm.com" defaultValue="sofia@chidoluelaw.com" />
           </Field>
           <Field label="Password" htmlFor="password">
-            <Input id="password" type="password" required placeholder="••••••••" defaultValue="demo-password" />
+            <Input id="password" name="password" type="password" required placeholder="••••••••" defaultValue="demo-password" />
           </Field>
+          {state?.error ? (
+            <p className="text-destructive text-sm" role="alert">
+              {state.error}
+            </p>
+          ) : null}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Checkbox id="remember" defaultChecked />
+              <Checkbox id="remember" name="remember" defaultChecked />
               <Label htmlFor="remember" className="text-sm font-normal">
                 Remember me
               </Label>
@@ -51,8 +51,8 @@ export default function LoginPage() {
               Forgot password?
             </Link>
           </div>
-          <Button type="submit" className="w-full">
-            Sign in
+          <Button type="submit" className="w-full" disabled={pending}>
+            {pending ? "Signing in…" : "Sign in"}
           </Button>
           <p className="text-muted-foreground text-center text-xs">
             Two-factor authentication is optional and can be enabled in Settings.

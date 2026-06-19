@@ -1,0 +1,10 @@
+# Minimal local config. Run `supabase init` against your project to expand this,
+# or set project_id to your project ref. See https://supabase.com/docs/guides/cli/config
+project_id = "lawfficient"
+
+[auth]
+enable_signup = true
+# Email/password only for v1. MFA (TOTP) is optional and added per spec 10.
+
+[auth.email]
+enable_confirmations = false
