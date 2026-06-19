@@ -39,22 +39,10 @@ function nextId(prefix: string) {
 }
 
 // ---------------------------------------------------------------- Permissions
+// Canonical matrix lives in @/lib/auth/permissions (shared by server + client).
+// Re-exported here so existing imports from @/data/store keep working.
 
-export type Permission = "edit" | "delete" | "editFinancial" | "manageUsers"
-
-export function can(role: Role, action: Permission): boolean {
-  if (role === "admin") return true
-  switch (action) {
-    case "edit":
-      return role !== "file_clerk"
-    case "delete":
-      return role === "la_lead"
-    case "editFinancial":
-      return role === "accounts_receivable"
-    case "manageUsers":
-      return false
-  }
-}
+export { can, type Permission } from "@/lib/auth/permissions"
 
 // ---------------------------------------------------------------- Inputs
 
