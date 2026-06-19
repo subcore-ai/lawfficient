@@ -22,7 +22,9 @@ feature needs a schema change, raise it against the foundation first.**
 - `firm_id` / `role` come from **`app_metadata`** (secret-key/service role only),
   never `user_metadata` (user-editable). Set them when you create/invite a user.
 - Frontend uses the **publishable key** (`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`);
-  server-only admin tasks use the **secret key** (`SUPABASE_SECRET_KEY`).
+  server-only admin tasks use the **secret key** (`SUPABASE_SECRET_KEY`), which
+  authenticates as the Postgres `service_role` (so the `service_role` you see in
+  the SQL grants is that database role, not a separate env var).
 - `firm_id` **auto-defaults to `current_firm_id()`** on insert, so feature code
   doesn't have to set it (and the RLS `WITH CHECK` still blocks forging another
   firm's id). The service-role lead-ingestion path has no session, so it **must**
@@ -55,7 +57,7 @@ RLS policies and the `firm_id`-on-every-table layout stay unchanged — only the
    ```
 3. Create the first admin, attaching them to the seeded firm via `app_metadata`:
    ```bash
-   # server-side / service role only
+   # run server-side with the secret key (SUPABASE_SECRET_KEY)
    supabase.auth.admin.createUser({
      email: "admin@chidoluelaw.com",
      password: "<temp>",
