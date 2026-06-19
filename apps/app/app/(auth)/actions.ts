@@ -4,6 +4,7 @@ import { redirect } from "next/navigation"
 
 import { createClient } from "@/lib/supabase/server"
 import { isSupabaseConfigured } from "@/lib/supabase/env"
+import { getCurrentUser } from "@/lib/auth/session"
 
 export type SignInState = { error: string } | null
 
@@ -21,6 +22,14 @@ export async function signIn(_prev: SignInState, formData: FormData): Promise<Si
   const { error } = await supabase.auth.signInWithPassword({ email, password })
   if (error) {
     return { error: error.message }
+  }
+
+  // Credentials are valid, but the app shell only admits active staff. If there's
+  // no active profile, sign back out and explain rather than bouncing to /login.
+  const user = await getCurrentUser()
+  if (!user) {
+    await supabase.auth.signOut()
+    return { error: "Your account isn't active. Contact your firm administrator." }
   }
 
   redirect("/")
