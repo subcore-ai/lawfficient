@@ -4,7 +4,6 @@ import { redirect } from "next/navigation"
 
 import { createClient } from "@/lib/supabase/server"
 import { isSupabaseConfigured } from "@/lib/supabase/env"
-import { getCurrentUser } from "@/lib/auth/session"
 
 export type SignInState = { error: string } | null
 
@@ -19,15 +18,24 @@ export async function signIn(_prev: SignInState, formData: FormData): Promise<Si
   }
 
   const supabase = await createClient()
-  const { error } = await supabase.auth.signInWithPassword({ email, password })
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password })
   if (error) {
     return { error: error.message }
   }
 
-  // Credentials are valid, but the app shell only admits active staff. If there's
-  // no active profile, sign back out and explain rather than bouncing to /login.
-  const user = await getCurrentUser()
-  if (!user) {
+  // Credentials are valid; the app shell only admits active staff. Distinguish a
+  // genuinely missing/inactive profile (sign out + explain) from a transient
+  // query failure (keep the session, ask to retry) so a blip doesn't lock people out.
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("status")
+    .eq("id", data.user?.id ?? "")
+    .maybeSingle()
+
+  if (profileError) {
+    return { error: "We couldn't verify your account just now. Please try again." }
+  }
+  if ((profile as { status?: string } | null)?.status !== "active") {
     await supabase.auth.signOut()
     return { error: "Your account isn't active. Contact your firm administrator." }
   }
