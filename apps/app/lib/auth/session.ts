@@ -23,10 +23,14 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   if (error || !data?.user) return null
   const user = data.user
 
+  // Only active staff are authenticated. A disabled (or not-yet-activated)
+  // profile resolves to no row → null → the app shell redirects to /login,
+  // even though Supabase Auth may still accept the credentials.
   const { data: profileRow } = await supabase
     .from("profiles")
     .select("id, email, name, role, firm_id, pod_id")
     .eq("id", user.id)
+    .eq("status", "active")
     .single()
 
   // Cast: column-level types arrive once database.types.ts is regenerated.
