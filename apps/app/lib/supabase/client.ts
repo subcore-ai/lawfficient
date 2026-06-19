@@ -5,6 +5,6 @@ import { requireSupabaseEnv } from "./env"
 import type { Database } from "./database.types"
 
 export function createClient() {
-  const { url, anonKey } = requireSupabaseEnv()
-  return createBrowserClient<Database>(url, anonKey)
+  const { url, publishableKey } = requireSupabaseEnv()
+  return createBrowserClient<Database>(url, publishableKey)
 }

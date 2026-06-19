@@ -5,7 +5,7 @@
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 
-import { isSupabaseConfigured, SUPABASE_ANON_KEY, SUPABASE_URL } from "./env"
+import { isSupabaseConfigured, SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "./env"
 
 // Unauthenticated users are allowed on these path prefixes.
 const PUBLIC_PREFIXES = ["/login", "/forgot-password", "/auth"]
@@ -21,7 +21,7 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
 
   let response = NextResponse.next({ request })
 
-  const supabase = createServerClient(SUPABASE_URL!, SUPABASE_ANON_KEY!, {
+  const supabase = createServerClient(SUPABASE_URL!, SUPABASE_PUBLISHABLE_KEY!, {
     cookies: {
       getAll() {
         return request.cookies.getAll()

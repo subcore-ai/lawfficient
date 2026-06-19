@@ -19,8 +19,10 @@ feature needs a schema change, raise it against the foundation first.**
 
 - Every row carries `firm_id`. RLS lets a user touch **only** their own firm's
   rows. This is the real enforcement; the app's `can()` matrix only hides UI.
-- `firm_id` / `role` come from **`app_metadata`** (service-role only), never
-  `user_metadata` (user-editable). Set them when you create/invite a user.
+- `firm_id` / `role` come from **`app_metadata`** (secret-key/service role only),
+  never `user_metadata` (user-editable). Set them when you create/invite a user.
+- Frontend uses the **publishable key** (`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`);
+  server-only admin tasks use the **secret key** (`SUPABASE_SECRET_KEY`).
 - `firm_id` **auto-defaults to `current_firm_id()`** on insert, so feature code
   doesn't have to set it (and the RLS `WITH CHECK` still blocks forging another
   firm's id). The service-role lead-ingestion path has no session, so it **must**
