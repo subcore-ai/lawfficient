@@ -9,7 +9,7 @@ specifications.
 
 - **Cross-cutting** (`00`–`03`) — context every module depends on: product overview,
   domain glossary, the role/permission model, and the architecture & v1-scope decisions.
-- **Modules** (`10`–`22`) — one spec per functional area of the product. Each maps to a set
+- **Modules** (`10`–`23`) — one spec per functional area of the product. Each maps to a set
   of use cases (UC#) from the source spec and describes purpose, roles, requirements, data
   model, screens, and acceptance criteria.
 
@@ -36,6 +36,7 @@ Each module spec follows the same template (see [`_template.md`](_template.md)).
 | 20 | [Reporting & Analytics](20-reporting-analytics.md) | Feature §2.2.7 |
 | 21 | [Integrations](21-integrations.md) | UC2, UC33 (migration), UC37, UC39 |
 | 22 | [Admin & Settings](22-admin-settings.md) | UC23, UC24, UC25 |
+| 23 | [Lead Ingestion & Source Connectors](23-lead-ingestion.md) | UC2, UC3, UC6, UC7, UC43 (multi-source contract) |
 
 ## Conventions
 
