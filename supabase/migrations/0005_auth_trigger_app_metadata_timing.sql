@@ -24,7 +24,7 @@ begin
     return new;
   end if;
 
-  insert into public.profiles (id, firm_id, name, email, role, status)
+  insert into public.profiles as p (id, firm_id, name, email, role, status)
   values (
     new.id,
     v_firm,
@@ -35,10 +35,13 @@ begin
   )
   on conflict (id) do update set
     firm_id = excluded.firm_id,
-    name    = excluded.name,
     email   = excluded.email,
-    role    = excluded.role,
-    status  = excluded.status;
+    -- Only overwrite name/role/status when this app_metadata actually carried
+    -- them; otherwise keep the existing profile so an unrelated app_metadata
+    -- update can't silently reset a user back to the defaults.
+    name   = coalesce(new.raw_app_meta_data ->> 'name', p.name),
+    role   = coalesce((new.raw_app_meta_data ->> 'role')::public.staff_role, p.role),
+    status = coalesce((new.raw_app_meta_data ->> 'status')::public.staff_status, p.status);
 
   return new;
 end;
