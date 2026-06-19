@@ -69,11 +69,14 @@ RLS policies and the `firm_id`-on-every-table layout stay unchanged — only the
      },
    })
    ```
-4. Regenerate types (replaces the placeholder shim):
+4. Regenerate types (replaces the placeholder shim) — from the repo root:
+
    ```bash
-   bunx supabase gen types typescript --project-id <ref> \
-     > apps/app/lib/supabase/database.types.ts
+   bun run db:types
    ```
+
+   Wraps `supabase gen types typescript --project-id <ref> --schema public` and
+   writes `apps/app/lib/supabase/database.types.ts`. Rerun it after any schema change.
 
 ## Follow-up optimizations (not blocking)
 

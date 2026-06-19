@@ -18,6 +18,7 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
@@ -133,15 +134,17 @@ export function AppTopbar() {
             <span className="hidden text-sm font-medium lg:inline">{CURRENT_USER.name}</span>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel>
-              <div className="flex flex-col">
-                <span className="text-sm font-medium">{CURRENT_USER.name}</span>
-                <span className="text-muted-foreground text-xs font-normal">{CURRENT_USER.email}</span>
-                <span className="text-muted-foreground mt-1 text-xs font-normal">
-                  Viewing as {ROLE_LABELS[currentRole]}
-                </span>
-              </div>
-            </DropdownMenuLabel>
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium">{CURRENT_USER.name}</span>
+                  <span className="text-muted-foreground text-xs font-normal">{CURRENT_USER.email}</span>
+                  <span className="text-muted-foreground mt-1 text-xs font-normal">
+                    Viewing as {ROLE_LABELS[currentRole]}
+                  </span>
+                </div>
+              </DropdownMenuLabel>
+            </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuSub>
               <DropdownMenuSubTrigger>
@@ -168,11 +171,9 @@ export function AppTopbar() {
               <Settings className="size-4" /> Settings
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <form action={signOut}>
-              <DropdownMenuItem render={<button type="submit" className="w-full" />}>
-                <LogOut className="size-4" /> Log out
-              </DropdownMenuItem>
-            </form>
+            <DropdownMenuItem onClick={() => React.startTransition(() => signOut())}>
+              <LogOut className="size-4" /> Log out
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
