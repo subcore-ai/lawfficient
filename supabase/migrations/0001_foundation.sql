@@ -127,8 +127,15 @@ $$;
 
 revoke execute on function public.current_firm_id() from public;
 revoke execute on function public.current_staff_role() from public;
-grant execute on function public.current_firm_id() to authenticated;
-grant execute on function public.current_staff_role() to authenticated;
+grant execute on function public.current_firm_id() to authenticated, service_role;
+grant execute on function public.current_staff_role() to authenticated, service_role;
+
+-- Auto-scope inserts to the caller's firm. Now that current_firm_id() exists,
+-- default these firm-managed tables to it (RLS WITH CHECK still blocks forging
+-- another firm's id). profiles is excluded: its firm_id is set by the signup
+-- trigger from app_metadata, before any profile row exists to look up.
+alter table public.pods          alter column firm_id set default public.current_firm_id();
+alter table public.packet_stages alter column firm_id set default public.current_firm_id();
 
 -- ---------------------------------------------------------------- RLS: core
 alter table public.firms enable row level security;

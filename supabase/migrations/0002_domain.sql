@@ -5,7 +5,7 @@
 -- ---------------------------------------------------------------- Leads
 create table public.leads (
   id                 uuid primary key default gen_random_uuid(),
-  firm_id            uuid not null references public.firms(id) on delete cascade,
+  firm_id            uuid not null default public.current_firm_id() references public.firms(id) on delete cascade,
   first_name         text not null,
   last_name          text not null,
   phone              text not null default '',
@@ -31,7 +31,7 @@ create index leads_assigned_to_idx on public.leads (assigned_to_id);
 -- Lead activity / disposition log.
 create table public.interactions (
   id        uuid primary key default gen_random_uuid(),
-  firm_id   uuid not null references public.firms(id) on delete cascade,
+  firm_id   uuid not null default public.current_firm_id() references public.firms(id) on delete cascade,
   lead_id   uuid not null references public.leads(id) on delete cascade,
   type      text not null check (type in ('call', 'sms', 'email', 'note', 'disposition')),
   summary   text not null,
@@ -43,7 +43,7 @@ create index interactions_lead_id_idx on public.interactions (lead_id);
 -- ---------------------------------------------------------------- Consultations
 create table public.consultations (
   id            uuid primary key default gen_random_uuid(),
-  firm_id       uuid not null references public.firms(id) on delete cascade,
+  firm_id       uuid not null default public.current_firm_id() references public.firms(id) on delete cascade,
   lead_id       uuid references public.leads(id) on delete set null,
   lead_name     text not null,
   attorney_id   uuid references public.profiles(id) on delete set null,
@@ -64,7 +64,7 @@ create index consultations_lead_id_idx on public.consultations (lead_id);
 -- ---------------------------------------------------------------- Clients
 create table public.clients (
   id              uuid primary key default gen_random_uuid(),
-  firm_id         uuid not null references public.firms(id) on delete cascade,
+  firm_id         uuid not null default public.current_firm_id() references public.firms(id) on delete cascade,
   lead_id         uuid references public.leads(id) on delete set null,
   name            text not null,
   case_type       text not null,
@@ -82,7 +82,7 @@ create index clients_firm_id_idx on public.clients (firm_id);
 -- ---------------------------------------------------------------- Cases
 create table public.immigration_cases (
   id                  uuid primary key default gen_random_uuid(),
-  firm_id             uuid not null references public.firms(id) on delete cascade,
+  firm_id             uuid not null default public.current_firm_id() references public.firms(id) on delete cascade,
   client_id           uuid not null references public.clients(id) on delete cascade,
   client_name         text not null,
   case_type           text not null,
@@ -104,7 +104,7 @@ create index immigration_cases_client_id_idx on public.immigration_cases (client
 
 create table public.deadlines (
   id           uuid primary key default gen_random_uuid(),
-  firm_id      uuid not null references public.firms(id) on delete cascade,
+  firm_id      uuid not null default public.current_firm_id() references public.firms(id) on delete cascade,
   case_id      uuid not null references public.immigration_cases(id) on delete cascade,
   client_name  text not null,
   kind         text not null check (kind in ('RFE', 'NOID', 'Denial', 'Abeyance Letter')),
@@ -118,7 +118,7 @@ create index deadlines_case_id_idx on public.deadlines (case_id);
 
 create table public.case_tasks (
   id           uuid primary key default gen_random_uuid(),
-  firm_id      uuid not null references public.firms(id) on delete cascade,
+  firm_id      uuid not null default public.current_firm_id() references public.firms(id) on delete cascade,
   case_id      uuid references public.immigration_cases(id) on delete cascade,
   title        text not null,
   assignee_id  uuid references public.profiles(id) on delete set null,
@@ -131,7 +131,7 @@ create index case_tasks_firm_id_idx on public.case_tasks (firm_id);
 -- ---------------------------------------------------------------- Billing
 create table public.invoices (
   id             uuid primary key default gen_random_uuid(),
-  firm_id        uuid not null references public.firms(id) on delete cascade,
+  firm_id        uuid not null default public.current_firm_id() references public.firms(id) on delete cascade,
   number         text not null,
   client_id      uuid references public.clients(id) on delete cascade,
   client_name    text not null,
@@ -152,7 +152,7 @@ create index invoices_client_id_idx on public.invoices (client_id);
 -- ---------------------------------------------------------------- Documents
 create table public.documents (
   id              uuid primary key default gen_random_uuid(),
-  firm_id         uuid not null references public.firms(id) on delete cascade,
+  firm_id         uuid not null default public.current_firm_id() references public.firms(id) on delete cascade,
   client_id       uuid references public.clients(id) on delete set null,
   case_id         uuid references public.immigration_cases(id) on delete set null,
   client_name     text not null,
@@ -171,7 +171,7 @@ create index documents_firm_id_idx on public.documents (firm_id);
 -- by_user_id null = system action. entity_id is text to tolerate non-uuid keys.
 create table public.audit_log (
   id          uuid primary key default gen_random_uuid(),
-  firm_id     uuid not null references public.firms(id) on delete cascade,
+  firm_id     uuid not null default public.current_firm_id() references public.firms(id) on delete cascade,
   entity      public.audit_entity not null,
   entity_id   text not null,
   label       text not null default '',

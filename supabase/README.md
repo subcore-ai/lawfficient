@@ -21,6 +21,27 @@ feature needs a schema change, raise it against the foundation first.**
   rows. This is the real enforcement; the app's `can()` matrix only hides UI.
 - `firm_id` / `role` come from **`app_metadata`** (service-role only), never
   `user_metadata` (user-editable). Set them when you create/invite a user.
+- `firm_id` **auto-defaults to `current_firm_id()`** on insert, so feature code
+  doesn't have to set it (and the RLS `WITH CHECK` still blocks forging another
+  firm's id). The service-role lead-ingestion path has no session, so it **must**
+  set `firm_id` explicitly — resolve it from the API key/source mapping, never
+  from the inbound payload.
+
+### Assumption: one user = one firm
+
+`profiles` is 1:1 with `auth.users` and carries a single `firm_id`. This is
+correct for firm staff and keeps RLS simple. **If a user ever needs to belong to
+multiple firms**, migrate like this:
+
+1. Add a `memberships(user_id, firm_id, role)` table; backfill from `profiles`.
+2. Add an "active firm" to the session — a JWT `app_metadata.firm_id` claim the
+   user can switch between firms they're a member of.
+3. Change `current_firm_id()` to read that claim instead of `profiles.firm_id`,
+   and `current_staff_role()` to read the membership row for the active firm.
+4. Drop the `firm_id` column from `profiles` (or keep it as "home firm").
+
+RLS policies and the `firm_id`-on-every-table layout stay unchanged — only the
+*resolution* of "which firm is this user acting as" moves into the claim.
 
 ## Bootstrap (once you have a project)
 
