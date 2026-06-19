@@ -1,4 +1,4 @@
-// Session-refresh middleware helper.
+// Session-refresh proxy helper.
 // Keeps the Supabase auth cookie fresh on every request and gates the
 // authenticated app shell. No-ops when Supabase isn't configured yet so the
 // Phase 0 mock app keeps working until credentials + a first user exist.
