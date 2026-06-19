@@ -39,6 +39,7 @@ create table public.interactions (
   at        timestamptz not null default now()
 );
 create index interactions_lead_id_idx on public.interactions (lead_id);
+create index interactions_firm_id_idx on public.interactions (firm_id);
 
 -- ---------------------------------------------------------------- Consultations
 create table public.consultations (
@@ -89,7 +90,7 @@ create table public.immigration_cases (
   hierarchy           text not null default 'NHRC' check (hierarchy in ('HRC', 'NHRC')),
   difficulty          smallint not null default 1 check (difficulty between 1 and 3),
   status              public.case_status not null default 'onboarding',
-  stage               integer not null default 1,
+  stage               integer not null default 1 check (stage between 1 and 10),
   red_flag            public.red_flag not null default 'none',
   la_id               uuid references public.profiles(id) on delete set null,
   attorney_id         uuid references public.profiles(id) on delete set null,

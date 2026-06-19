@@ -16,8 +16,8 @@ begin
   values (
     new.id,
     (new.raw_app_meta_data ->> 'firm_id')::uuid,
-    coalesce(new.raw_app_meta_data ->> 'name', split_part(new.email, '@', 1)),
-    new.email,
+    coalesce(new.raw_app_meta_data ->> 'name', split_part(coalesce(new.email, ''), '@', 1), 'Staff User'),
+    coalesce(new.email, ''),
     coalesce((new.raw_app_meta_data ->> 'role')::public.staff_role, 'sales'),
     'active'
   );

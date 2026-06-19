@@ -162,6 +162,34 @@ create policy "profiles_admin_write" on public.profiles
   using (firm_id = public.current_firm_id() and public.current_staff_role() = 'admin')
   with check (firm_id = public.current_firm_id() and public.current_staff_role() = 'admin');
 
+-- Privilege-escalation guard. profiles_update_self lets a user edit their own
+-- row (name, pod, etc.), but an RLS WITH CHECK can't see the OLD row, so it
+-- can't stop them flipping their own role/status/firm_id to admin. This trigger
+-- does: a user may not change those privileged fields on their own row. Admins
+-- changing *other* users' rows (auth.uid() <> the row) are unaffected; admin
+-- changes to privileged fields on one's own account go through the service role.
+create or replace function public.guard_profile_privileges()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if (select auth.uid()) = new.id then
+    if new.role is distinct from old.role
+       or new.status is distinct from old.status
+       or new.firm_id is distinct from old.firm_id then
+      raise exception 'cannot change role, status, or firm on your own profile';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+create trigger profiles_guard_privileges
+  before update on public.profiles
+  for each row execute function public.guard_profile_privileges();
+
 -- Pods + packet stages: firm-scoped read; admins write.
 create policy "pods_select_firm" on public.pods
   for select to authenticated

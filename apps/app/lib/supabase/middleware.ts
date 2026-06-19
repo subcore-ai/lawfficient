@@ -46,7 +46,13 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
   if (!user && !isPublicPath(request.nextUrl.pathname)) {
     const url = request.nextUrl.clone()
     url.pathname = "/login"
-    return NextResponse.redirect(url)
+    // Carry over any refreshed/cleared auth cookies so the redirect doesn't drop
+    // them — otherwise stale cookies can cause a redirect loop.
+    const redirectResponse = NextResponse.redirect(url)
+    for (const cookie of response.cookies.getAll()) {
+      redirectResponse.cookies.set(cookie)
+    }
+    return redirectResponse
   }
 
   return response

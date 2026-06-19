@@ -19,19 +19,18 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   if (!isSupabaseConfigured()) return null
 
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return null
+  const { data, error } = await supabase.auth.getUser()
+  if (error || !data?.user) return null
+  const user = data.user
 
-  const { data } = await supabase
+  const { data: profileRow } = await supabase
     .from("profiles")
     .select("id, email, name, role, firm_id, pod_id")
     .eq("id", user.id)
     .single()
 
   // Cast: column-level types arrive once database.types.ts is regenerated.
-  const profile = data as {
+  const profile = profileRow as {
     id: string
     email: string
     name: string
