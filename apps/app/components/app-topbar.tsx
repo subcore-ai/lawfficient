@@ -33,6 +33,7 @@ import { Separator } from "@workspace/ui/components/separator"
 import { SidebarTrigger } from "@workspace/ui/components/sidebar"
 
 import { ThemeToggle } from "@/components/theme-toggle"
+import { signOut } from "@/app/(auth)/actions"
 import { CURRENT_USER, ROLE_LABELS } from "@/data"
 import { useStore } from "@/data/store"
 import type { Role } from "@/data/types"
@@ -167,9 +168,11 @@ export function AppTopbar() {
               <Settings className="size-4" /> Settings
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem render={<Link href="/login" />}>
-              <LogOut className="size-4" /> Log out
-            </DropdownMenuItem>
+            <form action={signOut}>
+              <DropdownMenuItem render={<button type="submit" className="w-full" />}>
+                <LogOut className="size-4" /> Log out
+              </DropdownMenuItem>
+            </form>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

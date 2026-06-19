@@ -1,11 +1,23 @@
+import { redirect } from "next/navigation"
+
 import { SidebarInset, SidebarProvider } from "@workspace/ui/components/sidebar"
 import { TooltipProvider } from "@workspace/ui/components/tooltip"
 
 import { AppSidebar } from "@/components/app-sidebar"
 import { AppTopbar } from "@/components/app-topbar"
 import { MockStoreProvider } from "@/data/store"
+import { getCurrentUser } from "@/lib/auth/session"
+import { isSupabaseConfigured } from "@/lib/supabase/env"
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+export default async function AppLayout({ children }: { children: React.ReactNode }) {
+  // Keep the auth contract consistent: a valid JWT without a profiles row is
+  // treated as unauthenticated everywhere (getCurrentUser() returns null), so
+  // don't let the app shell load for it. Skipped when Supabase isn't configured
+  // so the Phase 0 mock app still renders.
+  if (isSupabaseConfigured() && !(await getCurrentUser())) {
+    redirect("/login")
+  }
+
   return (
     <MockStoreProvider>
       <TooltipProvider>
