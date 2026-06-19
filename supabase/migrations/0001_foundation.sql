@@ -112,7 +112,8 @@ stable
 security definer
 set search_path = ''
 as $$
-  select firm_id from public.profiles where id = (select auth.uid())
+  select firm_id from public.profiles
+  where id = (select auth.uid()) and status = 'active'
 $$;
 
 create or replace function public.current_staff_role()
@@ -122,7 +123,8 @@ stable
 security definer
 set search_path = ''
 as $$
-  select role from public.profiles where id = (select auth.uid())
+  select role from public.profiles
+  where id = (select auth.uid()) and status = 'active'
 $$;
 
 revoke execute on function public.current_firm_id() from public;
