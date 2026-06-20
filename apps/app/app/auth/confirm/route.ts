@@ -13,8 +13,10 @@ export async function GET(request: NextRequest) {
   const token_hash = searchParams.get("token_hash")
   const type = searchParams.get("type") as EmailOtpType | null
   const next = searchParams.get("next") ?? "/"
-  // Same-origin relative redirects only — never an attacker-supplied absolute URL.
-  const safeNext = next.startsWith("/") ? next : "/"
+  // Same-origin relative redirects only. Reject protocol-relative ("//evil.com") and
+  // backslash ("/\\evil") targets that new URL() would resolve to an external origin.
+  const safeNext =
+    next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next : "/"
 
   if (token_hash && type) {
     const supabase = await createClient()

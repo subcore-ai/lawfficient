@@ -27,7 +27,19 @@ export async function activateAccount(
     return { error: "Your activation link has expired. Ask an admin to resend the invite." }
   }
 
+  // Only an *invited* account activates here — otherwise an already-active (or
+  // disabled) user with a live session could reset their password without the current
+  // one. Read via the admin client: an invited user can't see their own row under RLS.
   const admin = createAdminClient()
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("status")
+    .eq("id", data.user.id)
+    .maybeSingle()
+  if (!profile || profile.status !== "invited") {
+    return { error: "This account is already active or can't be activated." }
+  }
+
   const { error: updateError } = await admin.auth.admin.updateUserById(data.user.id, {
     password,
     app_metadata: { ...(data.user.app_metadata ?? {}), status: "active" },

@@ -202,7 +202,8 @@ export function UserRowActions({
         await navigator.clipboard.writeText(res.url)
         toast.success("Invite link copied", { description: "Share it with the new user directly." })
       } catch {
-        toast.error("Couldn't access the clipboard", { description: res.url })
+        // Don't surface the URL — it carries the single-use invite token.
+        toast.error("Couldn't access the clipboard. Try copying the link again.")
       }
     })
   }

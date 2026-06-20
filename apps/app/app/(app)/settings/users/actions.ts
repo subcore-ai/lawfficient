@@ -43,7 +43,8 @@ async function otherActiveAdmins(
 }
 
 async function confirmUrl(): Promise<string | undefined> {
-  const origin = (await headers()).get("origin") ?? process.env.NEXT_PUBLIC_SITE_URL ?? ""
+  const base = (await headers()).get("origin") ?? process.env.NEXT_PUBLIC_SITE_URL ?? ""
+  const origin = base.replace(/\/$/, "")
   return origin ? `${origin}/auth/confirm` : undefined
 }
 
@@ -297,7 +298,8 @@ export async function getInviteLink(
   if (error) return { error: "Couldn't generate the invite link." }
   if (!token) return { error: "No pending invite for this user." }
 
-  const origin = (await headers()).get("origin") ?? process.env.NEXT_PUBLIC_SITE_URL ?? ""
+  const base = (await headers()).get("origin") ?? process.env.NEXT_PUBLIC_SITE_URL ?? ""
+  const origin = base.replace(/\/$/, "")
   if (!origin) return { error: "Couldn't resolve the app URL for the link." }
   return { url: `${origin}/auth/confirm?token_hash=${token}&type=invite&next=/set-password` }
 }
