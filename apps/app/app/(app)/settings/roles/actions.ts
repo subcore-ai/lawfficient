@@ -83,8 +83,17 @@ export async function renameRole(roleId: string, formData: FormData): Promise<Ac
   if (!name) return { error: "Enter a role name." }
 
   const supabase = await createClient()
-  const { error } = await supabase.from("roles").update({ name }).eq("id", roleId)
+  // Custom roles only: the is_system filter makes renaming a system role a no-op
+  // match (no rows) rather than relying on the UI to hide the control — system roles
+  // stay locked, consistent with the guard's key/is_system/firm immutability.
+  const { data, error } = await supabase
+    .from("roles")
+    .update({ name })
+    .eq("id", roleId)
+    .eq("is_system", false)
+    .select("id")
   if (error) return { error: "Couldn't rename the role." }
+  if (!data || data.length === 0) return { error: "That role can't be renamed." }
 
   await audit(supabase, gate.user.id, roleId, name, "renamed")
   revalidatePath(ROLES_PATH)

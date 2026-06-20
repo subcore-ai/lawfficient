@@ -6,7 +6,7 @@ export type AppPermission = Database["public"]["Enums"]["app_permission"]
 export type PermissionGroup = {
   /** Module display label. */
   module: string
-  permissions: { key: AppPermission; label: string }[]
+  permissions: readonly { key: AppPermission; label: string }[]
 }
 
 /**
@@ -15,7 +15,7 @@ export type PermissionGroup = {
  * migration AND an entry here. The `key: AppPermission` typing keeps them honest —
  * a key dropped from the enum stops type-checking here.
  */
-export const PERMISSION_GROUPS: PermissionGroup[] = [
+export const PERMISSION_GROUPS = [
   { module: "Dashboard", permissions: [{ key: "dashboard.view", label: "View" }] },
   {
     module: "Leads",
@@ -74,7 +74,19 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
       { key: "settings.manage", label: "Manage settings & roles" },
     ],
   },
-]
+] as const satisfies readonly PermissionGroup[]
+
+// Compile-time exhaustiveness: PERMISSIONS_ARE_EXHAUSTIVE is `true` only when every
+// app_permission is placed in a module group above. If the enum gains a value that is
+// missing from PERMISSION_GROUPS, _UngroupedPermission becomes that permission and this
+// assignment fails to compile — so the matrix can never silently drop a permission.
+type _UngroupedPermission = Exclude<
+  AppPermission,
+  (typeof PERMISSION_GROUPS)[number]["permissions"][number]["key"]
+>
+export const PERMISSIONS_ARE_EXHAUSTIVE: [_UngroupedPermission] extends [never]
+  ? true
+  : _UngroupedPermission = true
 
 /** Flat list of every valid permission key — used to validate incoming sets server-side. */
 export const ALL_PERMISSIONS: AppPermission[] = PERMISSION_GROUPS.flatMap((g) =>
