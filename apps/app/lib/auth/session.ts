@@ -2,6 +2,7 @@
 // through these so role + firm scoping stay consistent everywhere.
 import { createClient } from "@/lib/supabase/server"
 import { isSupabaseConfigured } from "@/lib/supabase/env"
+import type { AppPermission } from "@/lib/rbac/permissions"
 import type { Role } from "@/data/types"
 
 export type CurrentUser = {
@@ -11,6 +12,8 @@ export type CurrentUser = {
   role: Role
   firmId: string
   podId: string | null
+  // RBAC permissions from the access-token hook; null until the hook is live.
+  permissions: AppPermission[] | null
 }
 
 // Returns the signed-in user's firm-scoped profile, or null when not
@@ -44,6 +47,12 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   } | null
   if (!profile) return null
 
+  // Permissions are stamped into app_metadata by the access-token hook (the union
+  // of the user's role permissions). Absent until the hook is registered → null,
+  // which signals callers to fall back to the role-based matrix.
+  const stamped = user.app_metadata?.permissions
+  const permissions = Array.isArray(stamped) ? (stamped as AppPermission[]) : null
+
   return {
     id: profile.id,
     email: profile.email,
@@ -51,5 +60,6 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     role: profile.role as Role,
     firmId: profile.firm_id,
     podId: profile.pod_id,
+    permissions,
   }
 }

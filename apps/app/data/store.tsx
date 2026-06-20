@@ -3,6 +3,7 @@
 import * as React from "react"
 
 import { initialsOf } from "@/lib/format"
+import type { AppPermission } from "@/lib/rbac/permissions"
 import {
   CASES,
   CLIENTS,
@@ -42,7 +43,7 @@ function nextId(prefix: string) {
 // Canonical matrix lives in @/lib/auth/permissions (shared by server + client).
 // Re-exported here so existing imports from @/data/store keep working.
 
-export { can, type Permission } from "@/lib/auth/permissions"
+export { can, hasPermission, type Permission } from "@/lib/auth/permissions"
 
 // ---------------------------------------------------------------- Inputs
 
@@ -94,6 +95,7 @@ type Store = {
   auditLog: AuditEntry[]
   currentRole: Role
   setCurrentRole: (role: Role) => void
+  currentPermissions: AppPermission[] | null
   addLead: (input: NewLeadInput) => Lead
   updateLead: (id: string, patch: Partial<Lead>, summary?: string) => void
   convertLead: (id: string) => void
@@ -134,9 +136,11 @@ export function useStore() {
 export function MockStoreProvider({
   children,
   initialRole,
+  initialPermissions,
 }: {
   children: React.ReactNode
   initialRole?: Role
+  initialPermissions?: AppPermission[] | null
 }) {
   const [leads, setLeads] = React.useState<Lead[]>(LEADS)
   const [consultations, setConsultations] = React.useState<Consultation[]>(CONSULTATIONS)
@@ -176,6 +180,7 @@ export function MockStoreProvider({
       auditLog,
       currentRole,
       setCurrentRole,
+      currentPermissions: initialPermissions ?? null,
 
       addLead: (input) => {
         const lead: Lead = {
@@ -331,7 +336,7 @@ export function MockStoreProvider({
         }),
       resetPacketPipeline: () => setPacketPipeline(DEFAULT_PACKET_PIPELINE),
     }
-  }, [leads, consultations, clients, cases, invoices, documents, staff, auditLog, currentRole, packetPipeline, logAudit])
+  }, [leads, consultations, clients, cases, invoices, documents, staff, auditLog, currentRole, initialPermissions, packetPipeline, logAudit])
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
 }

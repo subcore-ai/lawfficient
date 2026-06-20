@@ -20,7 +20,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <MockStoreProvider initialRole={me?.role}>
+    <MockStoreProvider initialRole={me?.role} initialPermissions={me?.permissions ?? null}>
       <TooltipProvider>
         <SidebarProvider>
           <AppSidebar />
