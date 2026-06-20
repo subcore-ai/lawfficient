@@ -74,9 +74,15 @@ begin
   select id into v_primary_role_id
   from public.roles
   where firm_id = v_firm_id and key = v_primary_key and is_system;
+  -- Fail closed: if the primary system role can't be resolved, don't replace the
+  -- set at all (silently dropping the base role would be worse). Seeded firms
+  -- always have it, so this only fires on a real inconsistency.
+  if v_primary_role_id is null then
+    raise exception 'primary system role not found for this user' using errcode = 'P0002';
+  end if;
 
   v_ids := coalesce(p_role_ids, array[]::uuid[]);
-  if v_primary_role_id is not null and not (v_primary_role_id = any (v_ids)) then
+  if not (v_primary_role_id = any (v_ids)) then
     v_ids := array_append(v_ids, v_primary_role_id);
   end if;
 
