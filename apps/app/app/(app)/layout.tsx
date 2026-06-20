@@ -14,17 +14,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // treated as unauthenticated everywhere (getCurrentUser() returns null), so
   // don't let the app shell load for it. Skipped when Supabase isn't configured
   // so the Phase 0 mock app still renders.
-  if (isSupabaseConfigured() && !(await getCurrentUser())) {
+  const me = isSupabaseConfigured() ? await getCurrentUser() : null
+  if (isSupabaseConfigured() && !me) {
     redirect("/login")
   }
 
   return (
-    <MockStoreProvider>
+    <MockStoreProvider initialRole={me?.role}>
       <TooltipProvider>
         <SidebarProvider>
           <AppSidebar />
           <SidebarInset>
-            <AppTopbar />
+            <AppTopbar user={me} />
             <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">{children}</div>
           </SidebarInset>
         </SidebarProvider>

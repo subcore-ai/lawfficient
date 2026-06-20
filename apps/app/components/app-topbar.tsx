@@ -38,6 +38,7 @@ import { signOut } from "@/app/(auth)/actions"
 import { CURRENT_USER, ROLE_LABELS } from "@/data"
 import { useStore } from "@/data/store"
 import type { Role } from "@/data/types"
+import { initialsOf } from "@/lib/format"
 
 const ROLES = Object.keys(ROLE_LABELS) as Role[]
 
@@ -66,10 +67,15 @@ function labelFor(segment: string) {
   return SEGMENT_LABELS[segment] ?? "Details"
 }
 
-export function AppTopbar() {
+export function AppTopbar({ user }: { user?: { name: string; email: string } | null }) {
   const pathname = usePathname()
   const segments = pathname.split("/").filter(Boolean)
   const { currentRole, setCurrentRole } = useStore()
+
+  // Real signed-in user when Supabase is wired; the mock keeps the Phase 0 demo working.
+  const name = user?.name ?? CURRENT_USER.name
+  const email = user?.email ?? CURRENT_USER.email
+  const initials = user ? initialsOf(user.name) : CURRENT_USER.initials
 
   return (
     <header className="bg-background/80 sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b px-4 backdrop-blur md:px-6">
@@ -128,17 +134,17 @@ export function AppTopbar() {
           >
             <Avatar className="size-7 rounded-md">
               <AvatarFallback className="bg-primary text-primary-foreground rounded-md text-xs">
-                {CURRENT_USER.initials}
+                {initials}
               </AvatarFallback>
             </Avatar>
-            <span className="hidden text-sm font-medium lg:inline">{CURRENT_USER.name}</span>
+            <span className="hidden text-sm font-medium lg:inline">{name}</span>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuGroup>
               <DropdownMenuLabel>
                 <div className="flex flex-col">
-                  <span className="text-sm font-medium">{CURRENT_USER.name}</span>
-                  <span className="text-muted-foreground text-xs font-normal">{CURRENT_USER.email}</span>
+                  <span className="text-sm font-medium">{name}</span>
+                  <span className="text-muted-foreground text-xs font-normal">{email}</span>
                   <span className="text-muted-foreground mt-1 text-xs font-normal">
                     Viewing as {ROLE_LABELS[currentRole]}
                   </span>
