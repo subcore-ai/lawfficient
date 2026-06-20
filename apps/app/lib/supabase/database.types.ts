@@ -958,6 +958,7 @@ export type Database = {
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
       firm_exists: { Args: { p_firm_id: string }; Returns: boolean }
       invite_token_for: { Args: { p_user_id: string }; Returns: string }
+      rbac_unstamped: { Args: never; Returns: boolean }
       seed_system_roles: { Args: { p_firm_id: string }; Returns: undefined }
       set_role_permissions: {
         Args: {
