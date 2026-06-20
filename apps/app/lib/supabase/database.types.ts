@@ -967,6 +967,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      set_user_roles: {
+        Args: { p_role_ids: string[]; p_user_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       app_permission:

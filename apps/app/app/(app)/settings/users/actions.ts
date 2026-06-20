@@ -284,6 +284,52 @@ export async function updateUserProfile(
   return { ok: true }
 }
 
+// Assign the full set of roles a user holds (multi-role). The user's *primary*
+// role (profiles.role) is always kept — the UI locks it and we re-add it here so a
+// user can't lose their base role's access. set_user_roles replaces atomically;
+// the user_roles RLS (firm-scoped, settings.manage / admin) is the real gate.
+export async function setUserRoles(userId: string, roleIds: string[]): Promise<ActionResult> {
+  const gate = await requireAdmin()
+  if (!gate.ok) return { error: gate.error }
+  const admin = gate.user
+
+  const supabase = await createClient()
+  const { data: target } = await supabase
+    .from("profiles")
+    .select("id, name, role")
+    .eq("id", userId)
+    .maybeSingle()
+  if (!target) return { error: "User not found." }
+
+  // Always include the primary role's system role in the set.
+  const { data: primaryRole } = await supabase
+    .from("roles")
+    .select("id")
+    .eq("key", target.role)
+    .eq("is_system", true)
+    .maybeSingle()
+
+  const ids = new Set(roleIds)
+  if (primaryRole) ids.add(primaryRole.id)
+
+  const { error } = await supabase.rpc("set_user_roles", {
+    p_user_id: userId,
+    p_role_ids: [...ids],
+  })
+  if (error) return { error: "Couldn't update the user's roles." }
+
+  await supabase.from("audit_log").insert({
+    entity: "user",
+    entity_id: userId,
+    label: target.name,
+    action: "roles_updated",
+    by_user_id: admin.id,
+  })
+
+  revalidatePath(USERS_PATH)
+  return { ok: true }
+}
+
 // Read a pending invite's activation link so an admin can share it directly
 // (without waiting on email). invite_token_for (0007) returns the *existing*
 // token, so the emailed link stays valid — generateLink would regenerate it.
