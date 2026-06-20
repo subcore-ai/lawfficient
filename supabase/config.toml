@@ -27,3 +27,11 @@ content_path = "./supabase/templates/invite.html"
 enabled = false
 client_id = "env(SUPABASE_AUTH_GOOGLE_CLIENT_ID)"
 secret = "env(SUPABASE_AUTH_GOOGLE_SECRET)"
+
+# RBAC (spec 25): the custom access-token hook stamps the user's effective
+# permissions into the JWT (app_metadata.permissions), read by authorize() in RLS.
+# Defined in migration 0008. On the hosted project, enable this in the dashboard
+# instead (Authentication → Hooks → "Customize Access Token (JWT) Claims").
+[auth.hook.custom_access_token]
+enabled = true
+uri = "pg-functions://postgres/public/custom_access_token_hook"
