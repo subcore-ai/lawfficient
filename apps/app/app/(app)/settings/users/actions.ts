@@ -282,3 +282,22 @@ export async function updateUserProfile(
   revalidatePath(USERS_PATH)
   return { ok: true }
 }
+
+// Read a pending invite's activation link so an admin can share it directly
+// (without waiting on email). invite_token_for (0007) returns the *existing*
+// token, so the emailed link stays valid — generateLink would regenerate it.
+export async function getInviteLink(
+  userId: string,
+): Promise<{ url: string } | { error: string }> {
+  const gate = await requireAdmin()
+  if (!gate.ok) return { error: gate.error }
+
+  const supabase = await createClient()
+  const { data: token, error } = await supabase.rpc("invite_token_for", { p_user_id: userId })
+  if (error) return { error: "Couldn't generate the invite link." }
+  if (!token) return { error: "No pending invite for this user." }
+
+  const origin = (await headers()).get("origin") ?? process.env.NEXT_PUBLIC_SITE_URL ?? ""
+  if (!origin) return { error: "Couldn't resolve the app URL for the link." }
+  return { url: `${origin}/auth/confirm?token_hash=${token}&type=invite&next=/set-password` }
+}

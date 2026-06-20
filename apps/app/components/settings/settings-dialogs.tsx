@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { UserPlus } from "lucide-react"
+import { Copy, UserPlus } from "lucide-react"
 
 import { Button } from "@workspace/ui/components/button"
 import { Checkbox } from "@workspace/ui/components/checkbox"
@@ -30,6 +30,7 @@ import { Field } from "@/components/form-field"
 import { ROLE_LABELS } from "@/data"
 import type { Role, StaffUser } from "@/data/types"
 import {
+  getInviteLink,
   inviteUser,
   resendInvite,
   revokeInvite,
@@ -189,9 +190,36 @@ export function UserRowActions({
     })
   }
 
+  // Copy the activation link (not a resend) so the admin can share it directly.
+  function copyInviteLink() {
+    startTransition(async () => {
+      const res = await getInviteLink(user.id)
+      if ("error" in res) {
+        toast.error(res.error)
+        return
+      }
+      try {
+        await navigator.clipboard.writeText(res.url)
+        toast.success("Invite link copied", { description: "Share it with the new user directly." })
+      } catch {
+        toast.error("Couldn't access the clipboard", { description: res.url })
+      }
+    })
+  }
+
   if (user.status === "invited") {
     return (
       <div className="flex justify-end gap-1">
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={pending}
+          onClick={copyInviteLink}
+          title="Copy invite link"
+          aria-label="Copy invite link"
+        >
+          <Copy className="size-4" />
+        </Button>
         <Button
           variant="ghost"
           size="sm"

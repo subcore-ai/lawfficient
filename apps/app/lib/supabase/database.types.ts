@@ -856,6 +856,7 @@ export type Database = {
         Args: never
         Returns: Database["public"]["Enums"]["staff_role"]
       }
+      invite_token_for: { Args: { p_user_id: string }; Returns: string }
     }
     Enums: {
       audit_entity:
