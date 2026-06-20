@@ -105,7 +105,7 @@ export async function deleteRole(roleId: string): Promise<ActionResult> {
   if (!gate.ok) return { error: gate.error }
 
   const supabase = await createClient()
-  const { error } = await supabase.from("roles").delete().eq("id", roleId)
+  const { data, error } = await supabase.from("roles").delete().eq("id", roleId).select("id")
   if (error) {
     // The guard_system_role trigger raises for system roles and still-assigned roles.
     if (/system roles cannot be deleted/i.test(error.message)) {
@@ -116,6 +116,9 @@ export async function deleteRole(roleId: string): Promise<ActionResult> {
     }
     return { error: "Couldn't delete the role." }
   }
+  // No row deleted = the role is already gone or outside the caller's firm
+  // (RLS-hidden); don't report success or write a bogus audit entry.
+  if (!data || data.length === 0) return { error: "That role couldn't be deleted." }
 
   await audit(supabase, gate.user.id, roleId, "", "deleted")
   revalidatePath(ROLES_PATH)
