@@ -30,10 +30,10 @@ export default function SetPasswordPage() {
       <CardContent>
         <form action={formAction} className="flex flex-col gap-4">
           <Field label="New password" htmlFor="password">
-            <Input id="password" name="password" type="password" required minLength={8} placeholder="••••••••" />
+            <Input id="password" name="password" type="password" required minLength={8} autoComplete="new-password" placeholder="••••••••" />
           </Field>
           <Field label="Confirm password" htmlFor="confirm">
-            <Input id="confirm" name="confirm" type="password" required minLength={8} placeholder="••••••••" />
+            <Input id="confirm" name="confirm" type="password" required minLength={8} autoComplete="new-password" placeholder="••••••••" />
           </Field>
           {state?.error ? (
             <p className="text-destructive text-sm" role="alert">

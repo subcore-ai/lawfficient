@@ -301,5 +301,8 @@ export async function getInviteLink(
   const base = (await headers()).get("origin") ?? process.env.NEXT_PUBLIC_SITE_URL ?? ""
   const origin = base.replace(/\/$/, "")
   if (!origin) return { error: "Couldn't resolve the app URL for the link." }
-  return { url: `${origin}/auth/confirm?token_hash=${token}&type=invite&next=/set-password` }
+  // encodeURIComponent is defensive — GoTrue's token_hash is hex today, but a
+  // future format with +/= would otherwise break the query string.
+  const tokenHash = encodeURIComponent(token)
+  return { url: `${origin}/auth/confirm?token_hash=${tokenHash}&type=invite&next=/set-password` }
 }
