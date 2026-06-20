@@ -84,7 +84,9 @@ begin
     raise exception 'primary system role not found for this user' using errcode = 'P0002';
   end if;
 
-  v_ids := coalesce(p_role_ids, array[]::uuid[]);
+  -- Drop any NULL ids defensively (only reachable via a malformed direct RPC call;
+  -- the app never sends them) so the membership test and the insert stay NULL-safe.
+  v_ids := array_remove(coalesce(p_role_ids, array[]::uuid[]), null);
   if not (v_primary_role_id = any (v_ids)) then
     v_ids := array_append(v_ids, v_primary_role_id);
   end if;
