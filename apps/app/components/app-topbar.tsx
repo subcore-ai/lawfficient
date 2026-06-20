@@ -61,6 +61,7 @@ const SEGMENT_LABELS: Record<string, string> = {
   roles: "Roles",
   templates: "Templates",
   integrations: "Integrations",
+  profile: "My profile",
 }
 
 function labelFor(segment: string) {
@@ -170,7 +171,7 @@ export function AppTopbar({ user }: { user?: { name: string; email: string } | n
               </DropdownMenuSubContent>
             </DropdownMenuSub>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem render={<Link href="/profile" />}>
               <User className="size-4" /> Profile
             </DropdownMenuItem>
             <DropdownMenuItem render={<Link href="/settings" />}>
