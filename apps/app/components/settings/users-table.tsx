@@ -8,7 +8,11 @@ import {
   TableRow,
 } from "@workspace/ui/components/table"
 
-import { UserRowActions } from "@/components/settings/settings-dialogs"
+import {
+  UserRowActions,
+  type ManagedUser,
+  type RoleOption,
+} from "@/components/settings/settings-dialogs"
 import { StatusPill, type Tone } from "@/components/status-pill"
 import { ROLE_LABELS } from "@/data"
 import type { StaffUser } from "@/data/types"
@@ -23,10 +27,12 @@ export function UsersTable({
   users,
   currentUserId,
   canManage,
+  roles,
 }: {
-  users: StaffUser[]
+  users: ManagedUser[]
   currentUserId: string
   canManage: boolean
+  roles: RoleOption[]
 }) {
   return (
     <Table>
@@ -59,12 +65,19 @@ export function UsersTable({
                   </div>
                 </div>
               </TableCell>
-              <TableCell className="hidden text-sm md:table-cell">{ROLE_LABELS[u.role]}</TableCell>
+              <TableCell className="hidden text-sm md:table-cell">
+                {ROLE_LABELS[u.role]}
+                {u.roleIds.length > 1 ? (
+                  <span className="text-muted-foreground"> +{u.roleIds.length - 1}</span>
+                ) : null}
+              </TableCell>
               <TableCell>
                 <StatusPill {...USER_STATUS[u.status]} />
               </TableCell>
               <TableCell className="pr-4 text-right">
-                {canManage ? <UserRowActions user={u} currentUserId={currentUserId} /> : null}
+                {canManage ? (
+                  <UserRowActions user={u} currentUserId={currentUserId} roles={roles} />
+                ) : null}
               </TableCell>
             </TableRow>
           ))
