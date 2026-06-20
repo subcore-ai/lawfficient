@@ -31,11 +31,14 @@ export async function activateAccount(
   // disabled) user with a live session could reset their password without the current
   // one. Read via the admin client: an invited user can't see their own row under RLS.
   const admin = createAdminClient()
-  const { data: profile } = await admin
+  const { data: profile, error: profileError } = await admin
     .from("profiles")
     .select("status")
     .eq("id", data.user.id)
     .maybeSingle()
+  if (profileError) {
+    return { error: "We couldn't verify your account just now. Please try again." }
+  }
   if (!profile || profile.status !== "invited") {
     return { error: "This account is already active or can't be activated." }
   }
