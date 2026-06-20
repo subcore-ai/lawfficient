@@ -5,12 +5,26 @@ import * as React from "react"
 import { toast } from "@workspace/ui/components/sonner"
 
 import { RowActions } from "@/components/row-actions"
-import { can, useStore, type Permission } from "@/data/store"
+import { hasPermission, useStore, type Permission } from "@/data/store"
+import type { AppPermission } from "@/lib/rbac/permissions"
 import type { EntityKind } from "@/data/types"
+
+// Each editable/archivable entity maps to its module's edit permission. Editing and
+// archiving (a destructive edit) both require it once RBAC is live; the permission
+// vocabulary has no separate delete action.
+const EDIT_PERMISSION: Partial<Record<EntityKind, AppPermission>> = {
+  lead: "leads.edit",
+  consultation: "consultations.edit",
+  client: "clients.edit",
+  case: "cases.edit",
+  invoice: "billing.edit",
+  document: "documents.edit",
+}
 
 /**
  * Row-level actions for any entity: an Edit (opens the supplied controlled dialog) and an
- * Archive/Restore with an Undo toast. Both are gated by the current role via can().
+ * Archive/Restore with an Undo toast. Both are gated by the current user's permissions,
+ * falling back to the role-based matrix until RBAC enforcement is live.
  */
 export function EntityRowActions({
   entity,
@@ -29,11 +43,14 @@ export function EntityRowActions({
   editPermission?: Permission
   canArchive?: boolean
 }) {
-  const { setArchived, currentRole } = useStore()
+  const { setArchived, currentRole, currentPermissions } = useStore()
   const [editOpen, setEditOpen] = React.useState(false)
 
-  const allowEdit = Boolean(editDialog) && can(currentRole, editPermission)
-  const allowArchive = canArchive && can(currentRole, "delete")
+  const editApp = EDIT_PERMISSION[entity]
+  const allowEdit =
+    Boolean(editDialog) && hasPermission(currentPermissions, currentRole, editApp, editPermission)
+  const allowArchive =
+    canArchive && hasPermission(currentPermissions, currentRole, editApp, "delete")
 
   return (
     <>
