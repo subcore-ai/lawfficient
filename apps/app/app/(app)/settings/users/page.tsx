@@ -7,7 +7,11 @@ import {
   CardTitle,
 } from "@workspace/ui/components/card"
 
-import { InviteUserDialog } from "@/components/settings/settings-dialogs"
+import {
+  InviteUserDialog,
+  type ManagedUser,
+  type RoleOption,
+} from "@/components/settings/settings-dialogs"
 import { UsersTable } from "@/components/settings/users-table"
 import { can } from "@/lib/auth/permissions"
 import { getCurrentUser } from "@/lib/auth/session"
@@ -18,7 +22,12 @@ import type { StaffUser } from "@/data/types"
 
 export const metadata = { title: "Settings · Team" }
 
-type Loaded = { users: StaffUser[]; currentUserId: string; canManage: boolean }
+type Loaded = {
+  users: ManagedUser[]
+  roles: RoleOption[]
+  currentUserId: string
+  canManage: boolean
+}
 
 async function load(): Promise<Loaded> {
   // Phase 0 fallback: with no Supabase wired, render the mock team so the app
@@ -26,21 +35,44 @@ async function load(): Promise<Loaded> {
   if (!isSupabaseConfigured()) {
     // Read-only mock: the management actions are server-backed, so without
     // Supabase they can't complete — don't render controls that would fail.
-    return { users: STAFF, currentUserId: CURRENT_USER.id, canManage: false }
+    return {
+      users: STAFF.map((u) => ({ ...u, roleIds: [] })),
+      roles: [],
+      currentUserId: CURRENT_USER.id,
+      canManage: false,
+    }
   }
 
   const me = await getCurrentUser()
   const supabase = await createClient()
-  // RLS scopes this to the caller's firm — no explicit firm filter needed.
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("id, name, email, initials, role, status, pod_id")
-    .order("name")
+  // RLS scopes all three to the caller's firm. Load the roster, the firm's roles
+  // (multi-select options), and every assignment so each row knows its role set.
+  const [profilesRes, rolesRes, userRolesRes] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("id, name, email, initials, role, status, pod_id")
+      .order("name"),
+    supabase
+      .from("roles")
+      .select("id, key, name, is_system")
+      .order("is_system", { ascending: false })
+      .order("name"),
+    supabase.from("user_roles").select("user_id, role_id"),
+  ])
   // Surface RLS/network failures via the error boundary instead of rendering an
   // empty team (which would read as "no members").
-  if (error) throw error
+  if (profilesRes.error) throw profilesRes.error
+  if (rolesRes.error) throw rolesRes.error
+  if (userRolesRes.error) throw userRolesRes.error
 
-  const users: StaffUser[] = (data ?? []).map((p) => ({
+  const roleIdsByUser = new Map<string, string[]>()
+  for (const ur of userRolesRes.data ?? []) {
+    const list = roleIdsByUser.get(ur.user_id)
+    if (list) list.push(ur.role_id)
+    else roleIdsByUser.set(ur.user_id, [ur.role_id])
+  }
+
+  const users: ManagedUser[] = (profilesRes.data ?? []).map((p) => ({
     id: p.id,
     name: p.name,
     email: p.email,
@@ -48,17 +80,25 @@ async function load(): Promise<Loaded> {
     role: p.role as StaffUser["role"],
     status: p.status as StaffUser["status"],
     podId: p.pod_id ?? undefined,
+    roleIds: roleIdsByUser.get(p.id) ?? [],
+  }))
+  const roles: RoleOption[] = (rolesRes.data ?? []).map((r) => ({
+    id: r.id,
+    key: r.key,
+    name: r.name,
+    isSystem: r.is_system,
   }))
 
   return {
     users,
+    roles,
     currentUserId: me?.id ?? "",
     canManage: me ? can(me.role, "manageUsers") : false,
   }
 }
 
 export default async function SettingsUsersPage() {
-  const { users, currentUserId, canManage } = await load()
+  const { users, roles, currentUserId, canManage } = await load()
 
   return (
     <Card>
@@ -72,7 +112,7 @@ export default async function SettingsUsersPage() {
         ) : null}
       </CardHeader>
       <CardContent className="px-0">
-        <UsersTable users={users} currentUserId={currentUserId} canManage={canManage} />
+        <UsersTable users={users} currentUserId={currentUserId} canManage={canManage} roles={roles} />
       </CardContent>
     </Card>
   )
