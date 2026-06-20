@@ -959,6 +959,13 @@ export type Database = {
       firm_exists: { Args: { p_firm_id: string }; Returns: boolean }
       invite_token_for: { Args: { p_user_id: string }; Returns: string }
       seed_system_roles: { Args: { p_firm_id: string }; Returns: undefined }
+      set_role_permissions: {
+        Args: {
+          p_permissions: Database["public"]["Enums"]["app_permission"][]
+          p_role_id: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       app_permission:

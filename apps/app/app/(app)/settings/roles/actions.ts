@@ -124,16 +124,13 @@ export async function setRolePermissions(
   const valid = [...new Set(permissions.filter((p) => ALL_PERMISSIONS.includes(p)))]
 
   const supabase = await createClient()
-  // Replace the role's grants. Two statements (no client-side transaction); RLS
-  // scopes to the admin's firm and the (role_id, permission) PK dedupes.
-  const { error: delErr } = await supabase.from("role_permissions").delete().eq("role_id", roleId)
-  if (delErr) return { error: "Couldn't update permissions." }
-  if (valid.length > 0) {
-    const { error: insErr } = await supabase
-      .from("role_permissions")
-      .insert(valid.map((permission) => ({ role_id: roleId, permission })))
-    if (insErr) return { error: "Couldn't update permissions." }
-  }
+  // Atomic replace via RPC so a failed re-insert can't leave the role with zero
+  // permissions. The role_permissions RLS (firm-scoped, admin-only) is the gate.
+  const { error } = await supabase.rpc("set_role_permissions", {
+    p_role_id: roleId,
+    p_permissions: valid,
+  })
+  if (error) return { error: "Couldn't update permissions." }
 
   await audit(supabase, gate.user.id, roleId, "", "permissions_updated")
   revalidatePath(ROLES_PATH)
