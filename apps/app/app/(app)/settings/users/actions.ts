@@ -107,20 +107,30 @@ export async function resendInvite(userId: string): Promise<ActionResult> {
   if (!target) return { error: "User not found." }
   if (target.status !== "invited") return { error: "Only pending invites can be resent." }
 
-  // Supabase has no admin "resend invite"; re-issue by replacing the un-accepted
-  // placeholder. Safe — an invited user has no data of their own yet.
+  // Supabase has no admin "resend invite", and inviteUserByEmail rejects an
+  // existing address — so re-issue by replacing the un-accepted placeholder.
+  // Necessarily non-atomic (no transactional admin API): check every step and
+  // clean up partial state. Safe to replace — an invited user has no data yet.
   const adminClient = createAdminClient()
-  await adminClient.auth.admin.deleteUser(userId)
+  const removed = await adminClient.auth.admin.deleteUser(userId)
+  if (removed.error) return { error: "Could not resend the invite. Please try again." }
 
   const invited = await adminClient.auth.admin.inviteUserByEmail(target.email, {
     data: { name: target.name },
     redirectTo: await confirmUrl(),
   })
-  if (invited.error || !invited.data.user) return { error: "Could not resend the invite." }
+  if (invited.error || !invited.data.user) {
+    return { error: "Could not resend the invite — the old one was removed. Please send a new invite." }
+  }
 
-  await adminClient.auth.admin.updateUserById(invited.data.user.id, {
+  const bound = await adminClient.auth.admin.updateUserById(invited.data.user.id, {
     app_metadata: { firm_id: admin.firmId, role: target.role, status: "invited", name: target.name },
   })
+  if (bound.error) {
+    await adminClient.auth.admin.deleteUser(invited.data.user.id)
+    return { error: "Could not finish resending the invite. Please send a new invite." }
+  }
+
   if (target.pod_id) {
     await supabase.from("profiles").update({ pod_id: target.pod_id }).eq("id", invited.data.user.id)
   }
@@ -185,6 +195,14 @@ export async function setUserStatus(
     .maybeSingle()
   if (!target) return { error: "User not found." }
 
+  // Only active⇄disabled toggles here. invited→active must go through the
+  // activation flow, not an admin status flip.
+  const validTransition =
+    status === "disabled" ? target.status === "active" : target.status === "disabled"
+  if (!validTransition) {
+    return { error: "That status change isn't allowed from the user's current state." }
+  }
+
   if (status === "disabled" && target.role === "admin" && target.status === "active") {
     if ((await otherActiveAdmins(supabase, target.firm_id, userId)) === 0) {
       return { error: "You can't disable the last active admin." }
@@ -200,7 +218,13 @@ export async function setUserStatus(
   if (ban.error) return { error: "Could not update the account. Please try again." }
 
   const { error } = await supabase.from("profiles").update({ status }).eq("id", userId)
-  if (error) return { error: error.message }
+  if (error) {
+    // Roll back the ban so Supabase Auth and the profile don't diverge.
+    await adminClient.auth.admin.updateUserById(userId, {
+      ban_duration: status === "disabled" ? "none" : "876000h",
+    })
+    return { error: error.message }
+  }
 
   await supabase.from("audit_log").insert({
     entity: "user",

@@ -28,11 +28,18 @@ begin
   if tg_op = 'DELETE' then
     v_losing_admin := (old.role = 'admin' and old.status = 'active');
   else
+    -- A firm reassignment also removes the admin from the source firm.
     v_losing_admin := (old.role = 'admin' and old.status = 'active'
-                       and (new.role <> 'admin' or new.status <> 'active'));
+                       and (new.role <> 'admin'
+                            or new.status <> 'active'
+                            or new.firm_id is distinct from old.firm_id));
   end if;
 
   if v_losing_admin then
+    -- Serialize per-firm so two concurrent removals can't both observe a
+    -- surviving admin and commit, leaving the firm with zero.
+    perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(old.firm_id::text, 0));
+
     select count(*) into v_other_admins
     from public.profiles
     where firm_id = old.firm_id

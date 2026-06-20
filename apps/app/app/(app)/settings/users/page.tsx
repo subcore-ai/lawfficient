@@ -24,16 +24,21 @@ async function load(): Promise<Loaded> {
   // Phase 0 fallback: with no Supabase wired, render the mock team so the app
   // stays demoable (same contract as the auth flow + app shell).
   if (!isSupabaseConfigured()) {
-    return { users: STAFF, currentUserId: CURRENT_USER.id, canManage: true }
+    // Read-only mock: the management actions are server-backed, so without
+    // Supabase they can't complete — don't render controls that would fail.
+    return { users: STAFF, currentUserId: CURRENT_USER.id, canManage: false }
   }
 
   const me = await getCurrentUser()
   const supabase = await createClient()
   // RLS scopes this to the caller's firm — no explicit firm filter needed.
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("profiles")
     .select("id, name, email, initials, role, status, pod_id")
     .order("name")
+  // Surface RLS/network failures via the error boundary instead of rendering an
+  // empty team (which would read as "no members").
+  if (error) throw error
 
   const users: StaffUser[] = (data ?? []).map((p) => ({
     id: p.id,
