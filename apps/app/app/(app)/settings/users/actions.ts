@@ -23,20 +23,22 @@ async function requireAdmin(): Promise<AdminGate> {
   return { ok: true, user }
 }
 
-// A firm's *other* active admins — the friendly half of the last-admin guard.
-// The 0006 DB trigger is the hard backstop; this just avoids a raw error in the UI.
+// A firm's *other* active admins, or null if the query fails. Callers only
+// hard-block on a definitive 0, so a transient query error can't produce a
+// misleading "last admin" message — the 0006 DB trigger is the real backstop.
 async function otherActiveAdmins(
   supabase: Awaited<ReturnType<typeof createClient>>,
   firmId: string,
   exceptUserId: string,
-): Promise<number> {
-  const { count } = await supabase
+): Promise<number | null> {
+  const { count, error } = await supabase
     .from("profiles")
     .select("id", { count: "exact", head: true })
     .eq("firm_id", firmId)
     .eq("role", "admin")
     .eq("status", "active")
     .neq("id", exceptUserId)
+  if (error) return null
   return count ?? 0
 }
 
