@@ -30,10 +30,10 @@ export default function LoginPage() {
       <CardContent>
         <form action={formAction} className="flex flex-col gap-4">
           <Field label="Email" htmlFor="email">
-            <Input id="email" name="email" type="email" required placeholder="you@firm.com" defaultValue="sofia@chidoluelaw.com" />
+            <Input id="email" name="email" type="email" required placeholder="you@firm.com" />
           </Field>
           <Field label="Password" htmlFor="password">
-            <Input id="password" name="password" type="password" required placeholder="••••••••" defaultValue="demo-password" />
+            <Input id="password" name="password" type="password" required placeholder="••••••••" />
           </Field>
           {state?.error ? (
             <p className="text-destructive text-sm" role="alert">
