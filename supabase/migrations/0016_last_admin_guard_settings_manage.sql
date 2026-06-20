@@ -51,12 +51,12 @@ begin
     end if;
     select firm_id into v_firm_id from public.roles where id = old.role_id;
   elsif tg_table_name = 'user_roles' then
-    if not exists (
-      select 1 from public.role_permissions
-      where role_id = old.role_id and permission = 'settings.manage'
-    ) then
-      return null;
-    end if;
+    -- No early-return on "did old.role_id grant settings.manage?": that reads
+    -- role_permissions, which the SAME transaction can also change (un-assign the
+    -- role, then delete it — allowed once it has no assignees). At commit that read
+    -- would see settings.manage already gone and wrongly suppress the check. old.firm_id
+    -- is on the row itself, so always re-check the firm; deleting a role requires
+    -- removing its assignments first (guard_system_role), so this also backstops that.
     v_firm_id := old.firm_id;
   else
     -- profiles: only a role / status / firm change (or a delete) is relevant.
