@@ -39,7 +39,6 @@ import {
 } from "@/app/(app)/settings/users/actions"
 
 const ROLES = Object.keys(ROLE_LABELS) as Role[]
-const MODULES = ["Dashboard", "Leads", "Consultations", "Cases", "Documents", "Billing", "Reporting", "Admin"]
 
 function RoleSelect({ value, onChange }: { value: Role; onChange: (r: Role) => void }) {
   return (
@@ -271,44 +270,6 @@ export function UserRowActions({
         </Button>
       ) : null}
     </div>
-  )
-}
-
-export function EditRoleDialog({ role }: { role: Role }) {
-  const [open, setOpen] = React.useState(false)
-
-  function onSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setOpen(false)
-    toast.success("Permissions updated", { description: `${ROLE_LABELS[role]} access saved.` })
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button variant="ghost" size="sm" />}>Edit</DialogTrigger>
-      <DialogContent className="sm:max-w-md">
-        <form onSubmit={onSubmit}>
-          <DialogHeader>
-            <DialogTitle>{ROLE_LABELS[role]} permissions</DialogTitle>
-            <DialogDescription>Choose which modules this role can access.</DialogDescription>
-          </DialogHeader>
-          <div className="grid grid-cols-2 gap-3 py-5">
-            {MODULES.map((m, i) => (
-              <div key={m} className="flex items-center gap-2">
-                <Checkbox id={`perm-${role}-${i}`} defaultChecked={m !== "Admin" || role === "admin"} />
-                <Label htmlFor={`perm-${role}-${i}`} className="text-sm font-normal">
-                  {m}
-                </Label>
-              </div>
-            ))}
-          </div>
-          <DialogFooter>
-            <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
-            <Button type="submit">Save permissions</Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
   )
 }
 

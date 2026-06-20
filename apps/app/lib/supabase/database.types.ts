@@ -7,11 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.5"
-  }
   public: {
     Tables: {
       audit_log: {
@@ -846,19 +841,152 @@ export type Database = {
           },
         ]
       }
+      role_permissions: {
+        Row: {
+          permission: Database["public"]["Enums"]["app_permission"]
+          role_id: string
+        }
+        Insert: {
+          permission: Database["public"]["Enums"]["app_permission"]
+          role_id: string
+        }
+        Update: {
+          permission?: Database["public"]["Enums"]["app_permission"]
+          role_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_permissions_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      roles: {
+        Row: {
+          created_at: string
+          firm_id: string
+          id: string
+          is_system: boolean
+          key: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          firm_id?: string
+          id?: string
+          is_system?: boolean
+          key: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          firm_id?: string
+          id?: string
+          is_system?: boolean
+          key?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "roles_firm_id_fkey"
+            columns: ["firm_id"]
+            isOneToOne: false
+            referencedRelation: "firms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          firm_id: string
+          role_id: string
+          user_id: string
+        }
+        Insert: {
+          firm_id?: string
+          role_id: string
+          user_id: string
+        }
+        Update: {
+          firm_id?: string
+          role_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_roles_firm_id_fkey"
+            columns: ["firm_id"]
+            isOneToOne: false
+            referencedRelation: "firms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_roles_role_id_firm_id_fkey"
+            columns: ["role_id", "firm_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["id", "firm_id"]
+          },
+          {
+            foreignKeyName: "user_roles_user_id_firm_id_fkey"
+            columns: ["user_id", "firm_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id", "firm_id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      authorize: {
+        Args: {
+          requested_permission: Database["public"]["Enums"]["app_permission"]
+        }
+        Returns: boolean
+      }
       current_firm_id: { Args: never; Returns: string }
       current_staff_role: {
         Args: never
         Returns: Database["public"]["Enums"]["staff_role"]
       }
+      custom_access_token_hook: { Args: { event: Json }; Returns: Json }
+      firm_exists: { Args: { p_firm_id: string }; Returns: boolean }
       invite_token_for: { Args: { p_user_id: string }; Returns: string }
+      seed_system_roles: { Args: { p_firm_id: string }; Returns: undefined }
+      set_role_permissions: {
+        Args: {
+          p_permissions: Database["public"]["Enums"]["app_permission"][]
+          p_role_id: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
+      app_permission:
+        | "dashboard.view"
+        | "leads.view"
+        | "leads.edit"
+        | "consultations.view"
+        | "consultations.edit"
+        | "clients.view"
+        | "clients.edit"
+        | "cases.view"
+        | "cases.edit"
+        | "documents.view"
+        | "documents.edit"
+        | "billing.view"
+        | "billing.view_status"
+        | "billing.edit"
+        | "reporting.view"
+        | "reporting.edit"
+        | "users.manage"
+        | "settings.manage"
       audit_entity:
         | "lead"
         | "consultation"
@@ -867,6 +995,7 @@ export type Database = {
         | "invoice"
         | "document"
         | "user"
+        | "role"
       case_status:
         | "onboarding"
         | "packet_prep"
@@ -1050,6 +1179,26 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      app_permission: [
+        "dashboard.view",
+        "leads.view",
+        "leads.edit",
+        "consultations.view",
+        "consultations.edit",
+        "clients.view",
+        "clients.edit",
+        "cases.view",
+        "cases.edit",
+        "documents.view",
+        "documents.edit",
+        "billing.view",
+        "billing.view_status",
+        "billing.edit",
+        "reporting.view",
+        "reporting.edit",
+        "users.manage",
+        "settings.manage",
+      ],
       audit_entity: [
         "lead",
         "consultation",
@@ -1058,6 +1207,7 @@ export const Constants = {
         "invoice",
         "document",
         "user",
+        "role",
       ],
       case_status: [
         "onboarding",
@@ -1124,3 +1274,4 @@ export const Constants = {
     },
   },
 } as const
+
