@@ -59,12 +59,15 @@ declare
 begin
   perform pg_advisory_xact_lock(hashtext(p_user_id::text));
 
-  -- The target's firm + primary role, RLS-scoped to the caller's firm. firm_id is
-  -- inserted explicitly (not via the column default) so the composite FKs key off
-  -- the user's actual firm.
+  -- The target's firm + primary role, RLS-scoped to the caller's firm. FOR UPDATE
+  -- locks the profile row so a concurrent primary-role change (updateUserProfile via
+  -- Manage) can't interleave between this read and the re-insert and leave user_roles
+  -- out of sync with profiles.role. firm_id is inserted explicitly (not the column
+  -- default) so the composite FKs key off the user's actual firm.
   select firm_id, role::text into v_firm_id, v_primary_key
   from public.profiles
-  where id = p_user_id;
+  where id = p_user_id
+  for update;
   if v_firm_id is null then
     raise exception 'user not found' using errcode = 'P0002';
   end if;
