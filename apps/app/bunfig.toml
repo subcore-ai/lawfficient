@@ -1,0 +1,11 @@
+# bun test configuration. Coverage is opt-in via `bun run test:coverage`
+# (plain `bun test` stays fast and quiet).
+[test]
+# Floor for the logic we test, enforced PER-FILE not aggregate: every file a test
+# imports must individually clear these thresholds (bun only measures imported
+# files). That is also why the data barrel / IO glue below must be ignored — they
+# would fail the per-file gate otherwise (verified empirically).
+coverageThreshold = { lines = 0.9, functions = 0.9 }
+coverageSkipTestFiles = true
+# Mock-data barrel + Supabase IO clients are data/glue, not logic under test.
+coveragePathIgnorePatterns = ["data/**", "lib/supabase/**"]
