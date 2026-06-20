@@ -16,6 +16,7 @@ type ProfileView = {
   role: Role
   pod: string | null
   editable: boolean
+  googleConnected: boolean
 }
 
 async function load(): Promise<ProfileView> {
@@ -28,20 +29,27 @@ async function load(): Promise<ProfileView> {
       role: CURRENT_USER.role,
       pod: null,
       editable: false,
+      googleConnected: false,
     }
   }
 
   const me = await getCurrentUser()
   if (!me) redirect("/login")
 
+  const supabase = await createClient()
+
+  // A linked Google identity only exists if Google sign-in was enabled and used,
+  // so its presence is the signal — no separate "is Google on" flag is needed.
+  const { data } = await supabase.auth.getUser()
+  const googleConnected = (data?.user?.identities ?? []).some((i) => i.provider === "google")
+
   let pod: string | null = null
   if (me.podId) {
-    const supabase = await createClient()
     const { data } = await supabase.from("pods").select("name").eq("id", me.podId).maybeSingle()
     pod = data?.name ?? null
   }
 
-  return { name: me.name, email: me.email, role: me.role, pod, editable: true }
+  return { name: me.name, email: me.email, role: me.role, pod, editable: true, googleConnected }
 }
 
 export default async function ProfilePage() {

@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { Mail } from "lucide-react"
 
 import {
   Card,
@@ -14,6 +15,8 @@ import { Input } from "@workspace/ui/components/input"
 import { toast } from "@workspace/ui/components/sonner"
 
 import { Field } from "@/components/form-field"
+import { GoogleIcon } from "@/components/google-icon"
+import { StatusPill } from "@/components/status-pill"
 import { ROLE_LABELS } from "@/data"
 import type { Role } from "@/data/types"
 import { changeMyPassword, updateMyName } from "@/app/(app)/profile/actions"
@@ -24,16 +27,25 @@ export function ProfileSettings({
   role,
   pod,
   editable,
+  googleConnected,
 }: {
   name: string
   email: string
   role: Role
   pod: string | null
   editable: boolean
+  googleConnected: boolean
 }) {
   return (
     <>
-      <ProfileCard name={name} email={email} role={role} pod={pod} editable={editable} />
+      <ProfileCard
+        name={name}
+        email={email}
+        role={role}
+        pod={pod}
+        editable={editable}
+        googleConnected={googleConnected}
+      />
       {editable ? <PasswordCard /> : null}
     </>
   )
@@ -45,12 +57,14 @@ function ProfileCard({
   role,
   pod,
   editable,
+  googleConnected,
 }: {
   name: string
   email: string
   role: Role
   pod: string | null
   editable: boolean
+  googleConnected: boolean
 }) {
   const [pending, startTransition] = React.useTransition()
 
@@ -100,6 +114,23 @@ function ProfileCard({
               <Input defaultValue={pod ?? "Not assigned"} disabled />
             </Field>
           </div>
+          <Field label="Sign-in methods">
+            <div className="flex flex-col gap-2.5 rounded-md border px-3 py-2.5">
+              <div className="flex items-center gap-2.5 text-sm">
+                <Mail className="text-muted-foreground size-4 shrink-0" />
+                <span>Email &amp; password</span>
+              </div>
+              <div className="flex items-center gap-2.5 text-sm">
+                <GoogleIcon className="size-4 shrink-0" />
+                <span>Google</span>
+                <StatusPill
+                  label={googleConnected ? "Connected" : "Not connected"}
+                  tone={googleConnected ? "success" : "neutral"}
+                  className="ml-auto"
+                />
+              </div>
+            </div>
+          </Field>
           {editable ? (
             <div className="flex justify-end">
               <Button type="submit" disabled={pending}>
