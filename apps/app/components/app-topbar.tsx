@@ -38,6 +38,7 @@ import { signOut } from "@/app/(auth)/actions"
 import { CURRENT_USER, ROLE_LABELS } from "@/data"
 import { useStore } from "@/data/store"
 import type { Role } from "@/data/types"
+import { initialsOf } from "@/lib/format"
 
 const ROLES = Object.keys(ROLE_LABELS) as Role[]
 
@@ -64,19 +65,6 @@ const SEGMENT_LABELS: Record<string, string> = {
 
 function labelFor(segment: string) {
   return SEGMENT_LABELS[segment] ?? "Details"
-}
-
-// Initials from a display name (the real CurrentUser has no `initials` field).
-function initialsOf(name: string): string {
-  return (
-    name
-      .trim()
-      .split(/\s+/)
-      .map((w) => w[0] ?? "")
-      .slice(0, 2)
-      .join("")
-      .toUpperCase() || "?"
-  )
 }
 
 export function AppTopbar({ user }: { user?: { name: string; email: string } | null }) {
