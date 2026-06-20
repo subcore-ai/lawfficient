@@ -179,12 +179,17 @@ function ManageUserDialog({ user }: { user: StaffUser }) {
 function ManageUserRolesDialog({ user, roles }: { user: ManagedUser; roles: RoleOption[] }) {
   const [open, setOpen] = React.useState(false)
   const [pending, startTransition] = React.useTransition()
-  const [selected, setSelected] = React.useState<Set<string>>(() => new Set(user.roleIds))
-
   const primaryRoleId = roles.find((r) => r.key === user.role && r.isSystem)?.id
 
+  // Track only the *additional* roles — never the primary. set_user_roles always
+  // re-adds the current primary, so excluding it means a save can't resurrect a
+  // stale old primary even if it was changed via Manage while this dialog was open.
+  const [selected, setSelected] = React.useState<Set<string>>(
+    () => new Set(user.roleIds.filter((id) => id !== primaryRoleId)),
+  )
+
   function handleOpenChange(next: boolean) {
-    if (next) setSelected(new Set(user.roleIds))
+    if (next) setSelected(new Set(user.roleIds.filter((id) => id !== primaryRoleId)))
     setOpen(next)
   }
 
