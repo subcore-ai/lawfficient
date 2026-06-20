@@ -163,7 +163,15 @@ function RolePermissionsDialog({ role }: { role: RoleRow }) {
 
 function RenameRoleDialog({ role }: { role: RoleRow }) {
   const [open, setOpen] = React.useState(false)
+  const [name, setName] = React.useState(role.name)
   const [pending, startTransition] = React.useTransition()
+
+  // Re-sync the field from server data on open, so a reopened dialog never shows a
+  // stale name after a rename (the input is controlled, not defaultValue).
+  function handleOpenChange(next: boolean) {
+    if (next) setName(role.name)
+    setOpen(next)
+  }
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -180,7 +188,7 @@ function RenameRoleDialog({ role }: { role: RoleRow }) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger render={<Button variant="ghost" size="sm" aria-label={`Rename ${role.name}`} />}>
         <Pencil className="size-4" />
       </DialogTrigger>
@@ -192,7 +200,13 @@ function RenameRoleDialog({ role }: { role: RoleRow }) {
           </DialogHeader>
           <div className="py-5">
             <Field label="Role name">
-              <Input name="name" defaultValue={role.name} required autoComplete="off" />
+              <Input
+                name="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                autoComplete="off"
+              />
             </Field>
           </div>
           <DialogFooter>
