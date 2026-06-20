@@ -67,7 +67,9 @@ async function load(): Promise<Loaded> {
 
   const roleIdsByUser = new Map<string, string[]>()
   for (const ur of userRolesRes.data ?? []) {
-    roleIdsByUser.set(ur.user_id, [...(roleIdsByUser.get(ur.user_id) ?? []), ur.role_id])
+    const list = roleIdsByUser.get(ur.user_id)
+    if (list) list.push(ur.role_id)
+    else roleIdsByUser.set(ur.user_id, [ur.role_id])
   }
 
   const users: ManagedUser[] = (profilesRes.data ?? []).map((p) => ({

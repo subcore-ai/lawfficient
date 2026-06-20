@@ -51,17 +51,39 @@ language plpgsql
 security invoker
 set search_path = ''
 as $$
+declare
+  v_firm_id uuid;
+  v_primary_key text;
+  v_primary_role_id uuid;
+  v_ids uuid[];
 begin
   perform pg_advisory_xact_lock(hashtext(p_user_id::text));
 
-  if not exists (select 1 from public.profiles where id = p_user_id) then
+  -- The target's firm + primary role, RLS-scoped to the caller's firm. firm_id is
+  -- inserted explicitly (not via the column default) so the composite FKs key off
+  -- the user's actual firm.
+  select firm_id, role::text into v_firm_id, v_primary_key
+  from public.profiles
+  where id = p_user_id;
+  if v_firm_id is null then
     raise exception 'user not found' using errcode = 'P0002';
   end if;
 
+  -- Always keep the primary role's system role — enforced here (DB), not by the
+  -- caller, so a client bug/bypass can't strip a user of their base role.
+  select id into v_primary_role_id
+  from public.roles
+  where firm_id = v_firm_id and key = v_primary_key and is_system;
+
+  v_ids := coalesce(p_role_ids, array[]::uuid[]);
+  if v_primary_role_id is not null and not (v_primary_role_id = any (v_ids)) then
+    v_ids := array_append(v_ids, v_primary_role_id);
+  end if;
+
   delete from public.user_roles where user_id = p_user_id;
-  if array_length(p_role_ids, 1) is not null then
-    insert into public.user_roles (user_id, role_id)
-    select p_user_id, unnest(p_role_ids)
+  if array_length(v_ids, 1) is not null then
+    insert into public.user_roles (user_id, role_id, firm_id)
+    select p_user_id, unnest(v_ids), v_firm_id
     on conflict (user_id, role_id) do nothing;
   end if;
 end;
