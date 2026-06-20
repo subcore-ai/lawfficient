@@ -98,12 +98,15 @@ create constraint trigger profiles_keep_settings_manager
   deferrable initially deferred
   for each row execute function public.enforce_settings_manager();
 
+-- UPDATE too (not just DELETE): re-pointing an assignment's role_id, or changing a
+-- role_permissions row's permission off 'settings.manage', also drops coverage. The
+-- guard keys off OLD, so it handles both. (INSERT can only add, so it's not guarded.)
 create constraint trigger user_roles_keep_settings_manager
-  after delete on public.user_roles
+  after update or delete on public.user_roles
   deferrable initially deferred
   for each row execute function public.enforce_settings_manager();
 
 create constraint trigger role_permissions_keep_settings_manager
-  after delete on public.role_permissions
+  after update or delete on public.role_permissions
   deferrable initially deferred
   for each row execute function public.enforce_settings_manager();
