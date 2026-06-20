@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 
 import { Button } from "@workspace/ui/components/button"
 import {
@@ -18,8 +19,14 @@ import { Label } from "@workspace/ui/components/label"
 import { Field } from "@/components/form-field"
 import { signIn, type SignInState } from "../actions"
 
-export default function LoginPage() {
+// Reasons the /auth/confirm route bounces back to /login.
+const URL_ERRORS: Record<string, string> = {
+  link_invalid: "That link is invalid or has expired. Ask an admin to resend your invite.",
+}
+
+function LoginForm() {
   const [state, formAction, pending] = React.useActionState<SignInState, FormData>(signIn, null)
+  const urlError = URL_ERRORS[useSearchParams().get("error") ?? ""]
 
   return (
     <Card className="w-full max-w-sm">
@@ -28,12 +35,17 @@ export default function LoginPage() {
         <CardDescription>Welcome back — sign in to your firm workspace.</CardDescription>
       </CardHeader>
       <CardContent>
+        {urlError ? (
+          <p className="text-destructive mb-4 text-sm" role="alert">
+            {urlError}
+          </p>
+        ) : null}
         <form action={formAction} className="flex flex-col gap-4">
           <Field label="Email" htmlFor="email">
-            <Input id="email" name="email" type="email" required placeholder="you@firm.com" defaultValue="sofia@chidoluelaw.com" />
+            <Input id="email" name="email" type="email" required placeholder="you@firm.com" />
           </Field>
           <Field label="Password" htmlFor="password">
-            <Input id="password" name="password" type="password" required placeholder="••••••••" defaultValue="demo-password" />
+            <Input id="password" name="password" type="password" required placeholder="••••••••" />
           </Field>
           {state?.error ? (
             <p className="text-destructive text-sm" role="alert">
@@ -60,5 +72,13 @@ export default function LoginPage() {
         </form>
       </CardContent>
     </Card>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <React.Suspense>
+      <LoginForm />
+    </React.Suspense>
   )
 }

@@ -4,7 +4,16 @@ project_id = "lawfficient"
 
 [auth]
 enable_signup = true
+# Local dev: the app runs on :3099, so invite/recovery links resolve there.
+site_url = "http://localhost:3099"
+additional_redirect_urls = ["http://localhost:3099"]
 # Email/password only for v1. MFA (TOTP) is optional and added per spec 10.
 
 [auth.email]
 enable_confirmations = false
+
+# Invite email points at the app's /auth/confirm route (token_hash flow), which
+# verifies the link then sends the user to /set-password. See specs/24-user-management.md.
+[auth.email.template.invite]
+subject = "You've been invited to Lawfficient"
+content_path = "./supabase/templates/invite.html"
