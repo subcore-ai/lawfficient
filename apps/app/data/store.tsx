@@ -131,7 +131,13 @@ export function useStore() {
   return ctx
 }
 
-export function MockStoreProvider({ children }: { children: React.ReactNode }) {
+export function MockStoreProvider({
+  children,
+  initialRole,
+}: {
+  children: React.ReactNode
+  initialRole?: Role
+}) {
   const [leads, setLeads] = React.useState<Lead[]>(LEADS)
   const [consultations, setConsultations] = React.useState<Consultation[]>(CONSULTATIONS)
   const [clients, setClients] = React.useState<Client[]>(CLIENTS)
@@ -140,7 +146,7 @@ export function MockStoreProvider({ children }: { children: React.ReactNode }) {
   const [documents, setDocuments] = React.useState<DocItem[]>(DOCUMENTS)
   const [staff, setStaff] = React.useState<StaffUser[]>(STAFF)
   const [auditLog, setAuditLog] = React.useState<AuditEntry[]>(SEED_AUDIT)
-  const [currentRole, setCurrentRole] = React.useState<Role>(CURRENT_USER.role)
+  const [currentRole, setCurrentRole] = React.useState<Role>(initialRole ?? CURRENT_USER.role)
   const [packetPipeline, setPacketPipeline] = React.useState<PacketStage[]>(DEFAULT_PACKET_PIPELINE)
 
   const logAudit = React.useCallback(
