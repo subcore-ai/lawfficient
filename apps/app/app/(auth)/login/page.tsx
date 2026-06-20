@@ -43,12 +43,18 @@ function LoginForm() {
   const [state, formAction, pending] = React.useActionState<SignInState, FormData>(signIn, null)
   const urlError = URL_ERRORS[useSearchParams().get("error") ?? ""]
 
-  function signInWithGoogle() {
+  async function signInWithGoogle() {
     const supabase = createClient()
-    void supabase.auth.signInWithOAuth({
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: `${window.location.origin}/auth/callback` },
     })
+    // signInWithOAuth normally redirects the browser away; an error here means it
+    // didn't (provider disabled, missing creds, network) — surface it rather than
+    // appear to do nothing.
+    if (error) {
+      window.location.assign("/login?error=oauth_failed")
+    }
   }
 
   return (
