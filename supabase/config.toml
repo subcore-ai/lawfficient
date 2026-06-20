@@ -6,7 +6,7 @@ project_id = "lawfficient"
 enable_signup = true
 # Local dev: the app runs on :3099, so invite/recovery links resolve there.
 site_url = "http://localhost:3099"
-additional_redirect_urls = ["http://localhost:3099"]
+additional_redirect_urls = ["http://localhost:3099/**"]
 # Email/password only for v1. MFA (TOTP) is optional and added per spec 10.
 
 [auth.email]
@@ -17,3 +17,13 @@ enable_confirmations = false
 [auth.email.template.invite]
 subject = "You've been invited to Lawfficient"
 content_path = "./supabase/templates/invite.html"
+
+# Google OAuth ("Continue with Google"). Requires credentials — create an OAuth
+# client at https://console.cloud.google.com, then set SUPABASE_AUTH_GOOGLE_CLIENT_ID
+# and SUPABASE_AUTH_GOOGLE_SECRET (e.g. in .env) and flip enabled = true. Left off by
+# default so the local stack starts without credentials. On the hosted project,
+# configure this in the dashboard (Authentication → Providers → Google) instead.
+[auth.external.google]
+enabled = false
+client_id = "env(SUPABASE_AUTH_GOOGLE_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_GOOGLE_SECRET)"
