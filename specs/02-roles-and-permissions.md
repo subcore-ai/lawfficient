@@ -76,7 +76,7 @@ Indicative starting point; refined per-module.
 
 ## Screens
 
-- `/settings/users` — user list, invite, enable/disable. (Admin)
+- `/settings/users` — user list, invite, enable/disable. (Admin) — detailed in [24-user-management](24-user-management.md).
 - `/settings/roles` — role list, edit permissions, create/delete role. (Admin)
 - Detailed in [22-admin-settings](22-admin-settings.md).
 

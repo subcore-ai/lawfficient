@@ -62,10 +62,11 @@ For multi-step tasks, state a brief plan with a verify step for each.
 "Done" in this repo means the relevant gates pass (run with bun):
 - `bun run typecheck` — `tsc --noEmit`
 - `bun run lint` — eslint
+- `bun test` — unit tests via bun's built-in runner (`*.test.ts`; run from `apps/app`, or `bun run test` at the root)
 - `bun run build` — `next build`; the real check for Server/Client boundary and RSC errors
 - `bun dev` — manual check when the change is visual
 
-No test runner is configured yet — until one is, those commands are the verifiable gate. On Vercel, verify on the preview deployment before promoting to production; a green local build is not proof the deploy works.
+Test coverage is being built out with `bun test` — until it's broad, treat these commands together as the verifiable gate. On Vercel, verify on the preview deployment before promoting to production; a green local build is not proof the deploy works.
 
 ---
 
