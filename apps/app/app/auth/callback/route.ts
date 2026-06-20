@@ -33,11 +33,18 @@ export async function GET(request: NextRequest) {
   // Look up the profile with the admin client: an invited user can't read their own
   // row via RLS (current_firm_id() only resolves for active staff).
   const admin = createAdminClient()
-  const { data: profile } = await admin
+  const { data: profile, error: profileError } = await admin
     .from("profiles")
     .select("status")
     .eq("id", user.id)
     .maybeSingle()
+
+  // A transient read error must NOT be mistaken for "no account" — that would
+  // delete a valid provisioned user. Bail without touching the account.
+  if (profileError) {
+    await supabase.auth.signOut()
+    return NextResponse.redirect(new URL("/login?error=oauth_failed", origin))
+  }
 
   if (!profile) {
     // No invite for this Google account — don't leave a stray auth user behind.
@@ -54,9 +61,15 @@ export async function GET(request: NextRequest) {
   if (profile.status === "invited") {
     // First Google sign-in doubles as invite acceptance — activate the profile
     // (app_metadata.status='active' re-fires the 0005 trigger).
-    await admin.auth.admin.updateUserById(user.id, {
+    const { error: activateError } = await admin.auth.admin.updateUserById(user.id, {
       app_metadata: { ...(user.app_metadata ?? {}), status: "active" },
     })
+    // Don't drop them into the app still-invited — the shell would bounce them
+    // straight back to /login.
+    if (activateError) {
+      await supabase.auth.signOut()
+      return NextResponse.redirect(new URL("/login?error=oauth_failed", origin))
+    }
   }
 
   return NextResponse.redirect(new URL(safeNext, origin))
