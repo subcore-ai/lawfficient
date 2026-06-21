@@ -276,10 +276,12 @@ function ManageUserRolesDialog({ user, roles }: { user: ManagedUser; roles: Role
 export function UserRowActions({
   user,
   currentUserId,
+  canManageRoles,
   roles,
 }: {
   user: ManagedUser
   currentUserId: string
+  canManageRoles: boolean
   roles: RoleOption[]
 }) {
   const [pending, startTransition] = React.useTransition()
@@ -355,7 +357,7 @@ export function UserRowActions({
           Enable
         </Button>
         <ManageUserDialog user={user} />
-        <ManageUserRolesDialog user={user} roles={roles} />
+        {canManageRoles ? <ManageUserRolesDialog user={user} roles={roles} /> : null}
       </div>
     )
   }
@@ -363,7 +365,7 @@ export function UserRowActions({
   return (
     <div className="flex justify-end gap-1">
       <ManageUserDialog user={user} />
-      <ManageUserRolesDialog user={user} roles={roles} />
+      {canManageRoles ? <ManageUserRolesDialog user={user} roles={roles} /> : null}
       {user.id !== currentUserId ? (
         <Button
           variant="ghost"

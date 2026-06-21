@@ -27,11 +27,13 @@ export function UsersTable({
   users,
   currentUserId,
   canManage,
+  canManageRoles,
   roles,
 }: {
   users: ManagedUser[]
   currentUserId: string
   canManage: boolean
+  canManageRoles: boolean
   roles: RoleOption[]
 }) {
   return (
@@ -76,7 +78,12 @@ export function UsersTable({
               </TableCell>
               <TableCell className="pr-4 text-right">
                 {canManage ? (
-                  <UserRowActions user={u} currentUserId={currentUserId} roles={roles} />
+                  <UserRowActions
+                  user={u}
+                  currentUserId={currentUserId}
+                  canManageRoles={canManageRoles}
+                  roles={roles}
+                />
                 ) : null}
               </TableCell>
             </TableRow>

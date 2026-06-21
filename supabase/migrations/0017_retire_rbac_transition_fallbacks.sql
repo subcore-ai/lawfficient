@@ -26,11 +26,19 @@ alter policy "roles_admin_write" on public.roles
 
 alter policy "role_permissions_admin_write" on public.role_permissions
   using (
-    exists (select 1 from public.roles r where r.id = role_id and r.firm_id = public.current_firm_id())
+    exists (
+      select 1
+      from public.roles r
+      where r.id = role_id and r.firm_id = public.current_firm_id()
+    )
     and public.authorize('settings.manage')
   )
   with check (
-    exists (select 1 from public.roles r where r.id = role_id and r.firm_id = public.current_firm_id())
+    exists (
+      select 1
+      from public.roles r
+      where r.id = role_id and r.firm_id = public.current_firm_id()
+    )
     and public.authorize('settings.manage')
   );
 

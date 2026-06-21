@@ -13,7 +13,6 @@ import {
   type RoleOption,
 } from "@/components/settings/settings-dialogs"
 import { UsersTable } from "@/components/settings/users-table"
-import { hasPermission } from "@/lib/auth/permissions"
 import { getCurrentUser } from "@/lib/auth/session"
 import { createClient } from "@/lib/supabase/server"
 import { isSupabaseConfigured } from "@/lib/supabase/env"
@@ -27,6 +26,7 @@ type Loaded = {
   roles: RoleOption[]
   currentUserId: string
   canManage: boolean
+  canManageRoles: boolean
 }
 
 async function load(): Promise<Loaded> {
@@ -40,6 +40,7 @@ async function load(): Promise<Loaded> {
       roles: [],
       currentUserId: CURRENT_USER.id,
       canManage: false,
+      canManageRoles: false,
     }
   }
 
@@ -93,12 +94,13 @@ async function load(): Promise<Loaded> {
     users,
     roles,
     currentUserId: me?.id ?? "",
-    canManage: me ? hasPermission(me.permissions, me.role, "users.manage", "manageUsers") : false,
+    canManage: me?.permissions?.includes("users.manage") ?? false,
+    canManageRoles: me?.permissions?.includes("settings.manage") ?? false,
   }
 }
 
 export default async function SettingsUsersPage() {
-  const { users, roles, currentUserId, canManage } = await load()
+  const { users, roles, currentUserId, canManage, canManageRoles } = await load()
 
   return (
     <Card>
@@ -112,7 +114,13 @@ export default async function SettingsUsersPage() {
         ) : null}
       </CardHeader>
       <CardContent className="px-0">
-        <UsersTable users={users} currentUserId={currentUserId} canManage={canManage} roles={roles} />
+        <UsersTable
+          users={users}
+          currentUserId={currentUserId}
+          canManage={canManage}
+          canManageRoles={canManageRoles}
+          roles={roles}
+        />
       </CardContent>
     </Card>
   )

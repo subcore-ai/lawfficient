@@ -42,3 +42,20 @@ re-login). Granting new access is pure UX, no risk.
 
 **Depends on:** access-token hook live (done); ideally land the `profiles.role` retirement
 first so it's built on the final shape.
+
+---
+
+## Security — `billing.view_status` exposes full invoice rows
+
+_Added 2026-06-21 (surfaced in the #21 review)._
+
+**What:** the `invoices_select` RLS policy grants **full row** access to `billing.view_status`
+holders (file clerks), but the intent is **status-only** — they should see payment status,
+never amounts. A direct API/SQL query returns every column; only the UI redacts amounts (the
+`0014` policy comment literally says "amount redaction stays a UI concern").
+
+**Fix:** a status-only view/RPC that `billing.view_status` holders query instead of the base
+table, or column-level grants restricting them to the status columns. Pre-dates the RBAC
+fallback work — out of scope for that, but a real data-exposure.
+
+**Priority:** do before onboarding any firm whose file clerks must not see invoice amounts.
