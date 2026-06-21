@@ -247,7 +247,7 @@ function ManageUserRolesDialog({ user, roles }: { user: ManagedUser; roles: Role
                   </Label>
                   {isPrimary ? (
                     <span className="text-muted-foreground text-xs">
-                      Always kept — change the primary in Manage.
+                      To change it, use Manage.
                     </span>
                   ) : null}
                 </div>
