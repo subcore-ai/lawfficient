@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache"
 
 import { getCurrentUser, type CurrentUser } from "@/lib/auth/session"
 import { hasPermission } from "@/lib/auth/permissions"
+import type { AppPermission } from "@/lib/rbac/permissions"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { parseInviteInput, parseRole } from "@/lib/users/validation"
@@ -17,11 +18,14 @@ type AdminGate = { ok: true; user: CurrentUser } | { ok: false; error: string }
 
 // Every action funnels through this — signed-out callers and non-admins can't
 // manage users. RLS is the real enforcement; this gives a clean error first.
-async function requireAdmin(): Promise<AdminGate> {
+async function requireAdmin(
+  perm: AppPermission = "users.manage",
+  resource = "users",
+): Promise<AdminGate> {
   const user = await getCurrentUser()
   if (!user) return { ok: false, error: "You're not signed in." }
-  if (!hasPermission(user.permissions, user.role, "users.manage", "manageUsers"))
-    return { ok: false, error: "You don't have permission to manage users." }
+  if (!hasPermission(user.permissions, user.role, perm, "manageUsers"))
+    return { ok: false, error: `You don't have permission to manage ${resource}.` }
   return { ok: true, user }
 }
 
@@ -288,10 +292,10 @@ export async function updateUserProfile(
 
 // Assign the full set of roles a user holds (multi-role). The user's *primary*
 // role (profiles.role) is always kept — set_user_roles re-adds it server-side so a
-// user can't lose their base role's access. The RPC replaces atomically; the
-// user_roles RLS (firm-scoped, settings.manage / admin) is the real gate.
+// user can't lose their base role's access. The RPC replaces atomically; this gates on
+// settings.manage to match the user_roles RLS (firm-scoped, authorize('settings.manage')).
 export async function setUserRoles(userId: string, roleIds: string[]): Promise<ActionResult> {
-  const gate = await requireAdmin()
+  const gate = await requireAdmin("settings.manage", "roles")
   if (!gate.ok) return { error: gate.error }
   const admin = gate.user
 

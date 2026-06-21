@@ -95,6 +95,40 @@ alter policy "invoices_delete" on public.invoices
 alter policy "audit_log_select" on public.audit_log
   using (firm_id = public.current_firm_id() and public.authorize('reporting.view'));
 
--- 3) Drop the now-unreferenced transition helpers.
+-- 3) invite_token_for (0007) still gated on current_staff_role() in its body — move it
+--    to the permission so the helper can be dropped. SECURITY DEFINER, but authorize()
+--    reads the CALLER's JWT; current_firm_id() still constrains to active staff.
+create or replace function public.invite_token_for(p_user_id uuid)
+returns text
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_firm uuid;
+  v_token text;
+begin
+  -- Caller must hold users.manage (was: current_staff_role() = 'admin').
+  if not public.authorize('users.manage') then
+    return null;
+  end if;
+  v_firm := public.current_firm_id();
+  if v_firm is null then
+    return null;
+  end if;
+
+  select u.confirmation_token
+    into v_token
+  from public.profiles p
+  join auth.users u on u.id = p.id
+  where p.id = p_user_id
+    and p.firm_id = v_firm
+    and p.status = 'invited';
+
+  return nullif(v_token, '');
+end;
+$$;
+
+-- 4) Drop the now-unreferenced transition helpers.
 drop function if exists public.current_staff_role();
 drop function if exists public.rbac_unstamped();
