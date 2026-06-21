@@ -27,11 +27,13 @@ export function UsersTable({
   users,
   currentUserId,
   canManage,
+  canManageRoles,
   roles,
 }: {
   users: ManagedUser[]
   currentUserId: string
   canManage: boolean
+  canManageRoles: boolean
   roles: RoleOption[]
 }) {
   return (
@@ -75,8 +77,14 @@ export function UsersTable({
                 <StatusPill {...USER_STATUS[u.status]} />
               </TableCell>
               <TableCell className="pr-4 text-right">
-                {canManage ? (
-                  <UserRowActions user={u} currentUserId={currentUserId} roles={roles} />
+                {canManage || canManageRoles ? (
+                  <UserRowActions
+                    user={u}
+                    currentUserId={currentUserId}
+                    canManageUsers={canManage}
+                    canManageRoles={canManageRoles}
+                    roles={roles}
+                  />
                 ) : null}
               </TableCell>
             </TableRow>

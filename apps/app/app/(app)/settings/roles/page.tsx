@@ -53,9 +53,9 @@ async function load(): Promise<Loaded> {
     permissions: (r.role_permissions ?? []).map((rp) => rp.permission as AppPermission),
   }))
 
-  // Phase 1: role management is admin-only — mirrors requireAdmin in the actions and
-  // the roles_admin_write RLS. Phase 2b flips this to authorize('settings.manage').
-  return { roles, canManage: me?.role === "admin" }
+  // Role management needs settings.manage — mirrors requireAdmin in the actions and the
+  // roles_admin_write RLS (authorize('settings.manage')).
+  return { roles, canManage: me?.permissions?.includes("settings.manage") ?? false }
 }
 
 function summarize(role: RoleRow): string {
