@@ -21,12 +21,15 @@ export type CurrentUser = {
 // read them. Only the access_token is touched — never the unvalidated session user — so
 // this stays sound. Null when absent (hook not live) → callers fall back to the matrix.
 function permissionsFromAccessToken(accessToken: string | undefined): AppPermission[] | null {
-  const payload = accessToken?.split(".")[1]
-  if (!payload) return null
+  const segment = accessToken?.split(".")[1]
+  if (!segment) return null
   try {
-    const claims = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as {
-      app_metadata?: { permissions?: unknown }
-    }
+    // Decode the base64url payload with Web APIs (atob/TextDecoder) so it works in both
+    // the Node and Edge runtimes — Buffer isn't available on Edge.
+    const base64 = segment.replace(/-/g, "+").replace(/_/g, "/")
+    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), "=")
+    const json = new TextDecoder().decode(Uint8Array.from(atob(padded), (c) => c.charCodeAt(0)))
+    const claims = JSON.parse(json) as { app_metadata?: { permissions?: unknown } }
     const perms = claims.app_metadata?.permissions
     return Array.isArray(perms) ? (perms as AppPermission[]) : null
   } catch {
