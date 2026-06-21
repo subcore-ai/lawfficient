@@ -16,6 +16,24 @@ export type CurrentUser = {
   permissions: AppPermission[] | null
 }
 
+// The access-token hook writes permissions into the JWT claims, not the database
+// app_metadata that getUser() returns. Decode the (already-validated) access token to
+// read them. Only the access_token is touched — never the unvalidated session user — so
+// this stays sound. Null when absent (hook not live) → callers fall back to the matrix.
+function permissionsFromAccessToken(accessToken: string | undefined): AppPermission[] | null {
+  const payload = accessToken?.split(".")[1]
+  if (!payload) return null
+  try {
+    const claims = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as {
+      app_metadata?: { permissions?: unknown }
+    }
+    const perms = claims.app_metadata?.permissions
+    return Array.isArray(perms) ? (perms as AppPermission[]) : null
+  } catch {
+    return null
+  }
+}
+
 // Returns the signed-in user's firm-scoped profile, or null when not
 // authenticated (or while Supabase isn't configured yet).
 export async function getCurrentUser(): Promise<CurrentUser | null> {
@@ -47,11 +65,12 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   } | null
   if (!profile) return null
 
-  // Permissions are stamped into app_metadata by the access-token hook (the union
-  // of the user's role permissions). Absent until the hook is registered → null,
-  // which signals callers to fall back to the role-based matrix.
-  const stamped = user.app_metadata?.permissions
-  const permissions = Array.isArray(stamped) ? (stamped as AppPermission[]) : null
+  // Permissions are stamped into the JWT by the access-token hook — they live in the
+  // token's claims, NOT in the database app_metadata that getUser() returns. Read them
+  // from the access token (getUser() above already validated it). Absent (null) until
+  // the hook is live, which signals callers to fall back to the role-based matrix.
+  const { data: sessionData } = await supabase.auth.getSession()
+  const permissions = permissionsFromAccessToken(sessionData.session?.access_token)
 
   return {
     id: profile.id,
