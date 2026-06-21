@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server"
 import { isSupabaseConfigured } from "@/lib/supabase/env"
 import { CURRENT_USER } from "@/data"
 import type { Role } from "@/data/types"
+import type { AppPermission } from "@/lib/rbac/permissions"
 
 export const metadata = { title: "My profile" }
 
@@ -17,6 +18,8 @@ type ProfileView = {
   pod: string | null
   editable: boolean
   googleConnected: boolean
+  // TEMP: RBAC access-token hook validation — null means the hook didn't stamp.
+  permissions: AppPermission[] | null
 }
 
 async function load(): Promise<ProfileView> {
@@ -30,6 +33,7 @@ async function load(): Promise<ProfileView> {
       pod: null,
       editable: false,
       googleConnected: false,
+      permissions: null,
     }
   }
 
@@ -49,16 +53,39 @@ async function load(): Promise<ProfileView> {
     pod = data?.name ?? null
   }
 
-  return { name: me.name, email: me.email, role: me.role, pod, editable: true, googleConnected }
+  return { name: me.name, email: me.email, role: me.role, pod, editable: true, googleConnected, permissions: me.permissions }
 }
 
 export default async function ProfilePage() {
   const view = await load()
+  const { permissions, ...profile } = view
   return (
     <>
       <PageHeader title="My profile" description="Manage your display name and password." />
       <div className="flex max-w-2xl flex-col gap-6">
-        <ProfileSettings {...view} />
+        {/* TEMP — RBAC access-token hook validation. Remove this whole block after checking. */}
+        <div className="rounded-md border border-dashed p-4 text-sm">
+          <div className="font-semibold">RBAC hook check (temporary)</div>
+          <div className="mt-1">
+            role: <code>{profile.role}</code>
+          </div>
+          <div>
+            permissions stamped:{" "}
+            {permissions == null
+              ? "NO — falling back (hook off, or token not refreshed since you enabled it)"
+              : `YES — ${permissions.length} permission(s)`}
+          </div>
+          {permissions != null && (
+            <ul className="mt-1 list-disc pl-5">
+              {permissions.map((p) => (
+                <li key={p}>
+                  <code>{p}</code>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <ProfileSettings {...profile} />
       </div>
     </>
   )
