@@ -276,11 +276,13 @@ function ManageUserRolesDialog({ user, roles }: { user: ManagedUser; roles: Role
 export function UserRowActions({
   user,
   currentUserId,
+  canManageUsers,
   canManageRoles,
   roles,
 }: {
   user: ManagedUser
   currentUserId: string
+  canManageUsers: boolean
   canManageRoles: boolean
   roles: RoleOption[]
 }) {
@@ -313,6 +315,8 @@ export function UserRowActions({
   }
 
   if (user.status === "invited") {
+    // Invite controls are user management; a roles-only manager has nothing to do here.
+    if (!canManageUsers) return null
     return (
       <div className="flex justify-end gap-1">
         <Button
@@ -348,15 +352,19 @@ export function UserRowActions({
   if (user.status === "disabled") {
     return (
       <div className="flex justify-end gap-1">
-        <Button
-          variant="ghost"
-          size="sm"
-          disabled={pending}
-          onClick={() => run(() => setUserStatus(user.id, "active"), "User enabled")}
-        >
-          Enable
-        </Button>
-        <ManageUserDialog user={user} />
+        {canManageUsers ? (
+          <>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={pending}
+              onClick={() => run(() => setUserStatus(user.id, "active"), "User enabled")}
+            >
+              Enable
+            </Button>
+            <ManageUserDialog user={user} />
+          </>
+        ) : null}
         {canManageRoles ? <ManageUserRolesDialog user={user} roles={roles} /> : null}
       </div>
     )
@@ -364,9 +372,9 @@ export function UserRowActions({
 
   return (
     <div className="flex justify-end gap-1">
-      <ManageUserDialog user={user} />
+      {canManageUsers ? <ManageUserDialog user={user} /> : null}
       {canManageRoles ? <ManageUserRolesDialog user={user} roles={roles} /> : null}
-      {user.id !== currentUserId ? (
+      {canManageUsers && user.id !== currentUserId ? (
         <Button
           variant="ghost"
           size="sm"
