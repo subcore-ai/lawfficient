@@ -229,17 +229,25 @@ function ManageUserRolesDialog({ user, roles }: { user: ManagedUser; roles: Role
             const isPrimary = r.id === primaryRoleId
             const id = `urole-${user.id}-${r.id}`
             return (
-              <div key={r.id} className="flex items-center gap-2">
+              <div key={r.id} className="flex items-start gap-2">
                 <Checkbox
                   id={id}
+                  className="mt-0.5"
                   checked={isPrimary || selected.has(r.id)}
                   disabled={isPrimary}
                   onCheckedChange={(v) => toggle(r.id, v === true)}
                 />
-                <Label htmlFor={id} className="text-sm font-normal">
-                  {r.name}
-                  {isPrimary ? " · primary" : !r.isSystem ? " · custom" : ""}
-                </Label>
+                <div className="grid gap-0.5">
+                  <Label htmlFor={id} className="text-sm font-normal">
+                    {r.name}
+                    {isPrimary ? " · primary" : !r.isSystem ? " · custom" : ""}
+                  </Label>
+                  {isPrimary ? (
+                    <span className="text-muted-foreground text-xs">
+                      Always kept — change the primary in Manage.
+                    </span>
+                  ) : null}
+                </div>
               </div>
             )
           })}
