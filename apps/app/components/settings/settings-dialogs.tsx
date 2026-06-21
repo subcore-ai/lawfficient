@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Copy, UserPlus } from "lucide-react"
+import { Link2, Lock, UserPlus } from "lucide-react"
 
 import { Button } from "@workspace/ui/components/button"
 import { Checkbox } from "@workspace/ui/components/checkbox"
@@ -229,17 +229,32 @@ function ManageUserRolesDialog({ user, roles }: { user: ManagedUser; roles: Role
             const isPrimary = r.id === primaryRoleId
             const id = `urole-${user.id}-${r.id}`
             return (
-              <div key={r.id} className="flex items-center gap-2">
-                <Checkbox
-                  id={id}
-                  checked={isPrimary || selected.has(r.id)}
-                  disabled={isPrimary}
-                  onCheckedChange={(v) => toggle(r.id, v === true)}
-                />
-                <Label htmlFor={id} className="text-sm font-normal">
-                  {r.name}
-                  {isPrimary ? " · primary" : !r.isSystem ? " · custom" : ""}
-                </Label>
+              <div key={r.id} className="flex items-start gap-2">
+                {isPrimary ? (
+                  <Lock className="text-muted-foreground mt-0.5 size-4 shrink-0" aria-hidden />
+                ) : (
+                  <Checkbox
+                    id={id}
+                    className="mt-0.5"
+                    checked={selected.has(r.id)}
+                    onCheckedChange={(v) => toggle(r.id, v === true)}
+                  />
+                )}
+                <div className="grid gap-0.5">
+                  {isPrimary ? (
+                    <span className="text-sm font-normal">{r.name} · primary</span>
+                  ) : (
+                    <Label htmlFor={id} className="text-sm font-normal">
+                      {r.name}
+                      {!r.isSystem ? " · custom" : ""}
+                    </Label>
+                  )}
+                  {isPrimary ? (
+                    <span className="text-muted-foreground text-xs">
+                      Use Manage to change the primary role.
+                    </span>
+                  ) : null}
+                </div>
               </div>
             )
           })}
@@ -306,7 +321,7 @@ export function UserRowActions({
           title="Copy invite link"
           aria-label="Copy invite link"
         >
-          <Copy className="size-4" />
+          <Link2 className="size-4" />
         </Button>
         <Button
           variant="ghost"

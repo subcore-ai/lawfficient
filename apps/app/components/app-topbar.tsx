@@ -170,12 +170,8 @@ export function AppTopbar({ user }: { user?: { name: string; email: string } | n
                 </DropdownMenuRadioGroup>
               </DropdownMenuSubContent>
             </DropdownMenuSub>
-            <DropdownMenuSeparator />
             <DropdownMenuItem render={<Link href="/profile" />}>
               <User className="size-4" /> Profile
-            </DropdownMenuItem>
-            <DropdownMenuItem render={<Link href="/settings" />}>
-              <Settings className="size-4" /> Settings
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => React.startTransition(() => signOut())}>
