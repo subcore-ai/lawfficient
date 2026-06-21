@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 
 import { getCurrentUser, type CurrentUser } from "@/lib/auth/session"
+import { hasPermission } from "@/lib/auth/permissions"
 import { ALL_PERMISSIONS, type AppPermission } from "@/lib/rbac/permissions"
 import { createClient } from "@/lib/supabase/server"
 
@@ -12,13 +13,14 @@ const ROLES_PATH = "/settings/roles"
 
 type AdminGate = { ok: true; user: CurrentUser } | { ok: false; error: string }
 
-// Every action funnels through this — signed-out callers and non-admins can't
-// manage roles. RLS (current_staff_role()='admin', firm-scoped) is the real
-// enforcement; this gives a clean error first. (Phase 2b flips it to settings.manage.)
+// Every action funnels through this — signed-out callers and users without
+// settings.manage can't manage roles. RLS (authorize('settings.manage'), firm-scoped)
+// is the real enforcement; this gives a clean error first.
 async function requireAdmin(): Promise<AdminGate> {
   const user = await getCurrentUser()
   if (!user) return { ok: false, error: "You're not signed in." }
-  if (user.role !== "admin") return { ok: false, error: "Only admins can manage roles." }
+  if (!hasPermission(user.permissions, user.role, "settings.manage", "manageUsers"))
+    return { ok: false, error: "You don't have permission to manage roles." }
   return { ok: true, user }
 }
 

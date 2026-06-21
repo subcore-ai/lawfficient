@@ -10,6 +10,7 @@ import {
 
 import { CreateRoleDialog, RoleRowActions, type RoleRow } from "@/components/settings/roles-editor"
 import { getCurrentUser } from "@/lib/auth/session"
+import { hasPermission } from "@/lib/auth/permissions"
 import { ALL_PERMISSIONS, type AppPermission } from "@/lib/rbac/permissions"
 import { createClient } from "@/lib/supabase/server"
 import { isSupabaseConfigured } from "@/lib/supabase/env"
@@ -53,9 +54,9 @@ async function load(): Promise<Loaded> {
     permissions: (r.role_permissions ?? []).map((rp) => rp.permission as AppPermission),
   }))
 
-  // Phase 1: role management is admin-only — mirrors requireAdmin in the actions and
-  // the roles_admin_write RLS. Phase 2b flips this to authorize('settings.manage').
-  return { roles, canManage: me?.role === "admin" }
+  // Role management needs settings.manage — mirrors requireAdmin in the actions and the
+  // roles_admin_write RLS (authorize('settings.manage')).
+  return { roles, canManage: me ? hasPermission(me.permissions, me.role, "settings.manage", "manageUsers") : false }
 }
 
 function summarize(role: RoleRow): string {

@@ -13,7 +13,7 @@ import {
   type RoleOption,
 } from "@/components/settings/settings-dialogs"
 import { UsersTable } from "@/components/settings/users-table"
-import { can } from "@/lib/auth/permissions"
+import { hasPermission } from "@/lib/auth/permissions"
 import { getCurrentUser } from "@/lib/auth/session"
 import { createClient } from "@/lib/supabase/server"
 import { isSupabaseConfigured } from "@/lib/supabase/env"
@@ -93,7 +93,7 @@ async function load(): Promise<Loaded> {
     users,
     roles,
     currentUserId: me?.id ?? "",
-    canManage: me ? can(me.role, "manageUsers") : false,
+    canManage: me ? hasPermission(me.permissions, me.role, "users.manage", "manageUsers") : false,
   }
 }
 

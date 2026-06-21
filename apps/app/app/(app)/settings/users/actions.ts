@@ -4,6 +4,7 @@ import { headers } from "next/headers"
 import { revalidatePath } from "next/cache"
 
 import { getCurrentUser, type CurrentUser } from "@/lib/auth/session"
+import { hasPermission } from "@/lib/auth/permissions"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { parseInviteInput, parseRole } from "@/lib/users/validation"
@@ -19,7 +20,8 @@ type AdminGate = { ok: true; user: CurrentUser } | { ok: false; error: string }
 async function requireAdmin(): Promise<AdminGate> {
   const user = await getCurrentUser()
   if (!user) return { ok: false, error: "You're not signed in." }
-  if (user.role !== "admin") return { ok: false, error: "Only admins can manage users." }
+  if (!hasPermission(user.permissions, user.role, "users.manage", "manageUsers"))
+    return { ok: false, error: "You don't have permission to manage users." }
   return { ok: true, user }
 }
 
