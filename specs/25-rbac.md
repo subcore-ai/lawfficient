@@ -17,6 +17,8 @@ effective permissions into the JWT, and RLS reads them via an `authorize(permiss
 per-row table joins. `firm_id` isolation is unchanged and remains the security floor; RBAC layers
 on top.
 
+![RBAC permission flow — roles and permissions stored per firm, unioned into the JWT by the access-token hook at login, then read by authorize() in RLS (the real gate) and hasPermission() in the UI (cosmetic).](assets/rbac-permission-flow.svg)
+
 This spec defines *how roles/permissions are modeled, assigned, edited, and enforced*. What each
 staff role is responsible for stays in [02-roles-and-permissions](02-roles-and-permissions.md).
 
