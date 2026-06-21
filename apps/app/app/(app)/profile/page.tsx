@@ -18,8 +18,11 @@ type ProfileView = {
   pod: string | null
   editable: boolean
   googleConnected: boolean
-  // TEMP: RBAC access-token hook validation — null means the hook didn't stamp.
+  // TEMP: RBAC access-token hook validation.
+  // permissions   = via getUser().app_metadata (reflects the DB)
+  // jwtPermissions = decoded straight from the access token (what the hook stamped)
   permissions: AppPermission[] | null
+  jwtPermissions: AppPermission[] | null
 }
 
 async function load(): Promise<ProfileView> {
@@ -34,6 +37,7 @@ async function load(): Promise<ProfileView> {
       editable: false,
       googleConnected: false,
       permissions: null,
+      jwtPermissions: null,
     }
   }
 
@@ -53,12 +57,38 @@ async function load(): Promise<ProfileView> {
     pod = data?.name ?? null
   }
 
-  return { name: me.name, email: me.email, role: me.role, pod, editable: true, googleConnected, permissions: me.permissions }
+  // Authoritative read: decode the access token itself. getCurrentUser() above reads
+  // getUser().app_metadata, which reflects the DB — the hook's claim lives only in the JWT.
+  const { data: sessionData } = await supabase.auth.getSession()
+  const payloadB64 = sessionData.session?.access_token?.split(".")[1]
+  let jwtPermissions: AppPermission[] | null = null
+  if (payloadB64) {
+    try {
+      const payload = JSON.parse(Buffer.from(payloadB64, "base64url").toString("utf8")) as {
+        app_metadata?: { permissions?: unknown }
+      }
+      const p = payload.app_metadata?.permissions
+      jwtPermissions = Array.isArray(p) ? (p as AppPermission[]) : null
+    } catch {
+      jwtPermissions = null
+    }
+  }
+
+  return {
+    name: me.name,
+    email: me.email,
+    role: me.role,
+    pod,
+    editable: true,
+    googleConnected,
+    permissions: me.permissions,
+    jwtPermissions,
+  }
 }
 
 export default async function ProfilePage() {
   const view = await load()
-  const { permissions, ...profile } = view
+  const { permissions, jwtPermissions, ...profile } = view
   return (
     <>
       <PageHeader title="My profile" description="Manage your display name and password." />
@@ -70,14 +100,16 @@ export default async function ProfilePage() {
             role: <code>{profile.role}</code>
           </div>
           <div>
-            permissions stamped:{" "}
-            {permissions == null
-              ? "NO — falling back (hook off, or token not refreshed since you enabled it)"
-              : `YES — ${permissions.length} permission(s)`}
+            via <code>getUser()</code> (what the app reads today):{" "}
+            <strong>{permissions == null ? "null" : `${permissions.length} permission(s)`}</strong>
           </div>
-          {permissions != null && (
+          <div>
+            via JWT claim (what the hook stamped):{" "}
+            <strong>{jwtPermissions == null ? "null" : `${jwtPermissions.length} permission(s)`}</strong>
+          </div>
+          {jwtPermissions != null && (
             <ul className="mt-1 list-disc pl-5">
-              {permissions.map((p) => (
+              {jwtPermissions.map((p) => (
                 <li key={p}>
                   <code>{p}</code>
                 </li>
