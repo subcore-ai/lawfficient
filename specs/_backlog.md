@@ -18,7 +18,7 @@ _Added 2026-06-21._
 **What:** make role/permission changes take effect on save, without the affected user
 having to log out and back in.
 
-**Why deferred:** the data-driven RBAC design (`25-rbac.md`) stamps permissions into the
+**Why deferred:** the data-driven RBAC design ([25-rbac.md](25-rbac.md)) stamps permissions into the
 JWT at token issuance, so a change applies on the user's next token refresh — not
 instantly. Acceptable for an internal staff tool now; revisit when "applies on save" is
 wanted.
@@ -29,8 +29,10 @@ wanted.
 - _Real fix (~1–2 days):_ force the affected user's token to refresh on save — either a
   Supabase Realtime nudge the client reacts to with `refreshSession()`, or a
   `permissions_updated_at` stamp the Next proxy checks to force-refresh on the user's
-  next request (also catches offline / multi-device sessions). `refreshSession()` re-runs
-  `custom_access_token_hook`, so the new token rebuilds the permission union for free.
+  next request (also catches offline / multi-device sessions — but the proxy route adds a
+  per-request read of the stamp, so piggyback it on an existing query rather than a new
+  round-trip). `refreshSession()` re-runs `custom_access_token_hook`, so the new token
+  rebuilds the permission union for free.
   Per-user (assigning roles) ≈ 1 day; role-matrix fan-out (one edit touches every holder)
   adds ≈ 1 day.
 
