@@ -241,13 +241,17 @@ function ManageUserRolesDialog({ user, roles }: { user: ManagedUser; roles: Role
                   />
                 )}
                 <div className="grid gap-0.5">
-                  <Label htmlFor={isPrimary ? undefined : id} className="text-sm font-normal">
-                    {r.name}
-                    {isPrimary ? " · primary" : !r.isSystem ? " · custom" : ""}
-                  </Label>
+                  {isPrimary ? (
+                    <span className="text-sm font-normal">{r.name} · primary</span>
+                  ) : (
+                    <Label htmlFor={id} className="text-sm font-normal">
+                      {r.name}
+                      {!r.isSystem ? " · custom" : ""}
+                    </Label>
+                  )}
                   {isPrimary ? (
                     <span className="text-muted-foreground text-xs">
-                      To change it, use Manage.
+                      Use Manage to change the primary role.
                     </span>
                   ) : null}
                 </div>
