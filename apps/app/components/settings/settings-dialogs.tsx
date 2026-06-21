@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Copy, UserPlus } from "lucide-react"
+import { Link2, Lock, UserPlus } from "lucide-react"
 
 import { Button } from "@workspace/ui/components/button"
 import { Checkbox } from "@workspace/ui/components/checkbox"
@@ -230,15 +230,18 @@ function ManageUserRolesDialog({ user, roles }: { user: ManagedUser; roles: Role
             const id = `urole-${user.id}-${r.id}`
             return (
               <div key={r.id} className="flex items-start gap-2">
-                <Checkbox
-                  id={id}
-                  className="mt-0.5"
-                  checked={isPrimary || selected.has(r.id)}
-                  disabled={isPrimary}
-                  onCheckedChange={(v) => toggle(r.id, v === true)}
-                />
+                {isPrimary ? (
+                  <Lock className="text-muted-foreground mt-0.5 size-4 shrink-0" aria-hidden />
+                ) : (
+                  <Checkbox
+                    id={id}
+                    className="mt-0.5"
+                    checked={selected.has(r.id)}
+                    onCheckedChange={(v) => toggle(r.id, v === true)}
+                  />
+                )}
                 <div className="grid gap-0.5">
-                  <Label htmlFor={id} className="text-sm font-normal">
+                  <Label htmlFor={isPrimary ? undefined : id} className="text-sm font-normal">
                     {r.name}
                     {isPrimary ? " · primary" : !r.isSystem ? " · custom" : ""}
                   </Label>
@@ -314,7 +317,7 @@ export function UserRowActions({
           title="Copy invite link"
           aria-label="Copy invite link"
         >
-          <Copy className="size-4" />
+          <Link2 className="size-4" />
         </Button>
         <Button
           variant="ghost"
