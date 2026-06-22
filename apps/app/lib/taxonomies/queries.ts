@@ -52,12 +52,24 @@ export function vocab(t: FirmTaxonomies, category: TaxonomyCategory): string[] {
   return t[category].filter((o) => o.isActive).map((o) => o.label)
 }
 
-// The LeadVocab that buildLeadData / parseCanonicalPayload validate against.
+// The LeadVocab that buildLeadData / parseCanonicalPayload validate against (active labels only —
+// for the lead form, where only active values are selectable).
 export function toLeadVocab(t: FirmTaxonomies): LeadVocab {
   return {
     caseType: vocab(t, "case_type"),
     hierarchy: vocab(t, "case_hierarchy"),
     qualification: vocab(t, "qualification"),
+  }
+}
+
+// Like toLeadVocab but includes INACTIVE labels — for ingest, a trusted machine source that should
+// accept any value the firm has ever defined (e.g. a re-delivery still carrying a since-deactivated
+// value), not just active ones. Genuinely-unknown values are still rejected.
+export function toLeadVocabAll(t: FirmTaxonomies): LeadVocab {
+  return {
+    caseType: t.case_type.map((o) => o.label),
+    hierarchy: t.case_hierarchy.map((o) => o.label),
+    qualification: t.qualification.map((o) => o.label),
   }
 }
 

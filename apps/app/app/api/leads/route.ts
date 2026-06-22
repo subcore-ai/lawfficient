@@ -8,7 +8,7 @@ import { parseLeadInput } from "@/lib/leads/validation"
 import { createAdminClient } from "@/lib/supabase/admin"
 import type { Json } from "@/lib/supabase/database.types"
 import { isSupabaseConfigured } from "@/lib/supabase/env"
-import { groupTaxonomies, toLeadVocab } from "@/lib/taxonomies/queries"
+import { groupTaxonomies, toLeadVocabAll } from "@/lib/taxonomies/queries"
 
 // node:crypto (key hashing) + libphonenumber-js → Node runtime, not Edge.
 export const runtime = "nodejs"
@@ -97,7 +97,9 @@ export async function POST(request: NextRequest) {
   if (taxRes.error) {
     return NextResponse.json({ error: "Temporarily unavailable." }, { status: 503 })
   }
-  const vocab = toLeadVocab(groupTaxonomies(taxRes.data ?? []))
+  // Ingest accepts any firm-defined value (incl. deactivated) so a re-delivery carrying a
+  // since-deactivated label still validates (mirrors updateLead's existing-value widening).
+  const vocab = toLeadVocabAll(groupTaxonomies(taxRes.data ?? []))
   const parsedPayload = parseCanonicalPayload(payload, vocab)
   const core = parseLeadInput({
     firstName: parsedPayload.core.firstName,
