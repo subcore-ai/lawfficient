@@ -43,15 +43,13 @@ async function audit(
   action: string
 ) {
   try {
-    const { error } = await supabase
-      .from("audit_log")
-      .insert({
-        entity: "lead",
-        entity_id: entityId,
-        label,
-        action,
-        by_user_id: byUserId,
-      })
+    const { error } = await supabase.from("audit_log").insert({
+      entity: "lead",
+      entity_id: entityId,
+      label,
+      action,
+      by_user_id: byUserId,
+    })
     if (error) console.error("audit_log insert failed:", error.message)
   } catch (err) {
     console.error("audit_log insert threw:", err)
@@ -140,6 +138,19 @@ export async function setNoteResolved(
   if (!gate.ok) return { error: gate.error }
 
   const supabase = await createClient()
+  // Idempotent: if the note is already in the target state, no-op (and re-sync the UI). This also
+  // avoids guard_notes rejecting a set->set timestamp rewrite on a repeat/double-click.
+  const { data: note, error: readErr } = await supabase
+    .from("notes")
+    .select("entity_type, entity_id, resolved_at")
+    .eq("id", id)
+    .single()
+  if (readErr || !note) return { error: "Couldn't update the note." }
+  if (!!note.resolved_at === resolved) {
+    revalidateEntity(note.entity_type, note.entity_id)
+    return { ok: true }
+  }
+
   const { data: updated, error } = await supabase
     .from("notes")
     .update({
@@ -170,6 +181,19 @@ export async function setNoteHidden(
   if (!gate.ok) return { error: gate.error }
 
   const supabase = await createClient()
+  // Idempotent: if the note is already in the target state, no-op (and re-sync the UI). Avoids the
+  // guard_notes set->set rejection on a repeat/double-click.
+  const { data: note, error: readErr } = await supabase
+    .from("notes")
+    .select("entity_type, entity_id, hidden_at")
+    .eq("id", id)
+    .single()
+  if (readErr || !note) return { error: "Couldn't update the note." }
+  if (!!note.hidden_at === hidden) {
+    revalidateEntity(note.entity_type, note.entity_id)
+    return { ok: true }
+  }
+
   const { data: updated, error } = await supabase
     .from("notes")
     .update({
