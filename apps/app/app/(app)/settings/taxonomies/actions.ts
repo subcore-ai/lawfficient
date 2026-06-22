@@ -13,6 +13,13 @@ export type CreateResult = { ok: true; id: string; label: string } | { error: st
 
 const PATH = "/settings/taxonomies"
 
+// Taxonomy values surface in Settings, the leads board, and the dashboard quick-add — revalidate all.
+function revalidateTaxonomyViews() {
+  revalidatePath(PATH)
+  revalidatePath("/")
+  revalidatePath("/leads")
+}
+
 type Gate = { ok: true; user: CurrentUser } | { ok: false; error: string }
 type DbClient = Awaited<ReturnType<typeof createClient>>
 
@@ -50,6 +57,7 @@ async function insertTaxonomy(category: TaxonomyCategory, label: string, notes: 
   if (!gate.ok) return { error: gate.error }
   const trimmed = label.trim()
   if (!trimmed) return { error: "Enter a value." }
+  if (trimmed.startsWith("__")) return { error: "Values can't start with “__” (reserved)." }
 
   const supabase = await createClient()
   // Append after the last position in this category. firm_id defaults to current_firm_id().
@@ -71,8 +79,7 @@ async function insertTaxonomy(category: TaxonomyCategory, label: string, notes: 
   }
 
   await audit(supabase, gate.user.id, data.id, trimmed, "created")
-  revalidatePath(PATH)
-  revalidatePath("/leads")
+  revalidateTaxonomyViews()
   return { ok: true, id: data.id, label: trimmed }
 }
 
@@ -95,6 +102,7 @@ export async function editTaxonomy(id: string, formData: FormData): Promise<Acti
   const label = String(formData.get("label") ?? "").trim()
   const notes = String(formData.get("notes") ?? "").trim() || null
   if (!label) return { error: "Enter a value." }
+  if (label.startsWith("__")) return { error: "Values can't start with “__” (reserved)." }
 
   const supabase = await createClient()
   const { data: row, error: readErr } = await supabase
@@ -123,8 +131,7 @@ export async function editTaxonomy(id: string, formData: FormData): Promise<Acti
   if (notesErr || !updated || updated.length === 0) return { error: "Couldn't save the value." }
 
   await audit(supabase, gate.user.id, id, label, "updated")
-  revalidatePath(PATH)
-  revalidatePath("/leads")
+  revalidateTaxonomyViews()
   return { ok: true }
 }
 
@@ -141,8 +148,7 @@ export async function setTaxonomyActive(id: string, isActive: boolean): Promise<
   if (error || !data || data.length === 0) return { error: "Couldn't update the value." }
 
   await audit(supabase, gate.user.id, id, data[0]!.label, isActive ? "activated" : "deactivated")
-  revalidatePath(PATH)
-  revalidatePath("/leads")
+  revalidateTaxonomyViews()
   return { ok: true }
 }
 
@@ -172,8 +178,7 @@ export async function reorderTaxonomy(id: string, direction: "up" | "down"): Pro
   if (swap1.error) return { error: "Couldn't reorder." }
   const swap2 = await supabase.from("firm_taxonomies").update({ position: row.position }).eq("id", neighbor.id)
   if (swap2.error) return { error: "Couldn't reorder." }
-  revalidatePath(PATH)
-  revalidatePath("/leads")
+  revalidateTaxonomyViews()
   return { ok: true }
 }
 
@@ -208,7 +213,6 @@ export async function deleteTaxonomy(id: string): Promise<ActionResult> {
   if (error || !data || data.length === 0) return { error: "Couldn't delete the value." }
 
   await audit(supabase, gate.user.id, id, row.label, "deleted")
-  revalidatePath(PATH)
-  revalidatePath("/leads")
+  revalidateTaxonomyViews()
   return { ok: true }
 }

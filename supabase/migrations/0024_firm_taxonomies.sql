@@ -75,18 +75,46 @@ create trigger firms_seed_firm_taxonomies
 revoke execute on function public.seed_firm_taxonomies(uuid) from public, anon, authenticated;
 revoke execute on function public.seed_firm_taxonomies_on_firm() from public, anon, authenticated;
 
--- Guard: protect seeded rows; block deleting a value still used by leads. The in-use check is an
--- inlined, firm-scoped jsonb scan (no FK exists — leads.data stores the label). It runs as the
--- caller (INVOKER), so under leads RLS it's a best-effort backstop; the delete action does the
--- authoritative check via the service-role client, and deactivate is the recommended retire path.
--- `notes` stays editable on system rows (it's annotation, not identity).
+-- In-use check that bypasses leads RLS (SECURITY DEFINER) so guard_firm_taxonomy can reliably block
+-- deleting a referenced value even for a settings.manage user WITHOUT leads.view (whose own RLS
+-- scan would see no rows). Granted to authenticated since the INVOKER guard calls it; firm-scoped
+-- to the caller so it can't probe other firms; returns only a boolean. (No FK exists — leads.data
+-- stores the label.)
+create or replace function public.firm_taxonomy_in_use(p_firm uuid, p_category text, p_label text)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+stable
+as $$
+declare
+  data_key text;
+begin
+  if p_firm is distinct from public.current_firm_id() then
+    return false;
+  end if;
+  data_key := case p_category
+    when 'case_type' then 'caseType'
+    when 'case_hierarchy' then 'hierarchy'
+    when 'qualification' then 'qualification'
+  end;
+  return exists (
+    select 1 from public.leads where firm_id = p_firm and data ->> data_key = p_label
+  );
+end;
+$$;
+
+revoke execute on function public.firm_taxonomy_in_use(uuid, text, text) from public;
+grant execute on function public.firm_taxonomy_in_use(uuid, text, text) to authenticated;
+
+-- Guard: protect seeded rows; block deleting a value still used by leads (via firm_taxonomy_in_use,
+-- DEFINER, so the check is reliable even without leads.view). The guard itself stays INVOKER so the
+-- system-row INSERT check (current_user) still works. `notes` stays editable on system rows.
 create or replace function public.guard_firm_taxonomy()
 returns trigger
 language plpgsql
 set search_path = ''
 as $$
-declare
-  data_key text;
 begin
   if tg_op = 'INSERT' then
     if new.is_system and current_user in ('authenticated', 'anon') then
@@ -102,15 +130,7 @@ begin
     if old.is_system then
       raise exception 'system taxonomies cannot be deleted';
     end if;
-    data_key := case old.category
-      when 'case_type' then 'caseType'
-      when 'case_hierarchy' then 'hierarchy'
-      when 'qualification' then 'qualification'
-    end;
-    if exists (
-      select 1 from public.leads
-      where firm_id = old.firm_id and data ->> data_key = old.label
-    ) then
+    if public.firm_taxonomy_in_use(old.firm_id, old.category, old.label) then
       raise exception 'cannot delete a taxonomy value still used by leads';
     end if;
     return old;

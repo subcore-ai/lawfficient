@@ -17,7 +17,9 @@ import type { AssigneeOption, LeadView } from "@/lib/leads/queries"
 import { LEAD_SOURCES } from "@/lib/leads/validation"
 import type { FirmTaxonomies, TaxonomyOption } from "@/lib/taxonomies/queries"
 
-const NONE = "none"
+// Distinctive sentinel so a firm-defined taxonomy label (e.g. literally "none") can't collide with
+// the "Not set" option. Taxonomy create/rename rejects "__"-prefixed labels (see settings actions).
+const NONE = "__none__"
 
 // Active taxonomy labels as select items; keep a deactivated/legacy value the lead still carries
 // visible so it still renders.

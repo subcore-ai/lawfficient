@@ -1149,6 +1149,10 @@ export type Database = {
         Args: { p_firm_id: string }
         Returns: boolean
       }
+      firm_taxonomy_in_use: {
+        Args: { p_category: string; p_firm: string; p_label: string }
+        Returns: boolean
+      }
       invite_token_for: { Args: { p_user_id: string }; Returns: string }
       rename_firm_taxonomy: {
         Args: { p_id: string; p_label: string }
