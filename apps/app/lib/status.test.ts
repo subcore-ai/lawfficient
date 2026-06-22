@@ -17,7 +17,8 @@ import {
 describe("enum → badge mappers", () => {
   test("map representative values to their label + tone", () => {
     expect(leadStatusBadge("retained")).toEqual({ label: "Retained", tone: "success" })
-    expect(qualificationBadge("qualified")).toEqual({ label: "Qualified", tone: "success" })
+    expect(qualificationBadge("Qualified")).toEqual({ label: "Qualified", tone: "success" })
+    expect(qualificationBadge("Custom value")).toEqual({ label: "Custom value", tone: "neutral" })
     expect(consultationStatusBadge("no_show")).toEqual({ label: "No-show", tone: "danger" })
     expect(caseStatusBadge("rfe")).toEqual({ label: "RFE / NOID", tone: "danger" })
     expect(invoiceStatusBadge("overdue")).toEqual({ label: "Overdue", tone: "danger" })

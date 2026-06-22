@@ -74,7 +74,7 @@ const MOCK: Record<TaxonomyCategory, string[]> = {
     "Removal of Conditions",
   ],
   case_hierarchy: ["HRC", "NHRC"],
-  qualification: ["pending", "qualified", "not_qualified"],
+  qualification: ["Pending", "Qualified", "Not qualified"],
 }
 
 export function mockTaxonomies(): FirmTaxonomies {

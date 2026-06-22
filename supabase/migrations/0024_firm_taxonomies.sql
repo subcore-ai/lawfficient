@@ -24,11 +24,8 @@ create table public.firm_taxonomies (
 create index firm_taxonomies_firm_category_idx
   on public.firm_taxonomies (firm_id, category, position);
 
--- Seed today's hard-coded vocabularies for one firm. SECURITY DEFINER: runs from the migration +
--- the new-firm trigger, only ever writing system rows for the given firm. NOTE: qualification rows
--- store the legacy KEYS (pending/qualified/not_qualified), because leads.data.qualification already
--- stores those keys and qualificationBadge maps them — storing display labels would invalidate
--- existing data.
+-- Seed today's default vocabularies for one firm. SECURITY DEFINER: runs from the migration +
+-- the new-firm trigger, only ever writing system rows for the given firm.
 create or replace function public.seed_firm_taxonomies(p_firm_id uuid)
 returns void
 language plpgsql
@@ -47,9 +44,9 @@ begin
     (p_firm_id, 'case_type', 'Removal of Conditions', 6, true),
     (p_firm_id, 'case_hierarchy', 'HRC',  0, true),
     (p_firm_id, 'case_hierarchy', 'NHRC', 1, true),
-    (p_firm_id, 'qualification', 'pending',       0, true),
-    (p_firm_id, 'qualification', 'qualified',     1, true),
-    (p_firm_id, 'qualification', 'not_qualified', 2, true)
+    (p_firm_id, 'qualification', 'Pending',       0, true),
+    (p_firm_id, 'qualification', 'Qualified',     1, true),
+    (p_firm_id, 'qualification', 'Not qualified', 2, true)
   on conflict (firm_id, category, label) do nothing;
 end;
 $$;

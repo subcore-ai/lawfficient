@@ -3,7 +3,14 @@
 import { revalidatePath } from "next/cache"
 
 import { getCurrentUser, type CurrentUser } from "@/lib/auth/session"
-import { buildLeadData, mergeLeadData, type LeadDataInput, type LeadVocab } from "@/lib/leads/data-schema"
+import {
+  buildLeadData,
+  mergeLeadData,
+  parseLeadData,
+  type LeadData,
+  type LeadDataInput,
+  type LeadVocab,
+} from "@/lib/leads/data-schema"
 import { parseLeadInput } from "@/lib/leads/validation"
 import { createClient } from "@/lib/supabase/server"
 import { groupTaxonomies, toLeadVocab } from "@/lib/taxonomies/queries"
@@ -81,8 +88,19 @@ function readCore(formData: FormData) {
 // The firm's active taxonomy labels, for buildLeadData validation (case type / hierarchy /
 // qualification are firm-defined now). RLS scopes the read to the firm.
 async function loadVocab(supabase: LeadsClient): Promise<LeadVocab> {
-  const { data } = await supabase.from("firm_taxonomies").select("*").order("position")
+  const { data, error } = await supabase.from("firm_taxonomies").select("*").order("position")
+  if (error) throw error
   return toLeadVocab(groupTaxonomies(data ?? []))
+}
+
+// Let a lead keep a value that's since been deactivated/renamed: its current taxonomy values stay
+// valid on update even if no longer in the active vocab (the form resubmits them via hidden inputs).
+function withExistingValues(vocab: LeadVocab, existing: LeadData): LeadVocab {
+  return {
+    caseType: existing.caseType ? [...vocab.caseType, existing.caseType] : vocab.caseType,
+    hierarchy: existing.hierarchy ? [...vocab.hierarchy, existing.hierarchy] : vocab.hierarchy,
+    qualification: existing.qualification ? [...vocab.qualification, existing.qualification] : vocab.qualification,
+  }
 }
 
 export async function createLead(formData: FormData): Promise<ActionResult> {
@@ -138,16 +156,20 @@ export async function updateLead(id: string, formData: FormData): Promise<Action
   if (!core.ok) return { error: core.error }
 
   const supabase = await createClient()
-  const data = buildLeadData(readDataFields(formData), await loadVocab(supabase))
-  if (!data.ok) return { error: data.error }
-
-  // Preserve jsonb keys the form doesn't manage (e.g. ingestion payload) — merge, not replace.
+  // Read existing first: for the jsonb merge below, and so an unchanged deactivated/legacy taxonomy
+  // value still validates (loadVocab returns only ACTIVE labels; the form resubmits current values).
   const { data: existing, error: readErr } = await supabase
     .from("leads")
     .select("data")
     .eq("id", id)
     .single()
   if (readErr || !existing) return { error: "Couldn't update the lead." }
+
+  const data = buildLeadData(
+    readDataFields(formData),
+    withExistingValues(await loadVocab(supabase), parseLeadData(existing.data)),
+  )
+  if (!data.ok) return { error: data.error }
 
   // .select().single() makes a 0-row update (RLS / wrong id) a real error, not a silent ok.
   const { data: updated, error } = await supabase

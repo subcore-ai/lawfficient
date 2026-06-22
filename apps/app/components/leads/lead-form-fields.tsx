@@ -15,27 +15,21 @@ import { Field } from "@/components/form-field"
 import { TaxonomySelect } from "@/components/taxonomy-select"
 import type { AssigneeOption, LeadView } from "@/lib/leads/queries"
 import { LEAD_SOURCES } from "@/lib/leads/validation"
-import { qualificationBadge } from "@/lib/status"
 import type { FirmTaxonomies, TaxonomyOption } from "@/lib/taxonomies/queries"
 
 const NONE = "none"
 
 // Active taxonomy labels as select items; keep a deactivated/legacy value the lead still carries
-// visible so it still renders. `display` maps the stored value → label (identity, except
-// qualification, which stores a key but shows a friendly label).
-function taxonomyItems(
-  options: TaxonomyOption[],
-  current: string,
-  display: (v: string) => string = (v) => v,
-): { value: string; label: string }[] {
+// visible so it still renders.
+function taxonomyItems(options: TaxonomyOption[], current: string): { value: string; label: string }[] {
   const items: { value: string; label: string }[] = []
   const seen = new Set<string>()
   for (const o of options) {
     if (!o.isActive || seen.has(o.label)) continue
     seen.add(o.label)
-    items.push({ value: o.label, label: display(o.label) })
+    items.push({ value: o.label, label: o.label })
   }
-  if (current && current !== NONE && !seen.has(current)) items.push({ value: current, label: display(current) })
+  if (current && current !== NONE && !seen.has(current)) items.push({ value: current, label: current })
   return items
 }
 
@@ -138,7 +132,7 @@ export function LeadFormFields({
           category="qualification"
           value={qualification}
           onValueChange={setQualification}
-          options={taxonomyItems(taxonomies.qualification, qualification, (v) => qualificationBadge(v).label)}
+          options={taxonomyItems(taxonomies.qualification, qualification)}
           canManage={canManage}
           addLabel="+ New qualification"
           noneValue={NONE}

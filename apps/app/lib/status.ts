@@ -30,13 +30,13 @@ export function leadStatusBadge(s: Lead["status"]): Badge {
 }
 
 export function qualificationBadge(q: string): Badge {
-  const map: Record<string, Badge> = {
-    qualified: { label: "Qualified", tone: "success" },
-    not_qualified: { label: "Not qualified", tone: "neutral" },
-    pending: { label: "Pending", tone: "warning" },
+  // Tone hint for the seeded qualifications; firm-defined / renamed values fall back to neutral.
+  const tones: Record<string, Tone> = {
+    Qualified: "success",
+    "Not qualified": "neutral",
+    Pending: "warning",
   }
-  // Firm-defined qualifications fall back to a neutral pill with the raw label.
-  return map[q] ?? { label: q, tone: "neutral" }
+  return { label: q, tone: tones[q] ?? "neutral" }
 }
 
 export function consultationStatusBadge(s: ConsultationStatus): Badge {

@@ -168,8 +168,10 @@ export async function reorderTaxonomy(id: string, direction: "up" | "down"): Pro
   if (!neighbor) return { ok: true } // already at the edge — no-op
 
   // Swap positions (two updates; admin-only + rare, so non-atomicity is fine — position isn't unique).
-  await supabase.from("firm_taxonomies").update({ position: neighbor.position }).eq("id", id)
-  await supabase.from("firm_taxonomies").update({ position: row.position }).eq("id", neighbor.id)
+  const swap1 = await supabase.from("firm_taxonomies").update({ position: neighbor.position }).eq("id", id)
+  if (swap1.error) return { error: "Couldn't reorder." }
+  const swap2 = await supabase.from("firm_taxonomies").update({ position: row.position }).eq("id", neighbor.id)
+  if (swap2.error) return { error: "Couldn't reorder." }
   revalidatePath(PATH)
   revalidatePath("/leads")
   return { ok: true }
@@ -191,11 +193,13 @@ export async function deleteTaxonomy(id: string): Promise<ActionResult> {
   // Authoritative in-use check via the service-role client: the guard's scan runs under leads RLS,
   // which a settings-only admin may not satisfy, and labels are denormalized in leads.data.
   const admin = createAdminClient()
-  const { count } = await admin
+  const { count, error: countErr } = await admin
     .from("leads")
     .select("id", { count: "exact", head: true })
     .eq("firm_id", row.firm_id)
     .eq(`data->>${dataKey(row.category as TaxonomyCategory)}`, row.label)
+  // Fail safe: if we can't verify usage, don't risk deleting an in-use value.
+  if (countErr) return { error: "Couldn't verify whether the value is in use. Try again." }
   if ((count ?? 0) > 0) {
     return { error: "This value is in use by leads. Deactivate it instead, or re-tag those leads first." }
   }

@@ -91,11 +91,13 @@ export async function POST(request: NextRequest) {
   // The firm's taxonomy vocabulary (admin client — the webhook has no user session, so RLS
   // doesn't apply; scope explicitly by firm). matchVocab normalizes casing against the firm's own
   // labels, and buildLeadData validates against them.
-  const vocab = toLeadVocab(
-    groupTaxonomies(
-      (await admin.from("firm_taxonomies").select("*").eq("firm_id", source.firmId).order("position")).data ?? []
-    )
-  )
+  const taxRes = await admin.from("firm_taxonomies").select("*").eq("firm_id", source.firmId).order("position")
+  // A failed vocab load must NOT yield an empty vocab → buildLeadData would 400 valid payloads and
+  // Zapier would stop retrying. 503 signals "try again" instead.
+  if (taxRes.error) {
+    return NextResponse.json({ error: "Temporarily unavailable." }, { status: 503 })
+  }
+  const vocab = toLeadVocab(groupTaxonomies(taxRes.data ?? []))
   const parsedPayload = parseCanonicalPayload(payload, vocab)
   const core = parseLeadInput({
     firstName: parsedPayload.core.firstName,
