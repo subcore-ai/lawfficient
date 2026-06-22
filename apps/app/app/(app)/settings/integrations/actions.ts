@@ -66,7 +66,7 @@ export async function createSource(formData: FormData): Promise<KeyResult> {
     return {
       error:
         error?.code === "23505"
-          ? "A source with that name already exists."
+          ? "Another source already uses that name (or one too similar)."
           : "Couldn't create the source.",
     }
   }
