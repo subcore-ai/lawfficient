@@ -34,16 +34,24 @@ export async function resolveSourceByKey(admin: Admin, keyHash: string): Promise
 // Trailing-window count over the event log (serverless has no reliable in-memory counter).
 export async function checkRateLimit(
   admin: Admin,
+  firmId: string,
   sourceId: string,
   limit: number,
   windowSeconds: number
 ): Promise<boolean> {
   const since = new Date(Date.now() - windowSeconds * 1000).toISOString()
-  const { count } = await admin
+  // firm_id leads the (firm_id, source_id, received_at) index, so include it for tenant scope + speed.
+  const { count, error } = await admin
     .from("webhook_events")
     .select("id", { count: "exact", head: true })
+    .eq("firm_id", firmId)
     .eq("source_id", sourceId)
     .gte("received_at", since)
+  // Fail open on a transient metering error — a count glitch shouldn't drop legitimate leads — but log it.
+  if (error) {
+    console.error("rate-limit count failed:", error.message)
+    return true
+  }
   return (count ?? 0) < limit
 }
 
@@ -87,7 +95,9 @@ export async function upsertLead(admin: Admin, args: UpsertArgs): Promise<Upsert
   }
 
   async function update(id: string, existingData: Json) {
-    await admin
+    // .select().single() turns a 0-row / RLS-blocked / failed update into a real error instead
+    // of a silent success (which would mislead the caller + the event log).
+    const { error } = await admin
       .from("leads")
       .update({
         ...core,
@@ -95,6 +105,9 @@ export async function upsertLead(admin: Admin, args: UpsertArgs): Promise<Upsert
         last_activity: new Date().toISOString(),
       })
       .eq("id", id)
+      .select("id")
+      .single()
+    if (error) throw new Error("update_failed")
   }
 
   const existing = await findExisting()

@@ -38,4 +38,10 @@ describe("parseCanonicalPayload", () => {
     expect(parsed.core.phone).toBe("call me")
     expect(parsed.extra).toEqual({})
   })
+
+  test("coerces numeric externalId + zip so idempotency keys survive (Zapier/CRM field maps)", () => {
+    const parsed = parseCanonicalPayload({ firstName: "A", lastName: "B", email: "a@b.co", externalId: 12345, zip: 90210 })
+    expect(parsed.externalId).toBe("12345")
+    expect(parsed.data.zip).toBe("90210")
+  })
 })

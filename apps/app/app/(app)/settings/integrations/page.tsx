@@ -47,31 +47,41 @@ async function load(): Promise<Loaded> {
 
   const me = await getCurrentUser()
   const supabase = await createClient()
-  const [sourcesRes, eventsRes, assigneesRes] = await Promise.all([
+  const [sourcesRes, assigneesRes] = await Promise.all([
     supabase
       .from("lead_sources")
       .select("id, key, name, key_last4, enabled, default_assignee_id")
       .order("created_at"),
-    supabase
-      .from("webhook_events")
-      .select("source_id, status, external_id, error, received_at")
-      .order("received_at", { ascending: false })
-      .limit(200),
     supabase.from("profiles").select("id, name").eq("status", "active").order("name"),
   ])
   if (sourcesRes.error) throw sourcesRes.error
+  if (assigneesRes.error) throw assigneesRes.error
 
-  const eventsBySource = new Map<string, LeadSourceRow["recentEvents"]>()
-  for (const e of eventsRes.data ?? []) {
-    const list = eventsBySource.get(e.source_id) ?? []
-    if (list.length < 20) {
-      list.push({ status: e.status, externalId: e.external_id, error: e.error, receivedAt: e.received_at })
-    }
-    eventsBySource.set(e.source_id, list)
-  }
+  const sourceRows = sourcesRes.data ?? []
+  // One recent-events query per source so a high-volume source can't crowd out others (a single
+  // global LIMIT would). RLS scopes each to the firm; a per-source failure degrades to no events.
+  const eventResults = await Promise.all(
+    sourceRows.map((s) =>
+      supabase
+        .from("webhook_events")
+        .select("status, external_id, error, received_at")
+        .eq("source_id", s.id)
+        .order("received_at", { ascending: false })
+        .limit(20)
+    )
+  )
 
-  const sources: LeadSourceRow[] = (sourcesRes.data ?? []).map((s) => {
-    const events = eventsBySource.get(s.id) ?? []
+  const sources: LeadSourceRow[] = sourceRows.map((s, i) => {
+    const res = eventResults[i]
+    const events =
+      res && !res.error
+        ? (res.data ?? []).map((e) => ({
+            status: e.status,
+            externalId: e.external_id,
+            error: e.error,
+            receivedAt: e.received_at,
+          }))
+        : []
     return {
       id: s.id,
       key: s.key,

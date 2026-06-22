@@ -34,8 +34,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Missing API key." }, { status: 401 })
   }
 
+  // Reject oversized payloads by Content-Length BEFORE buffering the body (DoS guard)…
+  const declaredLength = Number(request.headers.get("content-length") ?? "0")
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_BYTES) {
+    return NextResponse.json({ error: "Payload too large." }, { status: 413 })
+  }
   const body = await request.text()
-  if (body.length > MAX_BODY_BYTES) {
+  // …then re-check the actual byte length (Content-Length may be absent/wrong; .length is chars).
+  if (Buffer.byteLength(body, "utf8") > MAX_BODY_BYTES) {
     return NextResponse.json({ error: "Payload too large." }, { status: 413 })
   }
 
@@ -48,7 +54,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "This source is disabled." }, { status: 403 })
   }
 
-  if (!(await checkRateLimit(admin, source.id, RATE_LIMIT, RATE_WINDOW_SECONDS))) {
+  if (!(await checkRateLimit(admin, source.firmId, source.id, RATE_LIMIT, RATE_WINDOW_SECONDS))) {
     return NextResponse.json(
       { error: "Rate limit exceeded." },
       { status: 429, headers: { "Retry-After": String(RATE_WINDOW_SECONDS) } }

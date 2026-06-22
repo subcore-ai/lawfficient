@@ -674,11 +674,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "lead_sources_default_assignee_id_fkey"
-            columns: ["default_assignee_id"]
+            foreignKeyName: "lead_sources_assignee_firm_fk"
+            columns: ["default_assignee_id", "firm_id"]
             isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "firm_id"]
           },
           {
             foreignKeyName: "lead_sources_firm_id_fkey"

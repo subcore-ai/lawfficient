@@ -16,7 +16,6 @@ const KNOWN_KEYS = new Set<string>([
   "phone",
   "externalId",
   "notes",
-  "capturedAt",
   // data
   "caseType",
   "hierarchy",
@@ -39,7 +38,11 @@ export type ParsedPayload = {
 }
 
 function str(value: unknown): string {
-  return typeof value === "string" ? value.trim() : ""
+  if (typeof value === "string") return value.trim()
+  // Coerce JSON numbers (Zapier/CRM maps often send a numeric externalId or zip) so they aren't
+  // silently dropped — losing externalId would break idempotency and re-create leads on retry.
+  if (typeof value === "number" && Number.isFinite(value)) return String(value)
+  return ""
 }
 
 export function parseCanonicalPayload(
