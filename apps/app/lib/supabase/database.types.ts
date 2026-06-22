@@ -1237,7 +1237,7 @@ export type Database = {
       seed_system_roles: { Args: { p_firm_id: string }; Returns: undefined }
       set_lead_qualification: {
         Args: { p_id: string; p_value: string }
-        Returns: undefined
+        Returns: string
       }
       set_role_permissions: {
         Args: {

@@ -381,16 +381,18 @@ export async function setLeadQualification(
   // Atomic single-key write: jsonb_set (in the RPC) touches only data->qualification, so a concurrent
   // edit to another data key can't be lost. Validation + the firm scope live in the RPC, which runs
   // SECURITY INVOKER so the leads RLS (firm + leads.edit) still applies.
-  const { error } = await supabase.rpc("set_lead_qualification", {
-    p_id: id,
-    p_value: next,
-  })
+  const { data: updatedId, error } = await supabase.rpc(
+    "set_lead_qualification",
+    { p_id: id, p_value: next }
+  )
   if (error)
     return {
       error: error.message.includes("not available")
         ? "That qualification isn't available."
         : "Couldn't update the qualification.",
     }
+  // null = no row matched (wrong id or RLS) — don't claim success or log a phantom event.
+  if (!updatedId) return { error: "Couldn't update the qualification." }
 
   await recordEvent(
     gate.user.firmId,
