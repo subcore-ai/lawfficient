@@ -16,11 +16,13 @@ export type ResolvedSource = {
 // Resolve an opaque key (by its hash) to its source. The firm is read from this row — never
 // from the request body (FR-ingest-3).
 export async function resolveSourceByKey(admin: Admin, keyHash: string): Promise<ResolvedSource | null> {
-  const { data } = await admin
+  const { data, error } = await admin
     .from("lead_sources")
     .select("id, firm_id, key, default_assignee_id, enabled")
     .eq("key_hash", keyHash)
     .maybeSingle()
+  // Distinguish a real lookup failure (throw → 503, Zapier retries) from "no such key" (null → 401).
+  if (error) throw new Error("source_lookup_failed")
   if (!data) return null
   return {
     id: data.id,

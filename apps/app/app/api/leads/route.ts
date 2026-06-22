@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server"
 
 import { parseCanonicalPayload } from "@/lib/ingest/contract"
 import { hashKey } from "@/lib/ingest/keys"
-import { checkRateLimit, recordEvent, resolveSourceByKey, upsertLead } from "@/lib/ingest/store"
+import { checkRateLimit, recordEvent, resolveSourceByKey, upsertLead, type ResolvedSource } from "@/lib/ingest/store"
 import { buildLeadData } from "@/lib/leads/data-schema"
 import { parseLeadInput } from "@/lib/leads/validation"
 import { createAdminClient } from "@/lib/supabase/admin"
@@ -48,7 +48,14 @@ export async function POST(request: NextRequest) {
   }
 
   const admin = createAdminClient()
-  const source = await resolveSourceByKey(admin, hashKey(rawKey))
+  let source: ResolvedSource | null = null
+  try {
+    source = await resolveSourceByKey(admin, hashKey(rawKey))
+  } catch {
+    // A transient lookup failure must NOT masquerade as a bad key (401 → Zapier stops retrying);
+    // 503 signals "try again" so a real delivery isn't lost to a blip.
+    return NextResponse.json({ error: "Temporarily unavailable." }, { status: 503 })
+  }
   if (!source) {
     return NextResponse.json({ error: "Invalid API key." }, { status: 401 })
   }
