@@ -94,3 +94,22 @@ export function buildLeadData(
   }
   return { ok: true, value }
 }
+
+// Every key the lead form manages.
+const LEAD_DATA_KEYS = ["caseType", "hierarchy", "qualification", ...LEAD_DATA_TEXT_KEYS] as const
+
+// Merge a freshly-built form payload over the existing jsonb: the form-managed keys are
+// fully replaced (a cleared field drops out), but any OTHER keys — e.g. a future ingestion
+// payload kept verbatim (see parseLeadData) — are preserved. Used by updateLead so an edit
+// never wipes data the form doesn't surface.
+export function mergeLeadData(
+  existing: Json | null | undefined,
+  formValue: Record<string, string>
+): Record<string, Json> {
+  const base: Record<string, Json> =
+    existing && typeof existing === "object" && !Array.isArray(existing)
+      ? { ...(existing as Record<string, Json>) }
+      : {}
+  for (const key of LEAD_DATA_KEYS) delete base[key]
+  return { ...base, ...formValue }
+}

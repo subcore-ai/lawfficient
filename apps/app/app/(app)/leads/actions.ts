@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache"
 
 import { getCurrentUser, type CurrentUser } from "@/lib/auth/session"
-import { buildLeadData, type LeadDataInput } from "@/lib/leads/data-schema"
+import { buildLeadData, mergeLeadData, type LeadDataInput } from "@/lib/leads/data-schema"
 import { parseLeadInput } from "@/lib/leads/validation"
 import { createClient } from "@/lib/supabase/server"
 
@@ -23,11 +23,23 @@ async function requireLeadsEdit(): Promise<Gate> {
   return { ok: true, user }
 }
 
-// Best-effort — an audit failure must not fail the user's action.
+// Best-effort — an audit failure (incl. a thrown network/timeout error) must not fail the
+// user's action.
 async function audit(supabase: LeadsClient, byUserId: string, leadId: string, label: string, action: string) {
-  await supabase
-    .from("audit_log")
-    .insert({ entity: "lead", entity_id: leadId, label, action, by_user_id: byUserId })
+  try {
+    await supabase
+      .from("audit_log")
+      .insert({ entity: "lead", entity_id: leadId, label, action, by_user_id: byUserId })
+  } catch {
+    // swallow — auditing is non-critical
+  }
+}
+
+// Lead mutations also shift the dashboard's lead KPIs (/), so revalidate it alongside.
+function revalidateLeads(id?: string) {
+  revalidatePath(LEADS_PATH)
+  revalidatePath("/")
+  if (id) revalidatePath(`/leads/${id}`)
 }
 
 function readDataFields(formData: FormData): LeadDataInput {
@@ -102,7 +114,7 @@ export async function createLead(formData: FormData): Promise<ActionResult> {
   if (error || !inserted) return { error: "Couldn't create the lead." }
 
   await audit(supabase, gate.user.id, inserted.id, `${core.value.firstName} ${core.value.lastName}`, "created")
-  revalidatePath(LEADS_PATH)
+  revalidateLeads()
   return { ok: true }
 }
 
@@ -116,7 +128,16 @@ export async function updateLead(id: string, formData: FormData): Promise<Action
   if (!data.ok) return { error: data.error }
 
   const supabase = await createClient()
-  const { error } = await supabase
+  // Preserve jsonb keys the form doesn't manage (e.g. ingestion payload) — merge, not replace.
+  const { data: existing, error: readErr } = await supabase
+    .from("leads")
+    .select("data")
+    .eq("id", id)
+    .single()
+  if (readErr || !existing) return { error: "Couldn't update the lead." }
+
+  // .select().single() makes a 0-row update (RLS / wrong id) a real error, not a silent ok.
+  const { data: updated, error } = await supabase
     .from("leads")
     .update({
       first_name: core.value.firstName,
@@ -126,15 +147,16 @@ export async function updateLead(id: string, formData: FormData): Promise<Action
       source: core.value.source,
       assigned_to_id: core.value.assignedToId,
       notes: core.value.notes || null,
-      data: data.value,
+      data: mergeLeadData(existing.data, data.value),
       last_activity: new Date().toISOString(),
     })
     .eq("id", id)
-  if (error) return { error: "Couldn't update the lead." }
+    .select("id")
+    .single()
+  if (error || !updated) return { error: "Couldn't update the lead." }
 
   await audit(supabase, gate.user.id, id, `${core.value.firstName} ${core.value.lastName}`, "updated")
-  revalidatePath(LEADS_PATH)
-  revalidatePath(`/leads/${id}`)
+  revalidateLeads(id)
   return { ok: true }
 }
 
@@ -145,14 +167,15 @@ export async function setLeadStatus(id: string, statusId: string): Promise<Actio
   if (!statusId) return { error: "Choose a status." }
 
   const supabase = await createClient()
-  const { error } = await supabase
+  const { data: updated, error } = await supabase
     .from("leads")
     .update({ status_id: statusId, last_activity: new Date().toISOString() })
     .eq("id", id)
-  if (error) return { error: "Couldn't update the status." }
+    .select("id")
+    .single()
+  if (error || !updated) return { error: "Couldn't update the status." }
 
-  revalidatePath(LEADS_PATH)
-  revalidatePath(`/leads/${id}`)
+  revalidateLeads(id)
   return { ok: true }
 }
 
@@ -161,14 +184,15 @@ export async function assignLead(id: string, assigneeId: string): Promise<Action
   if (!gate.ok) return { error: gate.error }
 
   const supabase = await createClient()
-  const { error } = await supabase
+  const { data: updated, error } = await supabase
     .from("leads")
     .update({ assigned_to_id: assigneeId || null, last_activity: new Date().toISOString() })
     .eq("id", id)
-  if (error) return { error: "Couldn't reassign the lead." }
+    .select("id")
+    .single()
+  if (error || !updated) return { error: "Couldn't reassign the lead." }
 
-  revalidatePath(LEADS_PATH)
-  revalidatePath(`/leads/${id}`)
+  revalidateLeads(id)
   return { ok: true }
 }
 
@@ -181,11 +205,15 @@ export async function setLeadArchived(
   if (!gate.ok) return { error: gate.error }
 
   const supabase = await createClient()
-  const { error } = await supabase.from("leads").update({ archived }).eq("id", id)
-  if (error) return { error: "Couldn't archive the lead." }
+  const { data: updated, error } = await supabase
+    .from("leads")
+    .update({ archived })
+    .eq("id", id)
+    .select("id")
+    .single()
+  if (error || !updated) return { error: "Couldn't archive the lead." }
 
   await audit(supabase, gate.user.id, id, label, archived ? "archived" : "unarchived")
-  revalidatePath(LEADS_PATH)
-  revalidatePath(`/leads/${id}`)
+  revalidateLeads(id)
   return { ok: true }
 }

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { buildLeadData, parseLeadData } from "./data-schema"
+import { buildLeadData, mergeLeadData, parseLeadData } from "./data-schema"
 
 describe("parseLeadData", () => {
   test("non-objects yield an empty object", () => {
@@ -60,5 +60,24 @@ describe("buildLeadData", () => {
     expect(buildLeadData({ caseType: "Nope" })).toEqual({ ok: false, error: "Invalid case type." })
     expect(buildLeadData({ hierarchy: "X" })).toEqual({ ok: false, error: "Invalid hierarchy." })
     expect(buildLeadData({ qualification: "maybe" })).toEqual({ ok: false, error: "Invalid qualification." })
+  })
+})
+
+describe("mergeLeadData", () => {
+  test("replaces form-managed keys, drops cleared ones, preserves unknown keys", () => {
+    const existing = { caseType: "VAWA (AOS)", city: "Miami", rawPayload: { utm: "fb" }, externalId: "x1" }
+    // The form sets caseType + state and clears city (absent from the built payload).
+    const merged = mergeLeadData(existing, { caseType: "N-400 Naturalization", state: "FL" })
+    expect(merged).toEqual({
+      caseType: "N-400 Naturalization",
+      state: "FL",
+      rawPayload: { utm: "fb" }, // unknown key — survives the edit
+      externalId: "x1",
+    })
+  })
+
+  test("tolerates null / non-object existing data", () => {
+    expect(mergeLeadData(null, { city: "Miami" })).toEqual({ city: "Miami" })
+    expect(mergeLeadData("nope", { city: "Miami" })).toEqual({ city: "Miami" })
   })
 })
