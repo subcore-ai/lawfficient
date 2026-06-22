@@ -6,15 +6,16 @@ import { Archive, ArchiveRestore, ArrowLeft, Pencil } from "lucide-react"
 
 import { Button } from "@workspace/ui/components/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card"
-import { Separator } from "@workspace/ui/components/separator"
 import { toast } from "@workspace/ui/components/sonner"
 
 import { assignLead, setLeadArchived, setLeadStatus } from "@/app/(app)/leads/actions"
 import { DetailList, DetailRow } from "@/components/detail-list"
 import { EditLeadDialog } from "@/components/leads/edit-lead-dialog"
 import { InlineSelect } from "@/components/inline-select"
+import { NotesTimeline } from "@/components/notes/notes-timeline"
 import { StatusPill } from "@/components/status-pill"
 import type { AssigneeOption, LeadStatusView, LeadView } from "@/lib/leads/queries"
+import type { NoteView } from "@/lib/notes/queries"
 import { formatDate } from "@/lib/format"
 import { qualificationBadge } from "@/lib/status"
 import type { FirmTaxonomies } from "@/lib/taxonomies/queries"
@@ -28,6 +29,8 @@ export function LeadDetail({
   statuses,
   assignees,
   taxonomies,
+  notes,
+  currentUserId,
   canEdit,
   canManage,
 }: {
@@ -35,6 +38,8 @@ export function LeadDetail({
   statuses: LeadStatusView[]
   assignees: AssigneeOption[]
   taxonomies: FirmTaxonomies
+  notes: NoteView[]
+  currentUserId: string | null
   canEdit: boolean
   canManage: boolean
 }) {
@@ -134,13 +139,6 @@ export function LeadDetail({
               <DetailRow label="Created">{formatDate(lead.createdAt)}</DetailRow>
               <DetailRow label="Last activity">{formatDate(lead.lastActivity)}</DetailRow>
             </DetailList>
-            {lead.notes ? (
-              <>
-                <Separator className="my-5" />
-                <p className="text-muted-foreground text-xs">Notes</p>
-                <p className="mt-1 text-sm">{lead.notes}</p>
-              </>
-            ) : null}
           </CardContent>
         </Card>
 
@@ -178,6 +176,22 @@ export function LeadDetail({
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Notes</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <NotesTimeline
+            entityType="lead"
+            entityId={lead.id}
+            notes={notes}
+            currentUserId={currentUserId}
+            canEdit={canEdit}
+            isAdmin={canManage}
+          />
+        </CardContent>
+      </Card>
 
       {canEdit ? (
         <EditLeadDialog

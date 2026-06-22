@@ -31,7 +31,6 @@ export type LeadView = {
   archived: boolean
   createdAt: string
   lastActivity: string
-  notes: string | null
   data: LeadData
 }
 
@@ -68,7 +67,6 @@ export function mapLeadRow(row: LeadRow, statusesById: Map<string, LeadStatusVie
     archived: row.archived,
     createdAt: row.created_at,
     lastActivity: row.last_activity,
-    notes: row.notes,
     data: parseLeadData(row.data),
   }
 }

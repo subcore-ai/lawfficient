@@ -33,7 +33,6 @@ describe("parseCanonicalPayload", () => {
       lastName: "Gonzalez",
       email: "maria@example.com",
       phone: "+14155550123",
-      notes: "",
     })
     expect(parsed.externalId).toBe("zap-9981")
     expect(parsed.data.caseType).toBe("N-400 Naturalization")
@@ -74,5 +73,10 @@ describe("parseCanonicalPayload", () => {
     )
     expect(parsed.data.hierarchy).toBe("HRC")
     expect(parsed.data.qualification).toBe("qualified")
+  })
+
+  test("an incoming notes key is no longer a core field — it falls into extra (the timeline supersedes it)", () => {
+    const parsed = parseCanonicalPayload({ firstName: "A", lastName: "B", notes: "left a voicemail" }, VOCAB)
+    expect(parsed.extra).toEqual({ notes: "left a voicemail" })
   })
 })

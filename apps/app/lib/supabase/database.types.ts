@@ -790,7 +790,6 @@ export type Database = {
           id: string
           last_activity: string
           last_name: string
-          notes: string | null
           phone: string
           source: string
           status_id: string
@@ -807,7 +806,6 @@ export type Database = {
           id?: string
           last_activity?: string
           last_name: string
-          notes?: string | null
           phone?: string
           source: string
           status_id: string
@@ -824,7 +822,6 @@ export type Database = {
           id?: string
           last_activity?: string
           last_name?: string
-          notes?: string | null
           phone?: string
           source?: string
           status_id?: string
@@ -850,6 +847,80 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "lead_statuses"
             referencedColumns: ["id", "firm_id"]
+          },
+        ]
+      }
+      notes: {
+        Row: {
+          body: string
+          created_at: string
+          created_by_id: string | null
+          edited_at: string | null
+          entity_id: string
+          entity_type: string
+          firm_id: string
+          hidden_at: string | null
+          hidden_by_id: string | null
+          id: string
+          resolved_at: string | null
+          resolved_by_id: string | null
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          created_by_id?: string | null
+          edited_at?: string | null
+          entity_id: string
+          entity_type: string
+          firm_id?: string
+          hidden_at?: string | null
+          hidden_by_id?: string | null
+          id?: string
+          resolved_at?: string | null
+          resolved_by_id?: string | null
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          created_by_id?: string | null
+          edited_at?: string | null
+          entity_id?: string
+          entity_type?: string
+          firm_id?: string
+          hidden_at?: string | null
+          hidden_by_id?: string | null
+          id?: string
+          resolved_at?: string | null
+          resolved_by_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notes_created_by_id_fkey"
+            columns: ["created_by_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notes_firm_id_fkey"
+            columns: ["firm_id"]
+            isOneToOne: false
+            referencedRelation: "firms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notes_hidden_by_id_fkey"
+            columns: ["hidden_by_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notes_resolved_by_id_fkey"
+            columns: ["resolved_by_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
         ]
       }

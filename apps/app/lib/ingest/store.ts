@@ -61,7 +61,7 @@ type UpsertArgs = {
   firmId: string
   source: string
   externalId: string | null
-  core: { firstName: string; lastName: string; email: string; phone: string; notes: string }
+  core: { firstName: string; lastName: string; email: string; phone: string }
   assigneeId: string | null
   data: Record<string, Json>
 }
@@ -72,19 +72,18 @@ function asObject(value: Json | null | undefined): Record<string, Json> {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, Json>) : {}
 }
 
-type CorePatch = { first_name?: string; last_name?: string; email?: string; phone?: string; notes?: string }
+type CorePatch = { first_name?: string; last_name?: string; email?: string; phone?: string }
 
 // On an idempotent re-delivery, overwrite ONLY the core columns the payload actually carries — an
 // omitted/empty field must not blank an existing value (the data jsonb is merged for the same
-// reason). first/last name are validated as required upstream, so they're always present; email,
-// phone, and notes are optional. Pure + exported for unit testing.
+// reason). first/last name are validated as required upstream, so they're always present; email
+// and phone are optional. Pure + exported for unit testing.
 export function coreUpdatePatch(core: UpsertArgs["core"]): CorePatch {
   const patch: CorePatch = {}
   if (core.firstName) patch.first_name = core.firstName
   if (core.lastName) patch.last_name = core.lastName
   if (core.email) patch.email = core.email
   if (core.phone) patch.phone = core.phone
-  if (core.notes) patch.notes = core.notes
   return patch
 }
 
@@ -97,7 +96,6 @@ export async function upsertLead(admin: Admin, args: UpsertArgs): Promise<Upsert
     last_name: args.core.lastName,
     email: args.core.email,
     phone: args.core.phone,
-    notes: args.core.notes || null,
   }
 
   async function findExisting() {

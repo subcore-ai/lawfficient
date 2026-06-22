@@ -25,7 +25,6 @@ export type LeadCoreInput = {
   email: string
   source: string
   assignedToId: string | null
-  notes: string
 }
 
 function str(value: unknown): string {
@@ -41,7 +40,6 @@ export function parseLeadInput(raw: {
   email?: unknown
   source?: unknown
   assignedToId?: unknown
-  notes?: unknown
 }): { ok: true; value: LeadCoreInput } | { ok: false; error: string } {
   const firstName = str(raw.firstName)
   const lastName = str(raw.lastName)
@@ -49,7 +47,6 @@ export function parseLeadInput(raw: {
   const email = str(raw.email).toLowerCase()
   const source = str(raw.source)
   const assignedToId = str(raw.assignedToId)
-  const notes = str(raw.notes)
 
   if (!firstName || !lastName) return { ok: false, error: "First and last name are required." }
   if (!phone && !email) return { ok: false, error: "Add a phone number or an email." }
@@ -58,6 +55,6 @@ export function parseLeadInput(raw: {
 
   return {
     ok: true,
-    value: { firstName, lastName, phone, email, source, assignedToId: assignedToId || null, notes },
+    value: { firstName, lastName, phone, email, source, assignedToId: assignedToId || null },
   }
 }

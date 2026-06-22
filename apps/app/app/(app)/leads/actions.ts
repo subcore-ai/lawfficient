@@ -81,7 +81,6 @@ function readCore(formData: FormData) {
     email: formData.get("email"),
     source: formData.get("source"),
     assignedToId: formData.get("assignedToId"),
-    notes: formData.get("notes"),
   })
 }
 
@@ -141,7 +140,6 @@ export async function createLead(formData: FormData): Promise<ActionResult> {
       email: core.value.email,
       source: core.value.source,
       assigned_to_id: core.value.assignedToId,
-      notes: core.value.notes || null,
       status_id: stage.id,
       data: data.value,
     })
@@ -190,7 +188,6 @@ export async function updateLead(id: string, formData: FormData): Promise<Action
       email: core.value.email,
       source: core.value.source,
       assigned_to_id: core.value.assignedToId,
-      notes: core.value.notes || null,
       data: mergeLeadData(existing.data, data.value),
       last_activity: new Date().toISOString(),
     })
