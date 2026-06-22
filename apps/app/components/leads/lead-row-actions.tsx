@@ -8,6 +8,7 @@ import { setLeadArchived } from "@/app/(app)/leads/actions"
 import { EditLeadDialog } from "@/components/leads/edit-lead-dialog"
 import { RowActions } from "@/components/row-actions"
 import type { AssigneeOption, LeadView } from "@/lib/leads/queries"
+import type { FirmTaxonomies } from "@/lib/taxonomies/queries"
 
 // Lead row actions (edit + archive) wired to the server actions — rather than extending the
 // shared mock-store EntityRowActions (used by 6 other entities). Renders nothing when the
@@ -15,11 +16,15 @@ import type { AssigneeOption, LeadView } from "@/lib/leads/queries"
 export function LeadRowActions({
   lead,
   assignees,
+  taxonomies,
   canEdit,
+  canManage,
 }: {
   lead: LeadView
   assignees: AssigneeOption[]
+  taxonomies: FirmTaxonomies
   canEdit: boolean
+  canManage: boolean
 }) {
   const [editOpen, setEditOpen] = React.useState(false)
   const [, startTransition] = React.useTransition()
@@ -50,7 +55,14 @@ export function LeadRowActions({
         onEdit={() => setEditOpen(true)}
         onArchive={() => archive(!lead.archived)}
       />
-      <EditLeadDialog lead={lead} assignees={assignees} open={editOpen} onOpenChange={setEditOpen} />
+      <EditLeadDialog
+        lead={lead}
+        assignees={assignees}
+        taxonomies={taxonomies}
+        canManage={canManage}
+        open={editOpen}
+        onOpenChange={setEditOpen}
+      />
     </>
   )
 }

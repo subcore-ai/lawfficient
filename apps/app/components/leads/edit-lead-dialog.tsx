@@ -17,16 +17,21 @@ import { toast } from "@workspace/ui/components/sonner"
 import { updateLead } from "@/app/(app)/leads/actions"
 import { LeadFormFields } from "@/components/leads/lead-form-fields"
 import type { AssigneeOption, LeadView } from "@/lib/leads/queries"
+import type { FirmTaxonomies } from "@/lib/taxonomies/queries"
 
 // Controlled (no trigger) — callers (row actions, detail header) own the open state.
 export function EditLeadDialog({
   lead,
   assignees,
+  taxonomies,
+  canManage,
   open,
   onOpenChange,
 }: {
   lead: LeadView
   assignees: AssigneeOption[]
+  taxonomies: FirmTaxonomies
+  canManage: boolean
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
@@ -67,7 +72,7 @@ export function EditLeadDialog({
             </DialogDescription>
           </DialogHeader>
           <div className="max-h-[60vh] overflow-y-auto px-1 py-5">
-            <LeadFormFields key={seq} lead={lead} assignees={assignees} />
+            <LeadFormFields key={seq} lead={lead} assignees={assignees} taxonomies={taxonomies} canManage={canManage} />
           </div>
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>

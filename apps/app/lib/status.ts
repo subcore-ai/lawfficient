@@ -9,7 +9,6 @@ import type {
   Deadline,
   Invoice,
   Lead,
-  Qualification,
   RedFlag,
 } from "@/data/types"
 
@@ -30,13 +29,14 @@ export function leadStatusBadge(s: Lead["status"]): Badge {
   return { label: LEAD_STATUS_LABELS[s], tone: tone[s] }
 }
 
-export function qualificationBadge(q: Qualification): Badge {
-  const map: Record<Qualification, Badge> = {
-    qualified: { label: "Qualified", tone: "success" },
-    not_qualified: { label: "Not qualified", tone: "neutral" },
-    pending: { label: "Pending", tone: "warning" },
+export function qualificationBadge(q: string): Badge {
+  // Tone hint for the seeded qualifications; firm-defined / renamed values fall back to neutral.
+  const tones: Record<string, Tone> = {
+    Qualified: "success",
+    "Not qualified": "neutral",
+    Pending: "warning",
   }
-  return map[q]
+  return { label: q, tone: tones[q] ?? "neutral" }
 }
 
 export function consultationStatusBadge(s: ConsultationStatus): Badge {

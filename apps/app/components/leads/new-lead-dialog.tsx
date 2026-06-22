@@ -19,8 +19,17 @@ import { toast } from "@workspace/ui/components/sonner"
 import { createLead } from "@/app/(app)/leads/actions"
 import { LeadFormFields } from "@/components/leads/lead-form-fields"
 import type { AssigneeOption } from "@/lib/leads/queries"
+import type { FirmTaxonomies } from "@/lib/taxonomies/queries"
 
-export function NewLeadDialog({ assignees }: { assignees: AssigneeOption[] }) {
+export function NewLeadDialog({
+  assignees,
+  taxonomies,
+  canManage,
+}: {
+  assignees: AssigneeOption[]
+  taxonomies: FirmTaxonomies
+  canManage: boolean
+}) {
   const [open, setOpen] = React.useState(false)
   const [seq, setSeq] = React.useState(0) // bump on open to remount the form fresh
   const [pending, startTransition] = React.useTransition()
@@ -57,7 +66,7 @@ export function NewLeadDialog({ assignees }: { assignees: AssigneeOption[] }) {
             <DialogDescription>Capture a new lead into the pipeline.</DialogDescription>
           </DialogHeader>
           <div className="max-h-[60vh] overflow-y-auto px-1 py-5">
-            <LeadFormFields assignees={assignees} />
+            <LeadFormFields assignees={assignees} taxonomies={taxonomies} canManage={canManage} />
           </div>
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>

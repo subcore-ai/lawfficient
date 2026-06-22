@@ -28,6 +28,7 @@ import { NewLeadDialog } from "@/components/leads/new-lead-dialog"
 import { PageHeader } from "@/components/page-header"
 import { StatusPill } from "@/components/status-pill"
 import { ToastButton } from "@/components/toast-button"
+import type { FirmTaxonomies } from "@/lib/taxonomies/queries"
 import {
   ACTIVITY,
   CASE_TYPE_MIX,
@@ -59,12 +60,16 @@ export function DashboardView({
   openLeads,
   eaOut,
   assignees,
+  taxonomies,
   canCreateLead,
+  canManage,
 }: {
   openLeads: number
   eaOut: number
   assignees: AssigneeOption[]
+  taxonomies: FirmTaxonomies
   canCreateLead: boolean
+  canManage: boolean
 }) {
   const { consultations, clients, cases, invoices } = useStore()
 
@@ -93,7 +98,7 @@ export function DashboardView({
         <ToastButton variant="outline" size="sm" message="Dashboard exported" description="Downloaded as PDF.">
           <Download className="size-4" /> Export
         </ToastButton>
-        {canCreateLead ? <NewLeadDialog assignees={assignees} /> : null}
+        {canCreateLead ? <NewLeadDialog assignees={assignees} taxonomies={taxonomies} canManage={canManage} /> : null}
       </PageHeader>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">

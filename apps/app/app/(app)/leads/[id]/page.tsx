@@ -14,12 +14,15 @@ import {
 } from "@/lib/leads/queries"
 import { isSupabaseConfigured } from "@/lib/supabase/env"
 import { createClient } from "@/lib/supabase/server"
+import { groupTaxonomies, mockTaxonomies, type FirmTaxonomies } from "@/lib/taxonomies/queries"
 
 type Loaded = {
   lead: LeadView
   statuses: LeadStatusView[]
   assignees: AssigneeOption[]
+  taxonomies: FirmTaxonomies
   canEdit: boolean
+  canManage: boolean
 }
 
 async function load(id: string): Promise<Loaded | null> {
@@ -33,20 +36,24 @@ async function load(id: string): Promise<Loaded | null> {
       lead,
       statuses,
       assignees: STAFF.filter((u) => u.role === "sales").map((u) => ({ id: u.id, name: u.name })),
+      taxonomies: mockTaxonomies(),
       canEdit: false,
+      canManage: false,
     }
   }
 
   const me = await getCurrentUser()
   const supabase = await createClient()
-  const [leadRes, statusesRes, assigneesRes] = await Promise.all([
+  const [leadRes, statusesRes, assigneesRes, taxRes] = await Promise.all([
     supabase.from("leads").select("*").eq("id", id).maybeSingle(),
     supabase.from("lead_statuses").select("*").order("position"),
     supabase.from("profiles").select("id, name").eq("status", "active").order("name"),
+    supabase.from("firm_taxonomies").select("*").order("position"),
   ])
   if (leadRes.error) throw leadRes.error
   if (statusesRes.error) throw statusesRes.error
   if (assigneesRes.error) throw assigneesRes.error
+  if (taxRes.error) throw taxRes.error
   if (!leadRes.data) return null
 
   const statuses = (statusesRes.data ?? []).map(mapLeadStatus)
@@ -58,7 +65,9 @@ async function load(id: string): Promise<Loaded | null> {
     lead,
     statuses,
     assignees: (assigneesRes.data ?? []).map((p) => ({ id: p.id, name: p.name })),
+    taxonomies: groupTaxonomies(taxRes.data ?? []),
     canEdit: me?.permissions?.includes("leads.edit") ?? false,
+    canManage: me?.permissions?.includes("settings.manage") ?? false,
   }
 }
 
@@ -71,7 +80,9 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       lead={data.lead}
       statuses={data.statuses}
       assignees={data.assignees}
+      taxonomies={data.taxonomies}
       canEdit={data.canEdit}
+      canManage={data.canManage}
     />
   )
 }

@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth/session"
 import type { AssigneeOption } from "@/lib/leads/queries"
 import { isSupabaseConfigured } from "@/lib/supabase/env"
 import { createClient } from "@/lib/supabase/server"
+import { groupTaxonomies, mockTaxonomies, type FirmTaxonomies } from "@/lib/taxonomies/queries"
 
 export const metadata = { title: "Dashboard" }
 
@@ -13,7 +14,9 @@ type Loaded = {
   openLeads: number
   eaOut: number
   assignees: AssigneeOption[]
+  taxonomies: FirmTaxonomies
   canCreateLead: boolean
+  canManage: boolean
 }
 
 const MOCK_TERMINAL = ["retained", "lost", "not_qualified"]
@@ -30,22 +33,30 @@ async function load(): Promise<Loaded> {
     return {
       ...mockLeadCounts(),
       assignees: STAFF.filter((u) => u.role === "sales").map((u) => ({ id: u.id, name: u.name })),
+      taxonomies: mockTaxonomies(),
       canCreateLead: false,
+      canManage: false,
     }
   }
 
   const me = await getCurrentUser()
   const supabase = await createClient()
   const canCreateLead = me?.permissions?.includes("leads.edit") ?? false
+  const canManage = me?.permissions?.includes("settings.manage") ?? false
 
-  const assigneesRes = await supabase.from("profiles").select("id, name").eq("status", "active").order("name")
+  const [assigneesRes, taxRes] = await Promise.all([
+    supabase.from("profiles").select("id, name").eq("status", "active").order("name"),
+    supabase.from("firm_taxonomies").select("*").order("position"),
+  ])
   if (assigneesRes.error) throw assigneesRes.error
+  if (taxRes.error) throw taxRes.error
   const assignees = (assigneesRes.data ?? []).map((p) => ({ id: p.id, name: p.name }))
+  const taxonomies = groupTaxonomies(taxRes.data ?? [])
 
   // The lead KPIs need leads.view. For roles without it (QA lead, creative writer, file clerk)
   // keep them on the mock counts like the rest of the dashboard, rather than a misleading 0.
   if (!(me?.permissions?.includes("leads.view") ?? false)) {
-    return { ...mockLeadCounts(), assignees, canCreateLead }
+    return { ...mockLeadCounts(), assignees, taxonomies, canCreateLead, canManage }
   }
 
   const statusesRes = await supabase.from("lead_statuses").select("id, key, is_terminal")
@@ -62,12 +73,19 @@ async function load(): Promise<Loaded> {
   if (openRes.error) throw openRes.error
   if (eaRes.error) throw eaRes.error
 
-  return { openLeads: openRes.count ?? 0, eaOut: eaRes.count ?? 0, assignees, canCreateLead }
+  return { openLeads: openRes.count ?? 0, eaOut: eaRes.count ?? 0, assignees, taxonomies, canCreateLead, canManage }
 }
 
 export default async function DashboardPage() {
-  const { openLeads, eaOut, assignees, canCreateLead } = await load()
+  const { openLeads, eaOut, assignees, taxonomies, canCreateLead, canManage } = await load()
   return (
-    <DashboardView openLeads={openLeads} eaOut={eaOut} assignees={assignees} canCreateLead={canCreateLead} />
+    <DashboardView
+      openLeads={openLeads}
+      eaOut={eaOut}
+      assignees={assignees}
+      taxonomies={taxonomies}
+      canCreateLead={canCreateLead}
+      canManage={canManage}
+    />
   )
 }
