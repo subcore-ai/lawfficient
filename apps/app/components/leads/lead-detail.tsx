@@ -22,6 +22,7 @@ import {
 import { DetailList, DetailRow } from "@/components/detail-list"
 import { EditLeadDialog } from "@/components/leads/edit-lead-dialog"
 import { InlineSelect } from "@/components/inline-select"
+import { NoteComposer } from "@/components/notes/note-composer"
 import { NotesTimeline } from "@/components/notes/notes-timeline"
 import { StatusPill } from "@/components/status-pill"
 import type {
@@ -267,24 +268,33 @@ export function LeadDetail({
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Activity</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <NotesTimeline
-                entityType="lead"
-                entityId={lead.id}
-                notes={notes}
-                createdAt={lead.createdAt}
-                currentUserId={currentUserId}
-                canEdit={canEdit}
-                isAdmin={canManage}
-              />
-            </CardContent>
-          </Card>
+          {canEdit ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Add a note</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <NoteComposer entityType="lead" entityId={lead.id} />
+              </CardContent>
+            </Card>
+          ) : null}
         </div>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Activity</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <NotesTimeline
+            notes={notes}
+            createdAt={lead.createdAt}
+            currentUserId={currentUserId}
+            canEdit={canEdit}
+            isAdmin={canManage}
+          />
+        </CardContent>
+      </Card>
 
       {canEdit ? (
         <EditLeadDialog
