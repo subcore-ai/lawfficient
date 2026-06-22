@@ -5,16 +5,29 @@ import Link from "next/link"
 import { Archive, ArchiveRestore, ArrowLeft, Pencil } from "lucide-react"
 
 import { Button } from "@workspace/ui/components/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card"
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@workspace/ui/components/card"
 import { toast } from "@workspace/ui/components/sonner"
 
-import { assignLead, setLeadArchived, setLeadStatus } from "@/app/(app)/leads/actions"
+import {
+  assignLead,
+  setLeadArchived,
+  setLeadStatus,
+} from "@/app/(app)/leads/actions"
 import { DetailList, DetailRow } from "@/components/detail-list"
 import { EditLeadDialog } from "@/components/leads/edit-lead-dialog"
 import { InlineSelect } from "@/components/inline-select"
 import { NotesTimeline } from "@/components/notes/notes-timeline"
 import { StatusPill } from "@/components/status-pill"
-import type { AssigneeOption, LeadStatusView, LeadView } from "@/lib/leads/queries"
+import type {
+  AssigneeOption,
+  LeadStatusView,
+  LeadView,
+} from "@/lib/leads/queries"
 import type { NoteView } from "@/lib/notes/queries"
 import { formatDate } from "@/lib/format"
 import { qualificationBadge } from "@/lib/status"
@@ -80,7 +93,7 @@ export function LeadDetail({
     <>
       <Link
         href="/leads"
-        className="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1.5 text-sm"
+        className="inline-flex w-fit items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="size-4" /> Leads
       </Link>
@@ -90,14 +103,24 @@ export function LeadDetail({
           <h1 className="text-2xl font-semibold tracking-tight">{name}</h1>
           <div className="flex flex-wrap items-center gap-2">
             <StatusPill label={lead.status.name} tone={lead.status.tone} />
-            {data.qualification ? <StatusPill {...qualificationBadge(data.qualification)} /> : null}
-            {data.caseType ? <StatusPill label={data.caseType} tone="neutral" /> : null}
-            {lead.archived ? <StatusPill label="Archived" tone="neutral" /> : null}
+            {data.qualification ? (
+              <StatusPill {...qualificationBadge(data.qualification)} />
+            ) : null}
+            {data.caseType ? (
+              <StatusPill label={data.caseType} tone="neutral" />
+            ) : null}
+            {lead.archived ? (
+              <StatusPill label="Archived" tone="neutral" />
+            ) : null}
           </div>
         </div>
         {canEdit ? (
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setEditOpen(true)}
+            >
               <Pencil className="size-4" /> Edit
             </Button>
             <Button variant="outline" size="sm" onClick={onArchive}>
@@ -128,16 +151,30 @@ export function LeadDetail({
                 {[data.city, data.state].filter(Boolean).join(", ") || "—"}
               </DetailRow>
               <DetailRow label="ZIP">{data.zip ?? "—"}</DetailRow>
-              <DetailRow label="Country of origin">{data.countryOfOrigin ?? "—"}</DetailRow>
-              <DetailRow label="Preferred language">{data.preferredLanguage ?? "—"}</DetailRow>
+              <DetailRow label="Country of origin">
+                {data.countryOfOrigin ?? "—"}
+              </DetailRow>
+              <DetailRow label="Preferred language">
+                {data.preferredLanguage ?? "—"}
+              </DetailRow>
               <DetailRow label="Source">{lead.source}</DetailRow>
-              <DetailRow label="Case type">{data.caseType ?? "Not set"}</DetailRow>
-              <DetailRow label="Case hierarchy">{data.hierarchy ?? "Not set"}</DetailRow>
+              <DetailRow label="Case type">
+                {data.caseType ?? "Not set"}
+              </DetailRow>
+              <DetailRow label="Case hierarchy">
+                {data.hierarchy ?? "Not set"}
+              </DetailRow>
               <DetailRow label="Gender">{data.gender ?? "—"}</DetailRow>
               <DetailRow label="Date of birth">{data.dob ?? "—"}</DetailRow>
-              <DetailRow label="Referral source">{data.referralSource ?? "—"}</DetailRow>
-              <DetailRow label="Created">{formatDate(lead.createdAt)}</DetailRow>
-              <DetailRow label="Last activity">{formatDate(lead.lastActivity)}</DetailRow>
+              <DetailRow label="Referral source">
+                {data.referralSource ?? "—"}
+              </DetailRow>
+              <DetailRow label="Created">
+                {formatDate(lead.createdAt)}
+              </DetailRow>
+              <DetailRow label="Last activity">
+                {formatDate(lead.lastActivity)}
+              </DetailRow>
             </DetailList>
           </CardContent>
         </Card>
@@ -148,7 +185,7 @@ export function LeadDetail({
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
             <div className="flex items-center justify-between">
-              <span className="text-muted-foreground text-sm">Status</span>
+              <span className="text-sm text-muted-foreground">Status</span>
               {canEdit ? (
                 <InlineSelect
                   value={lead.status.id}
@@ -161,13 +198,15 @@ export function LeadDetail({
               )}
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-muted-foreground text-sm">Assigned to</span>
+              <span className="text-sm text-muted-foreground">Assigned to</span>
               {canEdit ? (
                 <InlineSelect
                   value={lead.assignedToId ?? UNASSIGNED}
                   options={inlineAssignee}
                   ariaLabel="Assignee"
-                  onValueChange={(v) => run(() => assignLead(lead.id, v === UNASSIGNED ? "" : v))}
+                  onValueChange={(v) =>
+                    run(() => assignLead(lead.id, v === UNASSIGNED ? "" : v))
+                  }
                 />
               ) : (
                 <span className="text-sm">{assigneeName}</span>
@@ -179,13 +218,14 @@ export function LeadDetail({
 
       <Card>
         <CardHeader>
-          <CardTitle>Notes</CardTitle>
+          <CardTitle>Activity</CardTitle>
         </CardHeader>
         <CardContent>
           <NotesTimeline
             entityType="lead"
             entityId={lead.id}
             notes={notes}
+            createdAt={lead.createdAt}
             currentUserId={currentUserId}
             canEdit={canEdit}
             isAdmin={canManage}

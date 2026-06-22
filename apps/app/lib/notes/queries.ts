@@ -12,6 +12,7 @@ export type NoteView = {
   id: string
   entityType: string
   entityId: string
+  kind: "note" | "event"
   body: string
   authorId: string | null
   authorName: string
@@ -25,14 +26,20 @@ export type NoteView = {
 
 // Resolve the author's display name from a firm-wide profiles map (id -> name), the same way the
 // lead page resolves assignees. Falls back to "Unknown" for a departed/unloaded author.
-export function mapNoteRow(row: NoteRow, namesById: Map<string, string>): NoteView {
+export function mapNoteRow(
+  row: NoteRow,
+  namesById: Map<string, string>
+): NoteView {
   return {
     id: row.id,
     entityType: row.entity_type,
     entityId: row.entity_id,
+    kind: row.kind === "event" ? "event" : "note",
     body: row.body,
     authorId: row.created_by_id,
-    authorName: row.created_by_id ? (namesById.get(row.created_by_id) ?? "Unknown") : "Unknown",
+    authorName: row.created_by_id
+      ? (namesById.get(row.created_by_id) ?? "Unknown")
+      : "Unknown",
     createdAt: row.created_at,
     editedAt: row.edited_at,
     resolvedAt: row.resolved_at,
@@ -47,9 +54,11 @@ export function mapNoteRow(row: NoteRow, namesById: Map<string, string>): NoteVi
 // component — addressed notes render collapsed. Input is expected newest-first.
 export function partitionNotes(
   notes: NoteView[],
-  opts: { showHidden: boolean },
+  opts: { showHidden: boolean }
 ): { visible: NoteView[]; hiddenCount: number } {
   const hiddenCount = notes.reduce((n, note) => n + (note.hiddenAt ? 1 : 0), 0)
-  const visible = opts.showHidden ? notes : notes.filter((note) => !note.hiddenAt)
+  const visible = opts.showHidden
+    ? notes
+    : notes.filter((note) => !note.hiddenAt)
   return { visible, hiddenCount }
 }

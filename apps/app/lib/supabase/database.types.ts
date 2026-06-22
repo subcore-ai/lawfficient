@@ -862,6 +862,7 @@ export type Database = {
           hidden_at: string | null
           hidden_by_id: string | null
           id: string
+          kind: string
           resolved_at: string | null
           resolved_by_id: string | null
         }
@@ -876,6 +877,7 @@ export type Database = {
           hidden_at?: string | null
           hidden_by_id?: string | null
           id?: string
+          kind?: string
           resolved_at?: string | null
           resolved_by_id?: string | null
         }
@@ -890,6 +892,7 @@ export type Database = {
           hidden_at?: string | null
           hidden_by_id?: string | null
           id?: string
+          kind?: string
           resolved_at?: string | null
           resolved_by_id?: string | null
         }
