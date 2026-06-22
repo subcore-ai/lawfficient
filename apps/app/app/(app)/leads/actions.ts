@@ -359,6 +359,15 @@ export async function setLeadArchived(
   if (!gate.ok) return { error: gate.error }
 
   const supabase = await createClient()
+  // Skip a no-op archive/restore (and its duplicate timeline event).
+  const { data: current, error: readErr } = await supabase
+    .from("leads")
+    .select("archived")
+    .eq("id", id)
+    .single()
+  if (readErr || !current) return { error: "Couldn't archive the lead." }
+  if (current.archived === archived) return { ok: true }
+
   const { data: updated, error } = await supabase
     .from("leads")
     .update({ archived })
