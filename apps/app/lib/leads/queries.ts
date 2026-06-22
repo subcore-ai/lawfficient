@@ -1,9 +1,6 @@
-// Lead view model: maps a DB row (+ the firm's statuses) — or a mock-store Lead — into one
-// shape the board, detail, and dashboard all consume. Keeps the firm-defined status
-// resolved and the jsonb narrowed in a single place.
+// Lead view model: maps a DB row + the firm's statuses into one shape the board, detail, and
+// dashboard all consume. Keeps the firm-defined status resolved and the jsonb narrowed in one place.
 import type { Tone } from "@/components/status-pill"
-import type { Lead, LeadStatus } from "@/data/types"
-import { leadStatusBadge } from "@/lib/status"
 import type { Database } from "@/lib/supabase/database.types"
 import { parseLeadData, type LeadData } from "./data-schema"
 
@@ -73,59 +70,5 @@ export function mapLeadRow(row: LeadRow, statusesById: Map<string, LeadStatusVie
     lastActivity: row.last_activity,
     notes: row.notes,
     data: parseLeadData(row.data),
-  }
-}
-
-// ---- Mock fallback (no Supabase configured): synthesize the firm-defined statuses from the
-// legacy enum + lib/status.ts so the same board renders read-only in demo mode. ----
-
-const MOCK_STATUS_ORDER: LeadStatus[] = [
-  "new",
-  "contacted",
-  "consult_scheduled",
-  "scheduled_paid",
-  "qualified_followup",
-  "ea_sent",
-  "retained",
-  "not_qualified",
-  "lost",
-]
-const MOCK_TERMINAL = new Set<LeadStatus>(["retained", "not_qualified", "lost"])
-
-export function mockLeadStatuses(): LeadStatusView[] {
-  return MOCK_STATUS_ORDER.map((key, position) => ({
-    id: key,
-    key,
-    name: leadStatusBadge(key).label,
-    tone: leadStatusBadge(key).tone,
-    isTerminal: MOCK_TERMINAL.has(key),
-    position,
-  }))
-}
-
-export function mapMockLead(lead: Lead, statusesByKey: Map<string, LeadStatusView>): LeadView | null {
-  const status = statusesByKey.get(lead.status)
-  if (!status) return null
-  const data: LeadData = { qualification: lead.qualification }
-  if (lead.caseType) data.caseType = lead.caseType
-  if (lead.hierarchy) data.hierarchy = lead.hierarchy
-  if (lead.preferredLanguage) data.preferredLanguage = lead.preferredLanguage
-  if (lead.countryOfOrigin) data.countryOfOrigin = lead.countryOfOrigin
-  if (lead.city) data.city = lead.city
-  if (lead.state) data.state = lead.state
-  return {
-    id: lead.id,
-    firstName: lead.firstName,
-    lastName: lead.lastName,
-    phone: lead.phone,
-    email: lead.email,
-    source: lead.source,
-    assignedToId: lead.assignedToId,
-    status,
-    archived: lead.archived ?? false,
-    createdAt: lead.createdAt,
-    lastActivity: lead.lastActivity,
-    notes: lead.notes ?? null,
-    data,
   }
 }

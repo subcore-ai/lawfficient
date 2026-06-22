@@ -1,20 +1,16 @@
 import { LeadsTable } from "@/components/leads/leads-table"
 import { NewLeadDialog } from "@/components/leads/new-lead-dialog"
 import { PageHeader } from "@/components/page-header"
-import { LEADS, STAFF } from "@/data"
 import { getCurrentUser } from "@/lib/auth/session"
 import {
   mapLeadRow,
   mapLeadStatus,
-  mapMockLead,
-  mockLeadStatuses,
   type AssigneeOption,
   type LeadStatusView,
   type LeadView,
 } from "@/lib/leads/queries"
-import { isSupabaseConfigured } from "@/lib/supabase/env"
 import { createClient } from "@/lib/supabase/server"
-import { groupTaxonomies, mockTaxonomies, type FirmTaxonomies } from "@/lib/taxonomies/queries"
+import { groupTaxonomies, type FirmTaxonomies } from "@/lib/taxonomies/queries"
 
 export const metadata = { title: "Leads" }
 
@@ -28,20 +24,6 @@ type Loaded = {
 }
 
 async function load(): Promise<Loaded> {
-  // Demo fallback: render the mock pipeline read-only when Supabase isn't configured.
-  if (!isSupabaseConfigured()) {
-    const statuses = mockLeadStatuses()
-    const byKey = new Map(statuses.map((s) => [s.key, s]))
-    return {
-      leads: LEADS.map((l) => mapMockLead(l, byKey)).filter((l): l is LeadView => l !== null),
-      statuses,
-      assignees: STAFF.filter((u) => u.role === "sales").map((u) => ({ id: u.id, name: u.name })),
-      taxonomies: mockTaxonomies(),
-      canEdit: false,
-      canManage: false,
-    }
-  }
-
   const me = await getCurrentUser()
   const supabase = await createClient()
   // RLS scopes all three to the caller's firm.

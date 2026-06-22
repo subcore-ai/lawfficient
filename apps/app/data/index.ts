@@ -13,7 +13,6 @@ import type {
   Deadline,
   ImmigrationCase,
   Invoice,
-  Kpi,
   Lead,
   SeriesPoint,
   StaffUser,
@@ -89,9 +88,6 @@ export const LEADS: Lead[] = [
   { id: "l14", firstName: "Priscilla", lastName: "Adeyemi", phone: "(773) 555-0185", email: "p.adeyemi@email.com", source: "Referral", status: "new", qualification: "pending", assignedToId: "u9", preferredLanguage: "English", countryOfOrigin: "Nigeria", city: "Chicago", state: "IL", createdAt: "2026-06-04", lastActivity: "2026-06-04", caseType: "N-400 Naturalization" },
 ]
 
-export const leadById = byId(LEADS)
-export const leadName = (l: Lead) => `${l.firstName} ${l.lastName}`
-
 export const LEAD_STATUS_LABELS: Record<Lead["status"], string> = {
   new: "New",
   contacted: "Contacted",
@@ -103,17 +99,6 @@ export const LEAD_STATUS_LABELS: Record<Lead["status"], string> = {
   not_qualified: "Not qualified",
   lost: "Lost",
 }
-
-// Pipeline used for the funnel/board.
-export const PIPELINE: { key: Lead["status"]; label: string }[] = [
-  { key: "new", label: "New" },
-  { key: "contacted", label: "Contacted" },
-  { key: "consult_scheduled", label: "Consult scheduled" },
-  { key: "scheduled_paid", label: "Scheduled & paid" },
-  { key: "qualified_followup", label: "Qualified follow-up" },
-  { key: "ea_sent", label: "EA sent" },
-  { key: "retained", label: "Retained" },
-]
 
 // ---------------------------------------------------------------- Consultations
 
@@ -127,8 +112,6 @@ export const CONSULTATIONS: Consultation[] = [
   { id: "c7", leadId: "l12", leadName: "Elena Popescu", attorneyId: "u1", type: "Initial consultation", paid: true, amount: 150, status: "rescheduled", startAt: "2026-06-08T15:30:00", durationMin: 45, timeZone: "PT", caseType: "VAWA (AOS)", bookedById: "u9" },
   { id: "c8", leadId: "l2", leadName: "Ahmed Hassan", attorneyId: "u2", type: "Initial consultation", paid: false, status: "scheduled", startAt: "2026-06-09T13:00:00", durationMin: 30, timeZone: "ET", caseType: "Marriage-Based GC", bookedById: "u8" },
 ]
-
-export const consultationById = byId(CONSULTATIONS)
 
 // ---------------------------------------------------------------- Clients (retained)
 
@@ -145,8 +128,6 @@ export const CLIENTS: Client[] = [
   { id: "cl10", name: "Hassan Nazari", caseType: "NVC Case", status: "monthly_plan", laId: "u5", dateHired: "2026-03-05", totalFees: 9000, paid: 3600, balance: 5400, paymentStatus: "overdue" },
 ]
 
-export const clientById = byId(CLIENTS)
-
 // ---------------------------------------------------------------- Cases
 
 export const CASES: ImmigrationCase[] = [
@@ -161,8 +142,6 @@ export const CASES: ImmigrationCase[] = [
   { id: "case9", clientId: "cl10", clientName: "Hassan Nazari", caseType: "NVC Case", hierarchy: "HRC", difficulty: 3, status: "rfe", stage: 5, redFlag: "none", laId: "u5", attorneyId: "u2", dateHired: "2026-03-05", expectedMailing: "2026-06-15", checklistComplete: 80, openDeadlines: 1 },
   { id: "case10", clientId: "cl7", clientName: "Lucia Fernandez", caseType: "VAWA (AOS)", hierarchy: "HRC", difficulty: 2, status: "approved", stage: 10, redFlag: "none", laId: "u4", attorneyId: "u1", dateHired: "2026-04-28", expectedMailing: "2026-05-15", checklistComplete: 100, openDeadlines: 0 },
 ]
-
-export const caseById = byId(CASES)
 
 // ---------------------------------------------------------------- Deadlines
 
@@ -231,15 +210,6 @@ export const ACTIVITY: Activity[] = [
 ]
 
 // ---------------------------------------------------------------- Dashboard aggregates
-
-export const KPIS: Kpi[] = [
-  { label: "New leads (30d)", value: "48", delta: 12.5, hint: "vs. previous 30 days" },
-  { label: "Upcoming consultations", value: "6", delta: 20, hint: "next 7 days" },
-  { label: "Pending retainers (EA out)", value: "5", delta: -8.3, hint: "awaiting signature" },
-  { label: "Revenue (June)", value: "$38,200", delta: 9.1, hint: "month to date" },
-  { label: "Overdue balance", value: "$16,300", delta: 4.2, hint: "across 4 clients" },
-  { label: "Red-flag cases", value: "2", delta: 0, hint: "need attention" },
-]
 
 export const REVENUE_BY_MONTH: SeriesPoint[] = [
   { month: "Jan", revenue: 41200 },

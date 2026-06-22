@@ -1,19 +1,13 @@
 import { TaxonomySection } from "@/components/settings/taxonomies-editor"
 import { getCurrentUser } from "@/lib/auth/session"
-import { isSupabaseConfigured } from "@/lib/supabase/env"
 import { createClient } from "@/lib/supabase/server"
-import { groupTaxonomies, mockTaxonomies, type FirmTaxonomies } from "@/lib/taxonomies/queries"
+import { groupTaxonomies, type FirmTaxonomies } from "@/lib/taxonomies/queries"
 
 export const metadata = { title: "Settings · Case taxonomies" }
 
 type Loaded = { taxonomies: FirmTaxonomies; canManage: boolean }
 
 async function load(): Promise<Loaded> {
-  // Phase 0 fallback: no Supabase wired → the seeded defaults, read-only (same contract as roles).
-  if (!isSupabaseConfigured()) {
-    return { taxonomies: mockTaxonomies(), canManage: false }
-  }
-
   const me = await getCurrentUser()
   const supabase = await createClient()
   // RLS scopes to the firm; include inactive rows so the editor can show + reactivate them.

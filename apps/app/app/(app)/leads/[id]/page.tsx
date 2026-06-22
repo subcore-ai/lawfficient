@@ -1,20 +1,16 @@
 import { notFound } from "next/navigation"
 
 import { LeadDetail } from "@/components/leads/lead-detail"
-import { LEADS, STAFF } from "@/data"
 import { getCurrentUser } from "@/lib/auth/session"
 import {
   mapLeadRow,
   mapLeadStatus,
-  mapMockLead,
-  mockLeadStatuses,
   type AssigneeOption,
   type LeadStatusView,
   type LeadView,
 } from "@/lib/leads/queries"
-import { isSupabaseConfigured } from "@/lib/supabase/env"
 import { createClient } from "@/lib/supabase/server"
-import { groupTaxonomies, mockTaxonomies, type FirmTaxonomies } from "@/lib/taxonomies/queries"
+import { groupTaxonomies, type FirmTaxonomies } from "@/lib/taxonomies/queries"
 
 type Loaded = {
   lead: LeadView
@@ -26,22 +22,6 @@ type Loaded = {
 }
 
 async function load(id: string): Promise<Loaded | null> {
-  if (!isSupabaseConfigured()) {
-    const statuses = mockLeadStatuses()
-    const byKey = new Map(statuses.map((s) => [s.key, s]))
-    const mock = LEADS.find((l) => l.id === id)
-    const lead = mock ? mapMockLead(mock, byKey) : null
-    if (!lead) return null
-    return {
-      lead,
-      statuses,
-      assignees: STAFF.filter((u) => u.role === "sales").map((u) => ({ id: u.id, name: u.name })),
-      taxonomies: mockTaxonomies(),
-      canEdit: false,
-      canManage: false,
-    }
-  }
-
   const me = await getCurrentUser()
   const supabase = await createClient()
   const [leadRes, statusesRes, assigneesRes, taxRes] = await Promise.all([
