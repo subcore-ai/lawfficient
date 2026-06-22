@@ -18,7 +18,6 @@ export const metadata = { title: "Settings · Roles" }
 type Loaded = { roles: RoleRow[]; canManage: boolean }
 
 async function load(): Promise<Loaded> {
-
   const me = await getCurrentUser()
   const supabase = await createClient()
   // RLS scopes to the caller's firm. Embed each role's granted permissions so the
