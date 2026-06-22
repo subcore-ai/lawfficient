@@ -13,6 +13,7 @@ import {
 } from "@/lib/leads/data-schema"
 import { parseLeadInput } from "@/lib/leads/validation"
 import { createAdminClient } from "@/lib/supabase/admin"
+import type { Json } from "@/lib/supabase/database.types"
 import { createClient } from "@/lib/supabase/server"
 import { groupTaxonomies, toLeadVocab } from "@/lib/taxonomies/queries"
 
@@ -346,6 +347,68 @@ export async function assignLead(
     body = `Assigned to ${assignee?.name ?? "a teammate"}`
   }
   await recordEvent(gate.user.firmId, id, body, gate.user.id)
+  revalidateLeads(id)
+  return { ok: true }
+}
+
+// Inline qualification change (a triage decision, stored in the lead's data jsonb).
+export async function setLeadQualification(
+  id: string,
+  value: string
+): Promise<ActionResult> {
+  const gate = await requireLeadsEdit()
+  if (!gate.ok) return { error: gate.error }
+
+  const supabase = await createClient()
+  const { data: existing, error: readErr } = await supabase
+    .from("leads")
+    .select("data")
+    .eq("id", id)
+    .single()
+  if (readErr || !existing) return { error: "Couldn't update the lead." }
+
+  const raw =
+    existing.data &&
+    typeof existing.data === "object" &&
+    !Array.isArray(existing.data)
+      ? (existing.data as Record<string, Json>)
+      : {}
+  const currentQual =
+    typeof raw.qualification === "string" ? raw.qualification : ""
+  const next = value.trim()
+  if (currentQual === next) return { ok: true }
+
+  // Validate against the firm's active qualification labels (empty = clear).
+  if (next) {
+    let vocab: LeadVocab
+    try {
+      vocab = await loadVocab(supabase)
+    } catch {
+      return { error: "Couldn't load the firm's options. Try again." }
+    }
+    if (!vocab.qualification.includes(next))
+      return { error: "That qualification isn't available." }
+  }
+
+  // Merge into the raw jsonb so unmapped/extra keys are preserved.
+  const merged: Record<string, Json> = { ...raw }
+  if (next) merged.qualification = next
+  else delete merged.qualification
+
+  const { data: updated, error } = await supabase
+    .from("leads")
+    .update({ data: merged, last_activity: new Date().toISOString() })
+    .eq("id", id)
+    .select("id")
+    .single()
+  if (error || !updated) return { error: "Couldn't update the qualification." }
+
+  await recordEvent(
+    gate.user.firmId,
+    id,
+    next ? `Qualification → ${next}` : "Qualification cleared",
+    gate.user.id
+  )
   revalidateLeads(id)
   return { ok: true }
 }

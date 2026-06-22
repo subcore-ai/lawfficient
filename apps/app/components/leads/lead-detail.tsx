@@ -16,6 +16,7 @@ import { toast } from "@workspace/ui/components/sonner"
 import {
   assignLead,
   setLeadArchived,
+  setLeadQualification,
   setLeadStatus,
 } from "@/app/(app)/leads/actions"
 import { DetailList, DetailRow } from "@/components/detail-list"
@@ -34,6 +35,8 @@ import { qualificationBadge } from "@/lib/status"
 import type { FirmTaxonomies } from "@/lib/taxonomies/queries"
 
 const UNASSIGNED = "none"
+// Sentinel for "clear qualification" — the reserved "__" prefix can't collide with a taxonomy label.
+const NO_QUALIFICATION = "__none__"
 
 type Result = { ok: true } | { error: string }
 
@@ -69,6 +72,23 @@ export function LeadDetail({
   const assigneeName = lead.assignedToId
     ? (assignees.find((a) => a.id === lead.assignedToId)?.name ?? "—")
     : "Unassigned"
+
+  // Qualification options = the firm's active labels, plus the lead's current value if it's been
+  // deactivated, so it still renders.
+  const qualificationOptions = [
+    { value: NO_QUALIFICATION, label: "Not set" },
+    ...taxonomies.qualification
+      .filter((o) => o.isActive)
+      .map((o) => ({ value: o.label, label: o.label })),
+  ]
+  if (
+    lead.data.qualification &&
+    !qualificationOptions.some((o) => o.value === lead.data.qualification)
+  )
+    qualificationOptions.push({
+      value: lead.data.qualification,
+      label: lead.data.qualification,
+    })
 
   function run(fn: () => Promise<Result>) {
     startTransition(async () => {
@@ -216,6 +236,32 @@ export function LeadDetail({
                   />
                 ) : (
                   <span className="text-sm">{assigneeName}</span>
+                )}
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">
+                  Qualification
+                </span>
+                {canEdit ? (
+                  <InlineSelect
+                    value={lead.data.qualification ?? NO_QUALIFICATION}
+                    options={qualificationOptions}
+                    ariaLabel="Qualification"
+                    onValueChange={(v) =>
+                      run(() =>
+                        setLeadQualification(
+                          lead.id,
+                          v === NO_QUALIFICATION ? "" : v
+                        )
+                      )
+                    }
+                  />
+                ) : lead.data.qualification ? (
+                  <StatusPill
+                    {...qualificationBadge(lead.data.qualification)}
+                  />
+                ) : (
+                  <span className="text-sm">—</span>
                 )}
               </div>
             </CardContent>
