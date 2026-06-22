@@ -378,30 +378,19 @@ export async function setLeadQualification(
   const next = value.trim()
   if (currentQual === next) return { ok: true }
 
-  // Validate against the firm's qualification labels — active OR inactive, since the inline control
-  // can offer a deactivated value the lead already carries (empty = clear).
-  if (next) {
-    const { data: tax, error: taxErr } = await supabase
-      .from("firm_taxonomies")
-      .select("label")
-      .eq("category", "qualification")
-    if (taxErr) return { error: "Couldn't load the firm's options. Try again." }
-    if (!(tax ?? []).some((t) => t.label === next))
-      return { error: "That qualification isn't available." }
-  }
-
-  // Merge into the raw jsonb so unmapped/extra keys are preserved.
-  const merged: Record<string, Json> = { ...raw }
-  if (next) merged.qualification = next
-  else delete merged.qualification
-
-  const { data: updated, error } = await supabase
-    .from("leads")
-    .update({ data: merged, last_activity: new Date().toISOString() })
-    .eq("id", id)
-    .select("id")
-    .single()
-  if (error || !updated) return { error: "Couldn't update the qualification." }
+  // Atomic single-key write: jsonb_set (in the RPC) touches only data->qualification, so a concurrent
+  // edit to another data key can't be lost. Validation + the firm scope live in the RPC, which runs
+  // SECURITY INVOKER so the leads RLS (firm + leads.edit) still applies.
+  const { error } = await supabase.rpc("set_lead_qualification", {
+    p_id: id,
+    p_value: next,
+  })
+  if (error)
+    return {
+      error: error.message.includes("not available")
+        ? "That qualification isn't available."
+        : "Couldn't update the qualification.",
+    }
 
   await recordEvent(
     gate.user.firmId,

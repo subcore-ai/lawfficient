@@ -7,11 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.5"
-  }
   public: {
     Tables: {
       audit_log: {
@@ -1240,6 +1235,10 @@ export type Database = {
       seed_firm_taxonomies: { Args: { p_firm_id: string }; Returns: undefined }
       seed_lead_statuses: { Args: { p_firm_id: string }; Returns: undefined }
       seed_system_roles: { Args: { p_firm_id: string }; Returns: undefined }
+      set_lead_qualification: {
+        Args: { p_id: string; p_value: string }
+        Returns: undefined
+      }
       set_role_permissions: {
         Args: {
           p_permissions: Database["public"]["Enums"]["app_permission"][]
@@ -1540,3 +1539,4 @@ export const Constants = {
     },
   },
 } as const
+
