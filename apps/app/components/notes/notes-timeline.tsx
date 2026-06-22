@@ -92,6 +92,7 @@ export function NotesTimeline({
   }
 
   function saveEdit(id: string) {
+    if (pending) return
     const text = editBody.trim()
     if (!text) return
     run(

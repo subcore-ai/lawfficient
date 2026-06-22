@@ -18,7 +18,9 @@ const ENTITY_PATHS: Record<NoteEntityType, (entityId: string) => string[]> = {
 }
 
 function revalidateEntity(entityType: string, entityId: string) {
-  for (const path of ENTITY_PATHS[entityType as NoteEntityType]?.(entityId) ?? []) revalidatePath(path)
+  for (const path of ENTITY_PATHS[entityType as NoteEntityType]?.(entityId) ??
+    [])
+    revalidatePath(path)
 }
 
 // Notes ride on the parent entity's permissions: writing requires that entity's edit permission.
@@ -33,11 +35,23 @@ async function requireNotesEdit(): Promise<Gate> {
 }
 
 // Best-effort audit under the PARENT entity (entity='lead'), so a lead's history stays in one place.
-async function audit(supabase: NotesClient, byUserId: string, entityId: string, label: string, action: string) {
+async function audit(
+  supabase: NotesClient,
+  byUserId: string,
+  entityId: string,
+  label: string,
+  action: string
+) {
   try {
     const { error } = await supabase
       .from("audit_log")
-      .insert({ entity: "lead", entity_id: entityId, label, action, by_user_id: byUserId })
+      .insert({
+        entity: "lead",
+        entity_id: entityId,
+        label,
+        action,
+        by_user_id: byUserId,
+      })
     if (error) console.error("audit_log insert failed:", error.message)
   } catch (err) {
     console.error("audit_log insert threw:", err)
@@ -49,11 +63,12 @@ const preview = (body: string) => body.trim().slice(0, 80)
 export async function addNote(
   entityType: NoteEntityType,
   entityId: string,
-  body: string,
+  body: string
 ): Promise<ActionResult> {
   const gate = await requireNotesEdit()
   if (!gate.ok) return { error: gate.error }
-  if (!(entityType in ENTITY_PATHS)) return { error: "Unsupported note target." }
+  if (!(entityType in ENTITY_PATHS))
+    return { error: "Unsupported note target." }
   const text = body.trim()
   if (!text) return { error: "Write something first." }
 
@@ -61,7 +76,12 @@ export async function addNote(
   // created_by_id must equal auth.uid() — the RLS insert check pins the author so it can't be forged.
   const { data: inserted, error } = await supabase
     .from("notes")
-    .insert({ entity_type: entityType, entity_id: entityId, body: text, created_by_id: gate.user.id })
+    .insert({
+      entity_type: entityType,
+      entity_id: entityId,
+      body: text,
+      created_by_id: gate.user.id,
+    })
     .select("id")
     .single()
   if (error || !inserted) return { error: "Couldn't add the note." }
@@ -71,7 +91,10 @@ export async function addNote(
   return { ok: true }
 }
 
-export async function editNote(id: string, body: string): Promise<ActionResult> {
+export async function editNote(
+  id: string,
+  body: string
+): Promise<ActionResult> {
   const gate = await requireNotesEdit()
   if (!gate.ok) return { error: gate.error }
   const text = body.trim()
@@ -86,7 +109,8 @@ export async function editNote(id: string, body: string): Promise<ActionResult> 
     .eq("id", id)
     .single()
   if (readErr || !note) return { error: "Couldn't find that note." }
-  if (note.created_by_id !== gate.user.id) return { error: "You can only edit your own notes." }
+  if (note.created_by_id !== gate.user.id)
+    return { error: "You can only edit your own notes." }
 
   // .select().single() makes a 0-row update (RLS / wrong id) a real error, not a silent ok.
   const { data: updated, error } = await supabase
@@ -97,12 +121,21 @@ export async function editNote(id: string, body: string): Promise<ActionResult> 
     .single()
   if (error || !updated) return { error: "Couldn't save the note." }
 
-  await audit(supabase, gate.user.id, note.entity_id, preview(text), "note_edited")
+  await audit(
+    supabase,
+    gate.user.id,
+    note.entity_id,
+    preview(text),
+    "note_edited"
+  )
   revalidateEntity(note.entity_type, note.entity_id)
   return { ok: true }
 }
 
-export async function setNoteResolved(id: string, resolved: boolean): Promise<ActionResult> {
+export async function setNoteResolved(
+  id: string,
+  resolved: boolean
+): Promise<ActionResult> {
   const gate = await requireNotesEdit()
   if (!gate.ok) return { error: gate.error }
 
@@ -118,11 +151,21 @@ export async function setNoteResolved(id: string, resolved: boolean): Promise<Ac
     .single()
   if (error || !updated) return { error: "Couldn't update the note." }
 
+  await audit(
+    supabase,
+    gate.user.id,
+    updated.entity_id,
+    "",
+    resolved ? "note_resolved" : "note_reopened"
+  )
   revalidateEntity(updated.entity_type, updated.entity_id)
   return { ok: true }
 }
 
-export async function setNoteHidden(id: string, hidden: boolean): Promise<ActionResult> {
+export async function setNoteHidden(
+  id: string,
+  hidden: boolean
+): Promise<ActionResult> {
   const gate = await requireNotesEdit()
   if (!gate.ok) return { error: gate.error }
 
@@ -138,6 +181,13 @@ export async function setNoteHidden(id: string, hidden: boolean): Promise<Action
     .single()
   if (error || !updated) return { error: "Couldn't update the note." }
 
+  await audit(
+    supabase,
+    gate.user.id,
+    updated.entity_id,
+    "",
+    hidden ? "note_hidden" : "note_unhidden"
+  )
   revalidateEntity(updated.entity_type, updated.entity_id)
   return { ok: true }
 }
@@ -154,7 +204,8 @@ export async function deleteNote(id: string): Promise<ActionResult> {
     .eq("id", id)
     .select("entity_type, entity_id")
     .single()
-  if (error || !deleted) return { error: "You can only delete your own notes, or ask an admin." }
+  if (error || !deleted)
+    return { error: "You can only delete your own notes, or ask an admin." }
 
   await audit(supabase, user.id, deleted.entity_id, "", "note_deleted")
   revalidateEntity(deleted.entity_type, deleted.entity_id)

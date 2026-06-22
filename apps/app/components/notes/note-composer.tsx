@@ -24,6 +24,7 @@ export function NoteComposer({
 
   function submit(e: React.FormEvent) {
     e.preventDefault()
+    if (pending) return
     const text = body.trim()
     if (!text) return
     startTransition(async () => {
