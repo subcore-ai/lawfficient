@@ -12,27 +12,12 @@ import { CreateRoleDialog, RoleRowActions, type RoleRow } from "@/components/set
 import { getCurrentUser } from "@/lib/auth/session"
 import { ALL_PERMISSIONS, type AppPermission } from "@/lib/rbac/permissions"
 import { createClient } from "@/lib/supabase/server"
-import { isSupabaseConfigured } from "@/lib/supabase/env"
-import { ROLE_LABELS } from "@/data"
-import type { Role } from "@/data/types"
 
 export const metadata = { title: "Settings · Roles" }
 
 type Loaded = { roles: RoleRow[]; canManage: boolean }
 
 async function load(): Promise<Loaded> {
-  // Phase 0 fallback: with no Supabase wired, list the seeded system roles read-only
-  // so the page stays demoable (same contract as the rest of the app shell).
-  if (!isSupabaseConfigured()) {
-    const roles: RoleRow[] = (Object.keys(ROLE_LABELS) as Role[]).map((key) => ({
-      id: key,
-      key,
-      name: ROLE_LABELS[key],
-      isSystem: true,
-      permissions: [],
-    }))
-    return { roles, canManage: false }
-  }
 
   const me = await getCurrentUser()
   const supabase = await createClient()

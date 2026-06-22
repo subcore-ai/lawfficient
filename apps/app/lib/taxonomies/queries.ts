@@ -72,35 +72,3 @@ export function toLeadVocabAll(t: FirmTaxonomies): LeadVocab {
     qualification: t.qualification.map((o) => o.label),
   }
 }
-
-// Mock fallback (no Supabase configured): synthesize the defaults so the form renders read-only in
-// demo mode. Mirrors lib/leads/queries.ts mockLeadStatuses.
-const MOCK: Record<TaxonomyCategory, string[]> = {
-  case_type: [
-    "VAWA (Abeyance)",
-    "VAWA (AOS)",
-    "Marriage-Based GC",
-    "N-400 Naturalization",
-    "Family-Based Petition",
-    "NVC Case",
-    "Removal of Conditions",
-  ],
-  case_hierarchy: ["HRC", "NHRC"],
-  qualification: ["Pending", "Qualified", "Not qualified"],
-}
-
-export function mockTaxonomies(): FirmTaxonomies {
-  const out = emptyGroups()
-  for (const category of TAXONOMY_CATEGORIES) {
-    out[category] = MOCK[category].map((label, position) => ({
-      id: `${category}:${label}`,
-      category,
-      label,
-      notes: null,
-      position,
-      isSystem: true,
-      isActive: true,
-    }))
-  }
-  return out
-}

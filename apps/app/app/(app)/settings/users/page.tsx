@@ -15,8 +15,6 @@ import {
 import { UsersTable } from "@/components/settings/users-table"
 import { getCurrentUser } from "@/lib/auth/session"
 import { createClient } from "@/lib/supabase/server"
-import { isSupabaseConfigured } from "@/lib/supabase/env"
-import { CURRENT_USER, STAFF } from "@/data"
 import type { StaffUser } from "@/data/types"
 
 export const metadata = { title: "Settings · Team" }
@@ -30,20 +28,6 @@ type Loaded = {
 }
 
 async function load(): Promise<Loaded> {
-  // Phase 0 fallback: with no Supabase wired, render the mock team so the app
-  // stays demoable (same contract as the auth flow + app shell).
-  if (!isSupabaseConfigured()) {
-    // Read-only mock: the management actions are server-backed, so without
-    // Supabase they can't complete — don't render controls that would fail.
-    return {
-      users: STAFF.map((u) => ({ ...u, roleIds: [] })),
-      roles: [],
-      currentUserId: CURRENT_USER.id,
-      canManage: false,
-      canManageRoles: false,
-    }
-  }
-
   const me = await getCurrentUser()
   const supabase = await createClient()
   // RLS scopes all three to the caller's firm. Load the roster, the firm's roles

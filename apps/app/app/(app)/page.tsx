@@ -1,10 +1,9 @@
 import { DashboardView } from "@/components/dashboard-view"
-import { LEADS, STAFF } from "@/data"
+import { LEADS } from "@/data"
 import { getCurrentUser } from "@/lib/auth/session"
 import type { AssigneeOption } from "@/lib/leads/queries"
-import { isSupabaseConfigured } from "@/lib/supabase/env"
 import { createClient } from "@/lib/supabase/server"
-import { groupTaxonomies, mockTaxonomies, type FirmTaxonomies } from "@/lib/taxonomies/queries"
+import { groupTaxonomies, type FirmTaxonomies } from "@/lib/taxonomies/queries"
 
 export const metadata = { title: "Dashboard" }
 
@@ -29,16 +28,6 @@ function mockLeadCounts() {
 
 // The two lead KPIs come from real counts; the rest of the dashboard stays on the mock store.
 async function load(): Promise<Loaded> {
-  if (!isSupabaseConfigured()) {
-    return {
-      ...mockLeadCounts(),
-      assignees: STAFF.filter((u) => u.role === "sales").map((u) => ({ id: u.id, name: u.name })),
-      taxonomies: mockTaxonomies(),
-      canCreateLead: false,
-      canManage: false,
-    }
-  }
-
   const me = await getCurrentUser()
   const supabase = await createClient()
   const canCreateLead = me?.permissions?.includes("leads.edit") ?? false
