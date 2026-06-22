@@ -27,11 +27,14 @@ async function requireLeadsEdit(): Promise<Gate> {
 // user's action.
 async function audit(supabase: LeadsClient, byUserId: string, leadId: string, label: string, action: string) {
   try {
-    await supabase
+    const { error } = await supabase
       .from("audit_log")
       .insert({ entity: "lead", entity_id: leadId, label, action, by_user_id: byUserId })
-  } catch {
-    // swallow — auditing is non-critical
+    // Best-effort: surface a returned error (RLS/constraint) in logs for visibility, but never
+    // block the user's action on it.
+    if (error) console.error("audit_log insert failed:", error.message)
+  } catch (err) {
+    console.error("audit_log insert threw:", err)
   }
 }
 
@@ -86,13 +89,14 @@ export async function createLead(formData: FormData): Promise<ActionResult> {
   const supabase = await createClient()
 
   // New leads land in the firm's first open stage (lowest position, non-terminal).
-  const { data: stage } = await supabase
+  const { data: stage, error: stageErr } = await supabase
     .from("lead_statuses")
     .select("id")
     .eq("is_terminal", false)
     .order("position")
     .limit(1)
     .maybeSingle()
+  if (stageErr) return { error: "Couldn't load the pipeline stages." }
   if (!stage) return { error: "No open pipeline stage is configured." }
 
   // firm_id defaults to current_firm_id(); status_id is from this firm, so the composite FK holds.
