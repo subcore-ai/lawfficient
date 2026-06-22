@@ -378,15 +378,15 @@ export async function setLeadQualification(
   const next = value.trim()
   if (currentQual === next) return { ok: true }
 
-  // Validate against the firm's active qualification labels (empty = clear).
+  // Validate against the firm's qualification labels — active OR inactive, since the inline control
+  // can offer a deactivated value the lead already carries (empty = clear).
   if (next) {
-    let vocab: LeadVocab
-    try {
-      vocab = await loadVocab(supabase)
-    } catch {
-      return { error: "Couldn't load the firm's options. Try again." }
-    }
-    if (!vocab.qualification.includes(next))
+    const { data: tax, error: taxErr } = await supabase
+      .from("firm_taxonomies")
+      .select("label")
+      .eq("category", "qualification")
+    if (taxErr) return { error: "Couldn't load the firm's options. Try again." }
+    if (!(tax ?? []).some((t) => t.label === next))
       return { error: "That qualification isn't available." }
   }
 
