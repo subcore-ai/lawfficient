@@ -130,6 +130,12 @@ export function NotesTimeline({
             rows={2}
             placeholder="Add a note — a call, a voicemail, something you learned…"
             aria-label="New note"
+            onKeyDown={(e) => {
+              if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                e.preventDefault()
+                e.currentTarget.form?.requestSubmit()
+              }
+            }}
           />
           <Button type="submit" size="sm" disabled={pending || !body.trim()}>
             Add
@@ -266,6 +272,12 @@ export function NotesTimeline({
                     onChange={(e) => setEditBody(e.target.value)}
                     rows={3}
                     aria-label="Edit note"
+                    onKeyDown={(e) => {
+                      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                        e.preventDefault()
+                        saveEdit(note.id)
+                      }
+                    }}
                   />
                   <div className="flex items-center gap-2">
                     <Button

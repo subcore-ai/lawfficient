@@ -179,59 +179,66 @@ export function LeadDetail({
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Status &amp; owner</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Status</span>
-              {canEdit ? (
-                <InlineSelect
-                  value={lead.status.id}
-                  options={statusOptions}
-                  ariaLabel="Status"
-                  onValueChange={(v) => run(() => setLeadStatus(lead.id, v))}
-                />
-              ) : (
-                <StatusPill label={lead.status.name} tone={lead.status.tone} />
-              )}
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Assigned to</span>
-              {canEdit ? (
-                <InlineSelect
-                  value={lead.assignedToId ?? UNASSIGNED}
-                  options={inlineAssignee}
-                  ariaLabel="Assignee"
-                  onValueChange={(v) =>
-                    run(() => assignLead(lead.id, v === UNASSIGNED ? "" : v))
-                  }
-                />
-              ) : (
-                <span className="text-sm">{assigneeName}</span>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+        <div className="flex flex-col gap-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Status &amp; owner</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Status</span>
+                {canEdit ? (
+                  <InlineSelect
+                    value={lead.status.id}
+                    options={statusOptions}
+                    ariaLabel="Status"
+                    onValueChange={(v) => run(() => setLeadStatus(lead.id, v))}
+                  />
+                ) : (
+                  <StatusPill
+                    label={lead.status.name}
+                    tone={lead.status.tone}
+                  />
+                )}
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">
+                  Assigned to
+                </span>
+                {canEdit ? (
+                  <InlineSelect
+                    value={lead.assignedToId ?? UNASSIGNED}
+                    options={inlineAssignee}
+                    ariaLabel="Assignee"
+                    onValueChange={(v) =>
+                      run(() => assignLead(lead.id, v === UNASSIGNED ? "" : v))
+                    }
+                  />
+                ) : (
+                  <span className="text-sm">{assigneeName}</span>
+                )}
+              </div>
+            </CardContent>
+          </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Activity</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <NotesTimeline
-            entityType="lead"
-            entityId={lead.id}
-            notes={notes}
-            createdAt={lead.createdAt}
-            currentUserId={currentUserId}
-            canEdit={canEdit}
-            isAdmin={canManage}
-          />
-        </CardContent>
-      </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Activity</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <NotesTimeline
+                entityType="lead"
+                entityId={lead.id}
+                notes={notes}
+                createdAt={lead.createdAt}
+                currentUserId={currentUserId}
+                canEdit={canEdit}
+                isAdmin={canManage}
+              />
+            </CardContent>
+          </Card>
+        </div>
+      </div>
 
       {canEdit ? (
         <EditLeadDialog
