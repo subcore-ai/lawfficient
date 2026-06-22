@@ -79,3 +79,28 @@ numbers. The dashboard KPIs already avoid this with `count` queries.
 counts stay correct at scale.
 
 **Priority:** before any firm approaches ~1000 leads.
+
+---
+
+## Testing — RLS + server-action integration harness (local Supabase)
+
+_Added 2026-06-22 (surfaced in the #27 notes review)._
+
+**What:** an automated integration layer that exercises RLS policies, guard triggers, and server
+actions against the local Supabase stack — seed via the service-role client, then assert allow/deny
+as an `authenticated` JWT for a given firm/role. Locks in invariants the pure-logic unit tests can't
+reach, e.g. "an editor can't insert a `kind='event'` note (forge activity)", "only the author or an
+admin can delete a note", "a note's identity is immutable on update", "every table is firm-scoped".
+
+**Why deferred:** today's `bun test` suite covers only pure logic (mappers/validators/parsers). The
+RLS + actions + authorization layer — where the #27 review found the real bugs (event forgery,
+ownership rewrite) — has no automated coverage; it's caught by review + preview e2e. A real harness
+is a meatier setup (test-DB lifecycle, JWT minting per role) and must first resolve the **local
+Data-API grant quirk** that blocks `authenticated` DML locally.
+
+**Shape:** a `bun test` suite that (1) resets/seeds a local DB via service-role, (2) mints / signs in
+`authenticated` users per firm + role, (3) asserts each policy + guard (`guard_notes`,
+`guard_firm_taxonomy`, `guard_lead_status`, the leads / billing RLS). Runs locally + in CI.
+
+**Promote when:** the security-sensitive surface grows (more entities adopt notes; billing/payments
+land) — that's when locking RLS invariants in CI earns its keep.
