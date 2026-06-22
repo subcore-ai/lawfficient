@@ -18,6 +18,7 @@ function revalidateTaxonomyViews() {
   revalidatePath(PATH)
   revalidatePath("/")
   revalidatePath("/leads")
+  revalidatePath("/leads/[id]", "page") // lead detail (dynamic) — its edit dialog uses the vocab
 }
 
 type Gate = { ok: true; user: CurrentUser } | { ok: false; error: string }
