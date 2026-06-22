@@ -7,8 +7,9 @@ import { NextResponse, type NextRequest } from "next/server"
 
 import { isSupabaseConfigured, SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "./env"
 
-// Unauthenticated users are allowed on these path prefixes.
-const PUBLIC_PREFIXES = ["/login", "/forgot-password", "/auth"]
+// Unauthenticated (no-session) requests are allowed on these path prefixes. /api/leads is the
+// lead-ingestion webhook — it does its own Bearer-key auth in the route handler, not via session.
+const PUBLIC_PREFIXES = ["/login", "/forgot-password", "/auth", "/api/leads"]
 
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))

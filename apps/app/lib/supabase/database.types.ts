@@ -635,6 +635,60 @@ export type Database = {
           },
         ]
       }
+      lead_sources: {
+        Row: {
+          created_at: string
+          default_assignee_id: string | null
+          enabled: boolean
+          firm_id: string
+          id: string
+          key: string
+          key_hash: string
+          key_last4: string
+          kind: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          default_assignee_id?: string | null
+          enabled?: boolean
+          firm_id?: string
+          id?: string
+          key: string
+          key_hash: string
+          key_last4: string
+          kind?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          default_assignee_id?: string | null
+          enabled?: boolean
+          firm_id?: string
+          id?: string
+          key?: string
+          key_hash?: string
+          key_last4?: string
+          kind?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_sources_assignee_firm_fk"
+            columns: ["default_assignee_id", "firm_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id", "firm_id"]
+          },
+          {
+            foreignKeyName: "lead_sources_firm_id_fkey"
+            columns: ["firm_id"]
+            isOneToOne: false
+            referencedRelation: "firms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_statuses: {
         Row: {
           created_at: string
@@ -686,6 +740,7 @@ export type Database = {
           created_at: string
           data: Json
           email: string
+          external_id: string | null
           firm_id: string
           first_name: string
           id: string
@@ -702,6 +757,7 @@ export type Database = {
           created_at?: string
           data?: Json
           email?: string
+          external_id?: string | null
           firm_id?: string
           first_name: string
           id?: string
@@ -718,6 +774,7 @@ export type Database = {
           created_at?: string
           data?: Json
           email?: string
+          external_id?: string | null
           firm_id?: string
           first_name?: string
           id?: string
@@ -972,6 +1029,64 @@ export type Database = {
           },
         ]
       }
+      webhook_events: {
+        Row: {
+          error: string | null
+          external_id: string | null
+          firm_id: string
+          id: string
+          lead_id: string | null
+          raw_payload: Json
+          received_at: string
+          source_id: string
+          status: string
+        }
+        Insert: {
+          error?: string | null
+          external_id?: string | null
+          firm_id: string
+          id?: string
+          lead_id?: string | null
+          raw_payload?: Json
+          received_at?: string
+          source_id: string
+          status: string
+        }
+        Update: {
+          error?: string | null
+          external_id?: string | null
+          firm_id?: string
+          id?: string
+          lead_id?: string | null
+          raw_payload?: Json
+          received_at?: string
+          source_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_events_firm_id_fkey"
+            columns: ["firm_id"]
+            isOneToOne: false
+            referencedRelation: "firms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "webhook_events_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "webhook_events_source_firm_fk"
+            columns: ["source_id", "firm_id"]
+            isOneToOne: false
+            referencedRelation: "lead_sources"
+            referencedColumns: ["id", "firm_id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -1034,6 +1149,7 @@ export type Database = {
         | "document"
         | "user"
         | "role"
+        | "lead_source"
       case_status:
         | "onboarding"
         | "packet_prep"
@@ -1235,6 +1351,7 @@ export const Constants = {
         "document",
         "user",
         "role",
+        "lead_source",
       ],
       case_status: [
         "onboarding",

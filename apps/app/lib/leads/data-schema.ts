@@ -31,8 +31,8 @@ export const LEAD_DATA_TEXT_KEYS = [
   "referralSource",
 ] as const
 
-const HIERARCHIES: CaseHierarchy[] = ["HRC", "NHRC"]
-const QUALIFICATIONS: Qualification[] = ["qualified", "not_qualified", "pending"]
+export const HIERARCHIES: CaseHierarchy[] = ["HRC", "NHRC"]
+export const QUALIFICATIONS: Qualification[] = ["qualified", "not_qualified", "pending"]
 
 function cleanString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() !== "" ? value.trim() : undefined
