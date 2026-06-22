@@ -111,7 +111,13 @@ export async function createLead(formData: FormData): Promise<ActionResult> {
   if (!core.ok) return { error: core.error }
 
   const supabase = await createClient()
-  const data = buildLeadData(readDataFields(formData), await loadVocab(supabase))
+  let vocab: LeadVocab
+  try {
+    vocab = await loadVocab(supabase)
+  } catch {
+    return { error: "Couldn't load the firm's case types. Try again." }
+  }
+  const data = buildLeadData(readDataFields(formData), vocab)
   if (!data.ok) return { error: data.error }
 
   // New leads land in the firm's first open stage (lowest position, non-terminal).
@@ -165,10 +171,13 @@ export async function updateLead(id: string, formData: FormData): Promise<Action
     .single()
   if (readErr || !existing) return { error: "Couldn't update the lead." }
 
-  const data = buildLeadData(
-    readDataFields(formData),
-    withExistingValues(await loadVocab(supabase), parseLeadData(existing.data)),
-  )
+  let vocab: LeadVocab
+  try {
+    vocab = await loadVocab(supabase)
+  } catch {
+    return { error: "Couldn't load the firm's case types. Try again." }
+  }
+  const data = buildLeadData(readDataFields(formData), withExistingValues(vocab, parseLeadData(existing.data)))
   if (!data.ok) return { error: data.error }
 
   // .select().single() makes a 0-row update (RLS / wrong id) a real error, not a silent ok.
