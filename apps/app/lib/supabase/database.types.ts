@@ -1155,7 +1155,7 @@ export type Database = {
       }
       invite_token_for: { Args: { p_user_id: string }; Returns: string }
       rename_firm_taxonomy: {
-        Args: { p_id: string; p_label: string }
+        Args: { p_id: string; p_label: string; p_notes: string }
         Returns: undefined
       }
       seed_firm_taxonomies: { Args: { p_firm_id: string }; Returns: undefined }

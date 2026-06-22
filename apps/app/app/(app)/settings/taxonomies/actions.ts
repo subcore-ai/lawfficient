@@ -115,21 +115,22 @@ export async function editTaxonomy(id: string, formData: FormData): Promise<Acti
 
   if (label !== row.label) {
     if (row.is_system) return { error: "System values can't be renamed (you can still edit their notes)." }
-    // Rename + bulk-update every lead carrying the old label (SECURITY DEFINER RPC; re-checks firm).
-    const { error } = await supabase.rpc("rename_firm_taxonomy", { p_id: id, p_label: label })
+    // One transaction: label + notes + the leads bulk-rewrite (SECURITY DEFINER RPC; re-checks firm).
+    const { error } = await supabase.rpc("rename_firm_taxonomy", { p_id: id, p_label: label, p_notes: notes ?? "" })
     if (error) {
       return {
         error: /duplicate|unique|23505/i.test(error.message) ? "That value already exists." : "Couldn't rename the value.",
       }
     }
+  } else {
+    // Notes-only edit (label unchanged) — a plain update is fine.
+    const { data: updated, error: notesErr } = await supabase
+      .from("firm_taxonomies")
+      .update({ notes })
+      .eq("id", id)
+      .select("id")
+    if (notesErr || !updated || updated.length === 0) return { error: "Couldn't save the value." }
   }
-
-  const { data: updated, error: notesErr } = await supabase
-    .from("firm_taxonomies")
-    .update({ notes })
-    .eq("id", id)
-    .select("id")
-  if (notesErr || !updated || updated.length === 0) return { error: "Couldn't save the value." }
 
   await audit(supabase, gate.user.id, id, label, "updated")
   revalidateTaxonomyViews()
