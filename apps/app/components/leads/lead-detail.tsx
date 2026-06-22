@@ -17,6 +17,7 @@ import { StatusPill } from "@/components/status-pill"
 import type { AssigneeOption, LeadStatusView, LeadView } from "@/lib/leads/queries"
 import { formatDate } from "@/lib/format"
 import { qualificationBadge } from "@/lib/status"
+import type { FirmTaxonomies } from "@/lib/taxonomies/queries"
 
 const UNASSIGNED = "none"
 
@@ -26,12 +27,16 @@ export function LeadDetail({
   lead,
   statuses,
   assignees,
+  taxonomies,
   canEdit,
+  canManage,
 }: {
   lead: LeadView
   statuses: LeadStatusView[]
   assignees: AssigneeOption[]
+  taxonomies: FirmTaxonomies
   canEdit: boolean
+  canManage: boolean
 }) {
   const [editOpen, setEditOpen] = React.useState(false)
   const [, startTransition] = React.useTransition()
@@ -175,7 +180,14 @@ export function LeadDetail({
       </div>
 
       {canEdit ? (
-        <EditLeadDialog lead={lead} assignees={assignees} open={editOpen} onOpenChange={setEditOpen} />
+        <EditLeadDialog
+          lead={lead}
+          assignees={assignees}
+          taxonomies={taxonomies}
+          canManage={canManage}
+          open={editOpen}
+          onOpenChange={setEditOpen}
+        />
       ) : null}
     </>
   )

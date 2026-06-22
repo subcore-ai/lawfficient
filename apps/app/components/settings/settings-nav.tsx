@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Building2, FileText, ListChecks, Plug, ShieldCheck, Users } from "lucide-react"
+import { Building2, FileText, ListChecks, Plug, ShieldCheck, Tags, Users } from "lucide-react"
 
 import { cn } from "@workspace/ui/lib/utils"
 
@@ -10,6 +10,7 @@ const ITEMS = [
   { href: "/settings", label: "General", icon: Building2 },
   { href: "/settings/users", label: "Team members", icon: Users },
   { href: "/settings/roles", label: "Roles & permissions", icon: ShieldCheck },
+  { href: "/settings/taxonomies", label: "Case taxonomies", icon: Tags },
   { href: "/settings/templates", label: "Templates", icon: FileText },
   { href: "/settings/pipeline", label: "Packet pipeline", icon: ListChecks },
   { href: "/settings/integrations", label: "Integrations", icon: Plug },

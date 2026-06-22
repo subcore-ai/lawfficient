@@ -407,6 +407,50 @@ export type Database = {
           },
         ]
       }
+      firm_taxonomies: {
+        Row: {
+          category: string
+          created_at: string
+          firm_id: string
+          id: string
+          is_active: boolean
+          is_system: boolean
+          label: string
+          notes: string | null
+          position: number
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          firm_id?: string
+          id?: string
+          is_active?: boolean
+          is_system?: boolean
+          label: string
+          notes?: string | null
+          position?: number
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          firm_id?: string
+          id?: string
+          is_active?: boolean
+          is_system?: boolean
+          label?: string
+          notes?: string | null
+          position?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "firm_taxonomies_firm_id_fkey"
+            columns: ["firm_id"]
+            isOneToOne: false
+            referencedRelation: "firms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       firms: {
         Row: {
           created_at: string
@@ -1106,6 +1150,11 @@ export type Database = {
         Returns: boolean
       }
       invite_token_for: { Args: { p_user_id: string }; Returns: string }
+      rename_firm_taxonomy: {
+        Args: { p_id: string; p_label: string }
+        Returns: undefined
+      }
+      seed_firm_taxonomies: { Args: { p_firm_id: string }; Returns: undefined }
       seed_lead_statuses: { Args: { p_firm_id: string }; Returns: undefined }
       seed_system_roles: { Args: { p_firm_id: string }; Returns: undefined }
       set_role_permissions: {
@@ -1150,6 +1199,7 @@ export type Database = {
         | "user"
         | "role"
         | "lead_source"
+        | "taxonomy"
       case_status:
         | "onboarding"
         | "packet_prep"
@@ -1352,6 +1402,7 @@ export const Constants = {
         "user",
         "role",
         "lead_source",
+        "taxonomy",
       ],
       case_status: [
         "onboarding",

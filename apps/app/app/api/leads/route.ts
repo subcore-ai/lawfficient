@@ -8,6 +8,7 @@ import { parseLeadInput } from "@/lib/leads/validation"
 import { createAdminClient } from "@/lib/supabase/admin"
 import type { Json } from "@/lib/supabase/database.types"
 import { isSupabaseConfigured } from "@/lib/supabase/env"
+import { groupTaxonomies, toLeadVocab } from "@/lib/taxonomies/queries"
 
 // node:crypto (key hashing) + libphonenumber-js → Node runtime, not Edge.
 export const runtime = "nodejs"
@@ -87,7 +88,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 })
   }
 
-  const parsedPayload = parseCanonicalPayload(payload)
+  // The firm's taxonomy vocabulary (admin client — the webhook has no user session, so RLS
+  // doesn't apply; scope explicitly by firm). matchVocab normalizes casing against the firm's own
+  // labels, and buildLeadData validates against them.
+  const vocab = toLeadVocab(
+    groupTaxonomies(
+      (await admin.from("firm_taxonomies").select("*").eq("firm_id", source.firmId).order("position")).data ?? []
+    )
+  )
+  const parsedPayload = parseCanonicalPayload(payload, vocab)
   const core = parseLeadInput({
     firstName: parsedPayload.core.firstName,
     lastName: parsedPayload.core.lastName,
@@ -96,7 +105,7 @@ export async function POST(request: NextRequest) {
     source: source.key, // resolved from the key, never the body
     notes: parsedPayload.core.notes,
   })
-  const builtData = buildLeadData(parsedPayload.data)
+  const builtData = buildLeadData(parsedPayload.data, vocab)
 
   if (!core.ok || !builtData.ok) {
     const error = !core.ok ? core.error : !builtData.ok ? builtData.error : "Invalid payload."

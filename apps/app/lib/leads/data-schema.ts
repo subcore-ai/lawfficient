@@ -1,14 +1,15 @@
 // Typed boundary around leads.data — a deliberately schemaless jsonb column holding the
-// variable "rest" of a lead (demographics, case details, future source-mapped/ingestion
-// fields). parseLeadData narrows the stored blob for display; buildLeadData validates raw
-// form input before persisting. Pure + dependency-free so it can be unit-tested directly.
-import { CASE_TYPES, type CaseHierarchy, type CaseType, type Qualification } from "@/data/types"
+// variable "rest" of a lead (demographics, case details, source-mapped/ingestion fields).
+// parseLeadData narrows the stored blob for display; buildLeadData validates raw form input
+// before persisting. The constrained fields (case type / hierarchy / qualification) are now
+// firm-defined (see firm_taxonomies), so their vocabulary is PASSED IN rather than hard-coded —
+// keeping these functions pure + unit-testable. Dependency-free.
 import type { Json } from "@/lib/supabase/database.types"
 
 export type LeadData = {
-  caseType?: CaseType
-  hierarchy?: CaseHierarchy
-  qualification?: Qualification
+  caseType?: string
+  hierarchy?: string
+  qualification?: string
   preferredLanguage?: string
   countryOfOrigin?: string
   city?: string
@@ -18,6 +19,10 @@ export type LeadData = {
   dob?: string
   referralSource?: string
 }
+
+// The firm's allowed values per constrained field (active taxonomy labels). buildLeadData
+// validates writes against this; see lib/taxonomies/queries.ts `vocab()`.
+export type LeadVocab = { caseType: string[]; hierarchy: string[]; qualification: string[] }
 
 // Free-text keys (no constrained vocabulary) — stored/displayed as-is when non-empty.
 export const LEAD_DATA_TEXT_KEYS = [
@@ -31,30 +36,25 @@ export const LEAD_DATA_TEXT_KEYS = [
   "referralSource",
 ] as const
 
-export const HIERARCHIES: CaseHierarchy[] = ["HRC", "NHRC"]
-export const QUALIFICATIONS: Qualification[] = ["qualified", "not_qualified", "pending"]
-
 function cleanString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() !== "" ? value.trim() : undefined
 }
 
-// Narrow the stored jsonb to LeadData: keep only known keys with valid types, drop the
-// rest. Unknown/extra keys (e.g. raw ingestion payload) are intentionally ignored here —
-// they stay in the column, they just aren't surfaced as typed fields.
+// Narrow the stored jsonb to LeadData for display. LENIENT for the firm-defined fields: a stored
+// value is kept verbatim (a firm may have renamed/retired a taxonomy, but the historical label
+// must still render). NEW values are validated on the write path (buildLeadData). Unknown/extra
+// keys (e.g. raw ingestion payload) stay in the column; they just aren't surfaced as typed fields.
 export function parseLeadData(json: Json | null | undefined): LeadData {
   if (!json || typeof json !== "object" || Array.isArray(json)) return {}
   const o = json as Record<string, unknown>
   const out: LeadData = {}
 
   const caseType = cleanString(o.caseType)
-  if (caseType && (CASE_TYPES as string[]).includes(caseType)) out.caseType = caseType as CaseType
-
+  if (caseType) out.caseType = caseType
   const hierarchy = cleanString(o.hierarchy)
-  if (hierarchy && (HIERARCHIES as string[]).includes(hierarchy)) out.hierarchy = hierarchy as CaseHierarchy
-
+  if (hierarchy) out.hierarchy = hierarchy
   const qualification = cleanString(o.qualification)
-  if (qualification && (QUALIFICATIONS as string[]).includes(qualification))
-    out.qualification = qualification as Qualification
+  if (qualification) out.qualification = qualification
 
   for (const k of LEAD_DATA_TEXT_KEYS) {
     const v = cleanString(o[k])
@@ -65,27 +65,27 @@ export function parseLeadData(json: Json | null | undefined): LeadData {
 
 export type LeadDataInput = Partial<Record<keyof LeadData, string | undefined>>
 
-// Validate + assemble the jsonb payload from raw form values. Constrained fields are
-// checked against their vocabulary; free-text fields are trimmed and dropped when empty.
+// Validate + assemble the jsonb payload from raw form values. Constrained fields are checked
+// against the firm's vocabulary (passed in); free-text fields are trimmed and dropped when empty.
 export function buildLeadData(
-  input: LeadDataInput
+  input: LeadDataInput,
+  vocab: LeadVocab
 ): { ok: true; value: Record<string, string> } | { ok: false; error: string } {
   const value: Record<string, string> = {}
 
   const caseType = cleanString(input.caseType)
   if (caseType) {
-    if (!(CASE_TYPES as string[]).includes(caseType)) return { ok: false, error: "Invalid case type." }
+    if (!vocab.caseType.includes(caseType)) return { ok: false, error: "Invalid case type." }
     value.caseType = caseType
   }
   const hierarchy = cleanString(input.hierarchy)
   if (hierarchy) {
-    if (!(HIERARCHIES as string[]).includes(hierarchy)) return { ok: false, error: "Invalid hierarchy." }
+    if (!vocab.hierarchy.includes(hierarchy)) return { ok: false, error: "Invalid hierarchy." }
     value.hierarchy = hierarchy
   }
   const qualification = cleanString(input.qualification)
   if (qualification) {
-    if (!(QUALIFICATIONS as string[]).includes(qualification))
-      return { ok: false, error: "Invalid qualification." }
+    if (!vocab.qualification.includes(qualification)) return { ok: false, error: "Invalid qualification." }
     value.qualification = qualification
   }
   for (const k of LEAD_DATA_TEXT_KEYS) {
@@ -98,10 +98,9 @@ export function buildLeadData(
 // Every key the lead form manages.
 const LEAD_DATA_KEYS = ["caseType", "hierarchy", "qualification", ...LEAD_DATA_TEXT_KEYS] as const
 
-// Merge a freshly-built form payload over the existing jsonb: the form-managed keys are
-// fully replaced (a cleared field drops out), but any OTHER keys — e.g. a future ingestion
-// payload kept verbatim (see parseLeadData) — are preserved. Used by updateLead so an edit
-// never wipes data the form doesn't surface.
+// Merge a freshly-built form payload over the existing jsonb: the form-managed keys are fully
+// replaced (a cleared field drops out), but any OTHER keys — e.g. ingestion payload kept verbatim
+// (see parseLeadData) — are preserved. Used by updateLead so an edit never wipes unsurfaced data.
 export function mergeLeadData(
   existing: Json | null | undefined,
   formValue: Record<string, string>

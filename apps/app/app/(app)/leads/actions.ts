@@ -3,9 +3,10 @@
 import { revalidatePath } from "next/cache"
 
 import { getCurrentUser, type CurrentUser } from "@/lib/auth/session"
-import { buildLeadData, mergeLeadData, type LeadDataInput } from "@/lib/leads/data-schema"
+import { buildLeadData, mergeLeadData, type LeadDataInput, type LeadVocab } from "@/lib/leads/data-schema"
 import { parseLeadInput } from "@/lib/leads/validation"
 import { createClient } from "@/lib/supabase/server"
+import { groupTaxonomies, toLeadVocab } from "@/lib/taxonomies/queries"
 
 export type ActionResult = { ok: true } | { error: string }
 
@@ -77,16 +78,23 @@ function readCore(formData: FormData) {
   })
 }
 
+// The firm's active taxonomy labels, for buildLeadData validation (case type / hierarchy /
+// qualification are firm-defined now). RLS scopes the read to the firm.
+async function loadVocab(supabase: LeadsClient): Promise<LeadVocab> {
+  const { data } = await supabase.from("firm_taxonomies").select("*").order("position")
+  return toLeadVocab(groupTaxonomies(data ?? []))
+}
+
 export async function createLead(formData: FormData): Promise<ActionResult> {
   const gate = await requireLeadsEdit()
   if (!gate.ok) return { error: gate.error }
 
   const core = readCore(formData)
   if (!core.ok) return { error: core.error }
-  const data = buildLeadData(readDataFields(formData))
-  if (!data.ok) return { error: data.error }
 
   const supabase = await createClient()
+  const data = buildLeadData(readDataFields(formData), await loadVocab(supabase))
+  if (!data.ok) return { error: data.error }
 
   // New leads land in the firm's first open stage (lowest position, non-terminal).
   const { data: stage, error: stageErr } = await supabase
@@ -128,10 +136,11 @@ export async function updateLead(id: string, formData: FormData): Promise<Action
 
   const core = readCore(formData)
   if (!core.ok) return { error: core.error }
-  const data = buildLeadData(readDataFields(formData))
-  if (!data.ok) return { error: data.error }
 
   const supabase = await createClient()
+  const data = buildLeadData(readDataFields(formData), await loadVocab(supabase))
+  if (!data.ok) return { error: data.error }
+
   // Preserve jsonb keys the form doesn't manage (e.g. ingestion payload) — merge, not replace.
   const { data: existing, error: readErr } = await supabase
     .from("leads")

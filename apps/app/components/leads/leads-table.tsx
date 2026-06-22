@@ -31,6 +31,7 @@ import { StatusPill } from "@/components/status-pill"
 import type { AssigneeOption, LeadStatusView, LeadView } from "@/lib/leads/queries"
 import { formatDate } from "@/lib/format"
 import { qualificationBadge } from "@/lib/status"
+import type { FirmTaxonomies } from "@/lib/taxonomies/queries"
 
 // Distinctive sentinels so a free-text lead source (or assignee) can't collide with them.
 const ALL = "__all__"
@@ -40,12 +41,16 @@ export function LeadsTable({
   leads,
   statuses,
   assignees,
+  taxonomies,
   canEdit,
+  canManage,
 }: {
   leads: LeadView[]
   statuses: LeadStatusView[]
   assignees: AssigneeOption[]
+  taxonomies: FirmTaxonomies
   canEdit: boolean
+  canManage: boolean
 }) {
   const [query, setQuery] = React.useState("")
   const [status, setStatus] = React.useState(ALL)
@@ -212,7 +217,13 @@ export function LeadsTable({
                   {formatDate(l.createdAt)}
                 </TableCell>
                 <TableCell>
-                  <LeadRowActions lead={l} assignees={assignees} canEdit={canEdit} />
+                  <LeadRowActions
+                    lead={l}
+                    assignees={assignees}
+                    taxonomies={taxonomies}
+                    canEdit={canEdit}
+                    canManage={canManage}
+                  />
                 </TableCell>
               </TableRow>
             ))}

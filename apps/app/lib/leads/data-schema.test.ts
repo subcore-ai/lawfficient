@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test"
 
-import { buildLeadData, mergeLeadData, parseLeadData } from "./data-schema"
+import { buildLeadData, type LeadVocab, mergeLeadData, parseLeadData } from "./data-schema"
+
+const VOCAB: LeadVocab = {
+  caseType: ["VAWA (AOS)", "N-400 Naturalization"],
+  hierarchy: ["HRC", "NHRC"],
+  qualification: ["qualified", "not_qualified", "pending"],
+}
 
 describe("parseLeadData", () => {
   test("non-objects yield an empty object", () => {
@@ -11,7 +17,7 @@ describe("parseLeadData", () => {
     expect(parseLeadData([1, 2])).toEqual({})
   })
 
-  test("keeps valid known fields", () => {
+  test("keeps stored known fields", () => {
     expect(
       parseLeadData({
         caseType: "N-400 Naturalization",
@@ -29,49 +35,58 @@ describe("parseLeadData", () => {
     })
   })
 
-  test("drops invalid vocab, non-strings, blanks, and unknown keys; trims", () => {
+  test("lenient on constrained fields (firm-defined / historical labels still render); drops non-strings, blanks, unknown keys; trims", () => {
     expect(
       parseLeadData({
-        caseType: "Made Up", // not in CASE_TYPES
-        hierarchy: "MID", // invalid
-        qualification: "maybe", // invalid
-        city: "  ", // blank
-        gender: 5, // non-string
+        caseType: "Asylum", // firm-defined value not in any hard-coded list — kept
+        hierarchy: " HRC ", // trimmed
+        qualification: "needs_review", // custom — kept
+        city: "  ", // blank → dropped
+        gender: 5, // non-string → dropped
         rawPayload: { a: 1 }, // unknown key — stays in the column, not surfaced
         preferredLanguage: " Spanish ",
       })
-    ).toEqual({ preferredLanguage: "Spanish" })
+    ).toEqual({
+      caseType: "Asylum",
+      hierarchy: "HRC",
+      qualification: "needs_review",
+      preferredLanguage: "Spanish",
+    })
   })
 })
 
 describe("buildLeadData", () => {
   test("assembles a clean payload, trimming + dropping empties", () => {
-    expect(buildLeadData({ caseType: "VAWA (AOS)", city: " Miami ", state: "", zip: "33101" })).toEqual({
+    expect(buildLeadData({ caseType: "VAWA (AOS)", city: " Miami ", state: "", zip: "33101" }, VOCAB)).toEqual({
       ok: true,
       value: { caseType: "VAWA (AOS)", city: "Miami", zip: "33101" },
     })
   })
 
   test("empty input is valid (an empty payload)", () => {
-    expect(buildLeadData({})).toEqual({ ok: true, value: {} })
+    expect(buildLeadData({}, VOCAB)).toEqual({ ok: true, value: {} })
   })
 
-  test("rejects invalid constrained values", () => {
-    expect(buildLeadData({ caseType: "Nope" })).toEqual({ ok: false, error: "Invalid case type." })
-    expect(buildLeadData({ hierarchy: "X" })).toEqual({ ok: false, error: "Invalid hierarchy." })
-    expect(buildLeadData({ qualification: "maybe" })).toEqual({ ok: false, error: "Invalid qualification." })
+  test("rejects values outside the firm's vocabulary", () => {
+    expect(buildLeadData({ caseType: "Nope" }, VOCAB)).toEqual({ ok: false, error: "Invalid case type." })
+    expect(buildLeadData({ hierarchy: "X" }, VOCAB)).toEqual({ ok: false, error: "Invalid hierarchy." })
+    expect(buildLeadData({ qualification: "maybe" }, VOCAB)).toEqual({ ok: false, error: "Invalid qualification." })
+  })
+
+  test("accepts a firm-defined custom value present in the vocab", () => {
+    const vocab: LeadVocab = { ...VOCAB, caseType: ["Asylum"] }
+    expect(buildLeadData({ caseType: "Asylum" }, vocab)).toEqual({ ok: true, value: { caseType: "Asylum" } })
   })
 })
 
 describe("mergeLeadData", () => {
   test("replaces form-managed keys, drops cleared ones, preserves unknown keys", () => {
     const existing = { caseType: "VAWA (AOS)", city: "Miami", rawPayload: { utm: "fb" }, externalId: "x1" }
-    // The form sets caseType + state and clears city (absent from the built payload).
     const merged = mergeLeadData(existing, { caseType: "N-400 Naturalization", state: "FL" })
     expect(merged).toEqual({
       caseType: "N-400 Naturalization",
       state: "FL",
-      rawPayload: { utm: "fb" }, // unknown key — survives the edit
+      rawPayload: { utm: "fb" },
       externalId: "x1",
     })
   })

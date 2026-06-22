@@ -2,8 +2,7 @@
 // the anti-corruption boundary (spec 23, FR-ingest-1): every source normalizes to this shape
 // before it reaches the leads core. Known core/data fields are normalized + extracted; any
 // OTHER keys are kept verbatim in `extra` (FR-ingest-4: unmapped fields are never dropped).
-import { CASE_TYPES } from "@/data/types"
-import { HIERARCHIES, QUALIFICATIONS, type LeadDataInput } from "@/lib/leads/data-schema"
+import type { LeadDataInput, LeadVocab } from "@/lib/leads/data-schema"
 import type { Json } from "@/lib/supabase/database.types"
 import { normalizeEmail } from "@/lib/users/validation"
 
@@ -63,6 +62,7 @@ function matchVocab(value: string, allowed: readonly string[]): string {
 
 export function parseCanonicalPayload(
   payload: Record<string, unknown>,
+  vocab: LeadVocab,
   defaultCountry: "US" = "US"
 ): ParsedPayload {
   const rawPhone = str(payload.phone)
@@ -81,9 +81,9 @@ export function parseCanonicalPayload(
       notes: str(payload.notes),
     },
     data: {
-      caseType: matchVocab(str(payload.caseType), CASE_TYPES) || undefined,
-      hierarchy: matchVocab(str(payload.hierarchy), HIERARCHIES) || undefined,
-      qualification: matchVocab(str(payload.qualification), QUALIFICATIONS) || undefined,
+      caseType: matchVocab(str(payload.caseType), vocab.caseType) || undefined,
+      hierarchy: matchVocab(str(payload.hierarchy), vocab.hierarchy) || undefined,
+      qualification: matchVocab(str(payload.qualification), vocab.qualification) || undefined,
       preferredLanguage: str(payload.preferredLanguage) || undefined,
       countryOfOrigin: str(payload.countryOfOrigin) || undefined,
       city: str(payload.city) || undefined,
