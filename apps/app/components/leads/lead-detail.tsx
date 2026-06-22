@@ -1,48 +1,70 @@
 "use client"
 
+import * as React from "react"
 import Link from "next/link"
-import { ArrowLeft, CalendarClock, Pencil } from "lucide-react"
+import { Archive, ArchiveRestore, ArrowLeft, Pencil } from "lucide-react"
 
 import { Button } from "@workspace/ui/components/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card"
 import { Separator } from "@workspace/ui/components/separator"
+import { toast } from "@workspace/ui/components/sonner"
 
-import { ActivityTimeline } from "@/components/activity-timeline"
-import { ConvertLeadDialog } from "@/components/leads/convert-lead-dialog"
-import { EditLeadDialog } from "@/components/leads/edit-lead-dialog"
-import { QuoteLetterDialog } from "@/components/leads/quote-letter-dialog"
+import { assignLead, setLeadArchived, setLeadStatus } from "@/app/(app)/leads/actions"
 import { DetailList, DetailRow } from "@/components/detail-list"
-import { EntityRowActions } from "@/components/entity-row-actions"
+import { EditLeadDialog } from "@/components/leads/edit-lead-dialog"
 import { InlineSelect } from "@/components/inline-select"
 import { StatusPill } from "@/components/status-pill"
-import { LEAD_STATUS_LABELS, STAFF, staffName } from "@/data"
-import { useStore } from "@/data/store"
-import type { LeadStatus } from "@/data/types"
+import type { AssigneeOption, LeadStatusView, LeadView } from "@/lib/leads/queries"
 import { formatDate } from "@/lib/format"
-import { leadStatusBadge, qualificationBadge } from "@/lib/status"
+import { qualificationBadge } from "@/lib/status"
 
-const STATUS_OPTIONS = Object.entries(LEAD_STATUS_LABELS).map(([value, label]) => ({ value, label }))
-const SALES_OPTIONS = STAFF.filter((u) => u.role === "sales").map((u) => ({ value: u.id, label: u.name }))
+const UNASSIGNED = "none"
 
-export function LeadDetail({ id }: { id: string }) {
-  const { leads, updateLead } = useStore()
-  const lead = leads.find((l) => l.id === id)
+type Result = { ok: true } | { error: string }
 
-  if (!lead) {
-    return (
-      <div className="flex flex-col items-start gap-3">
-        <Link
-          href="/leads"
-          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm"
-        >
-          <ArrowLeft className="size-4" /> Leads
-        </Link>
-        <p className="text-muted-foreground text-sm">Lead not found.</p>
-      </div>
-    )
-  }
+export function LeadDetail({
+  lead,
+  statuses,
+  assignees,
+  canEdit,
+}: {
+  lead: LeadView
+  statuses: LeadStatusView[]
+  assignees: AssigneeOption[]
+  canEdit: boolean
+}) {
+  const [editOpen, setEditOpen] = React.useState(false)
+  const [, startTransition] = React.useTransition()
 
   const name = `${lead.firstName} ${lead.lastName}`
+  const { data } = lead
+  const statusOptions = statuses.map((s) => ({ value: s.id, label: s.name }))
+  const inlineAssignee = [
+    { value: UNASSIGNED, label: "Unassigned" },
+    ...assignees.map((a) => ({ value: a.id, label: a.name })),
+  ]
+  const assigneeName = lead.assignedToId
+    ? (assignees.find((a) => a.id === lead.assignedToId)?.name ?? "—")
+    : "Unassigned"
+
+  function run(fn: () => Promise<Result>) {
+    startTransition(async () => {
+      const result = await fn()
+      if ("error" in result) toast.error(result.error)
+    })
+  }
+
+  function onArchive() {
+    const next = !lead.archived
+    startTransition(async () => {
+      const result = await setLeadArchived(lead.id, next, name)
+      if ("error" in result) {
+        toast.error(result.error)
+        return
+      }
+      toast.success(next ? "Archived" : "Restored", { description: name })
+    })
+  }
 
   return (
     <>
@@ -57,28 +79,30 @@ export function LeadDetail({ id }: { id: string }) {
         <div className="space-y-2">
           <h1 className="text-2xl font-semibold tracking-tight">{name}</h1>
           <div className="flex flex-wrap items-center gap-2">
-            <StatusPill {...leadStatusBadge(lead.status)} />
-            <StatusPill {...qualificationBadge(lead.qualification)} />
-            {lead.caseType ? <StatusPill label={lead.caseType} tone="neutral" /> : null}
+            <StatusPill label={lead.status.name} tone={lead.status.tone} />
+            {data.qualification ? <StatusPill {...qualificationBadge(data.qualification)} /> : null}
+            {data.caseType ? <StatusPill label={data.caseType} tone="neutral" /> : null}
             {lead.archived ? <StatusPill label="Archived" tone="neutral" /> : null}
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" render={<Link href="/consultations" />}>
-            <CalendarClock className="size-4" /> Book consultation
-          </Button>
-          <QuoteLetterDialog lead={lead} />
-          {lead.status === "retained" ? null : <ConvertLeadDialog lead={lead} />}
-          <EditLeadDialog
-            lead={lead}
-            trigger={
-              <Button variant="outline" size="sm">
-                <Pencil className="size-4" /> Edit
-              </Button>
-            }
-          />
-          <EntityRowActions entity="lead" id={lead.id} label={name} archived={lead.archived} />
-        </div>
+        {canEdit ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+              <Pencil className="size-4" /> Edit
+            </Button>
+            <Button variant="outline" size="sm" onClick={onArchive}>
+              {lead.archived ? (
+                <>
+                  <ArchiveRestore className="size-4" /> Restore
+                </>
+              ) : (
+                <>
+                  <Archive className="size-4" /> Archive
+                </>
+              )}
+            </Button>
+          </div>
+        ) : null}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
@@ -89,15 +113,19 @@ export function LeadDetail({ id }: { id: string }) {
           <CardContent>
             <DetailList>
               <DetailRow label="Phone">{lead.phone || "—"}</DetailRow>
-              <DetailRow label="Email">{lead.email}</DetailRow>
+              <DetailRow label="Email">{lead.email || "—"}</DetailRow>
               <DetailRow label="Location">
-                {[lead.city, lead.state].filter(Boolean).join(", ") || "—"}
+                {[data.city, data.state].filter(Boolean).join(", ") || "—"}
               </DetailRow>
-              <DetailRow label="Country of origin">{lead.countryOfOrigin || "—"}</DetailRow>
-              <DetailRow label="Preferred language">{lead.preferredLanguage}</DetailRow>
+              <DetailRow label="ZIP">{data.zip ?? "—"}</DetailRow>
+              <DetailRow label="Country of origin">{data.countryOfOrigin ?? "—"}</DetailRow>
+              <DetailRow label="Preferred language">{data.preferredLanguage ?? "—"}</DetailRow>
               <DetailRow label="Source">{lead.source}</DetailRow>
-              <DetailRow label="Case type">{lead.caseType ?? "Not set"}</DetailRow>
-              <DetailRow label="Case hierarchy">{lead.hierarchy ?? "Not set"}</DetailRow>
+              <DetailRow label="Case type">{data.caseType ?? "Not set"}</DetailRow>
+              <DetailRow label="Case hierarchy">{data.hierarchy ?? "Not set"}</DetailRow>
+              <DetailRow label="Gender">{data.gender ?? "—"}</DetailRow>
+              <DetailRow label="Date of birth">{data.dob ?? "—"}</DetailRow>
+              <DetailRow label="Referral source">{data.referralSource ?? "—"}</DetailRow>
               <DetailRow label="Created">{formatDate(lead.createdAt)}</DetailRow>
               <DetailRow label="Last activity">{formatDate(lead.lastActivity)}</DetailRow>
             </DetailList>
@@ -111,45 +139,44 @@ export function LeadDetail({ id }: { id: string }) {
           </CardContent>
         </Card>
 
-        <div className="flex flex-col gap-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Status &amp; owner</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground text-sm">Status</span>
+        <Card>
+          <CardHeader>
+            <CardTitle>Status &amp; owner</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground text-sm">Status</span>
+              {canEdit ? (
                 <InlineSelect
-                  value={lead.status}
-                  options={STATUS_OPTIONS}
+                  value={lead.status.id}
+                  options={statusOptions}
                   ariaLabel="Status"
-                  onValueChange={(v) =>
-                    updateLead(lead.id, { status: v as LeadStatus }, `Status → ${LEAD_STATUS_LABELS[v as LeadStatus]}`)
-                  }
+                  onValueChange={(v) => run(() => setLeadStatus(lead.id, v))}
                 />
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground text-sm">Assigned to</span>
+              ) : (
+                <StatusPill label={lead.status.name} tone={lead.status.tone} />
+              )}
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground text-sm">Assigned to</span>
+              {canEdit ? (
                 <InlineSelect
-                  value={lead.assignedToId}
-                  options={SALES_OPTIONS}
+                  value={lead.assignedToId ?? UNASSIGNED}
+                  options={inlineAssignee}
                   ariaLabel="Assignee"
-                  onValueChange={(v) => updateLead(lead.id, { assignedToId: v }, `Reassigned to ${staffName(v)}`)}
+                  onValueChange={(v) => run(() => assignLead(lead.id, v === UNASSIGNED ? "" : v))}
                 />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Activity</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ActivityTimeline entity="lead" id={lead.id} label={name} seedDate={lead.createdAt} />
-            </CardContent>
-          </Card>
-        </div>
+              ) : (
+                <span className="text-sm">{assigneeName}</span>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </div>
+
+      {canEdit ? (
+        <EditLeadDialog lead={lead} assignees={assignees} open={editOpen} onOpenChange={setEditOpen} />
+      ) : null}
     </>
   )
 }

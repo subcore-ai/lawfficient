@@ -1,218 +1,73 @@
-"use client"
+import { DashboardView } from "@/components/dashboard-view"
+import { LEADS, STAFF } from "@/data"
+import { getCurrentUser } from "@/lib/auth/session"
+import type { AssigneeOption } from "@/lib/leads/queries"
+import { isSupabaseConfigured } from "@/lib/supabase/env"
+import { createClient } from "@/lib/supabase/server"
 
-import type * as React from "react"
-import Link from "next/link"
-import {
-  CalendarClock,
-  CircleDollarSign,
-  Download,
-  FileText,
-  FolderKanban,
-  MessageSquare,
-  Users,
-} from "lucide-react"
+export const metadata = { title: "Dashboard" }
 
-import { Avatar, AvatarFallback } from "@workspace/ui/components/avatar"
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@workspace/ui/components/card"
+const NIL_UUID = "00000000-0000-0000-0000-000000000000"
 
-import { CaseMixChart, ConsultationsChart, ConversionFunnelChart, RevenueChart } from "@/components/charts"
-import { KpiCard } from "@/components/kpi-card"
-import { NewLeadDialog } from "@/components/leads/new-lead-dialog"
-import { PageHeader } from "@/components/page-header"
-import { StatusPill } from "@/components/status-pill"
-import { ToastButton } from "@/components/toast-button"
-import {
-  ACTIVITY,
-  CASE_TYPE_MIX,
-  CONSULTATIONS_BY_MONTH,
-  CONVERSION_FUNNEL,
-  DEADLINES,
-  REVENUE_BY_MONTH,
-  staffById,
-  staffName,
-} from "@/data"
-import { useStore } from "@/data/store"
-import type { Activity, Kpi } from "@/data/types"
-import { formatCurrency, formatDateTime } from "@/lib/format"
-import { consultationStatusBadge, deadlineBadge } from "@/lib/status"
-
-const ACTIVITY_ICON: Record<Activity["kind"], React.ComponentType<{ className?: string }>> = {
-  lead: Users,
-  consultation: CalendarClock,
-  payment: CircleDollarSign,
-  case: FolderKanban,
-  document: FileText,
-  message: MessageSquare,
+type Loaded = {
+  openLeads: number
+  eaOut: number
+  assignees: AssigneeOption[]
+  canCreateLead: boolean
 }
 
-export default function DashboardPage() {
-  const { leads, consultations, clients, cases, invoices } = useStore()
+const MOCK_TERMINAL = ["retained", "lost", "not_qualified"]
+function mockLeadCounts() {
+  return {
+    openLeads: LEADS.filter((l) => !l.archived && !MOCK_TERMINAL.includes(l.status)).length,
+    eaOut: LEADS.filter((l) => !l.archived && l.status === "ea_sent").length,
+  }
+}
 
-  const upcoming = consultations
-    .filter((c) => ["scheduled", "paid", "rescheduled"].includes(c.status))
-    .slice()
-    .sort((a, b) => a.startAt.localeCompare(b.startAt))
+// The two lead KPIs come from real counts; the rest of the dashboard stays on the mock store.
+async function load(): Promise<Loaded> {
+  if (!isSupabaseConfigured()) {
+    return {
+      ...mockLeadCounts(),
+      assignees: STAFF.filter((u) => u.role === "sales").map((u) => ({ id: u.id, name: u.name })),
+      canCreateLead: false,
+    }
+  }
 
-  const overdue = invoices.filter((i) => i.status === "overdue").reduce((sum, i) => sum + i.remaining, 0)
-  const redFlags = cases.filter((c) => c.redFlag !== "none").length
-  const openLeads = leads.filter((l) => !["retained", "lost", "not_qualified"].includes(l.status)).length
-  const eaOut = leads.filter((l) => l.status === "ea_sent").length
+  const me = await getCurrentUser()
+  const supabase = await createClient()
+  const canCreateLead = me?.permissions?.includes("leads.edit") ?? false
 
-  const kpis: Kpi[] = [
-    { label: "Leads in pipeline", value: String(openLeads), delta: 12.5, hint: "active leads" },
-    { label: "Upcoming consultations", value: String(upcoming.length), delta: 20, hint: "scheduled & paid" },
-    { label: "Pending retainers (EA out)", value: String(eaOut), delta: -8.3, hint: "awaiting signature" },
-    { label: "Retained clients", value: String(clients.length), delta: 9.1, hint: "active engagements" },
-    { label: "Overdue balance", value: formatCurrency(overdue), delta: 4.2, hint: "across clients" },
-    { label: "Red-flag cases", value: String(redFlags), delta: 0, hint: "need attention" },
-  ]
+  const assigneesRes = await supabase.from("profiles").select("id, name").eq("status", "active").order("name")
+  if (assigneesRes.error) throw assigneesRes.error
+  const assignees = (assigneesRes.data ?? []).map((p) => ({ id: p.id, name: p.name }))
 
-  const deadlines = DEADLINES.slice().sort((a, b) => a.dueInDays - b.dueInDays).slice(0, 5)
+  // The lead KPIs need leads.view. For roles without it (QA lead, creative writer, file clerk)
+  // keep them on the mock counts like the rest of the dashboard, rather than a misleading 0.
+  if (!(me?.permissions?.includes("leads.view") ?? false)) {
+    return { ...mockLeadCounts(), assignees, canCreateLead }
+  }
 
+  const statusesRes = await supabase.from("lead_statuses").select("id, key, is_terminal")
+  if (statusesRes.error) throw statusesRes.error
+  const statuses = statusesRes.data ?? []
+  const openIds = statuses.filter((s) => !s.is_terminal).map((s) => s.id)
+  const eaId = statuses.find((s) => s.key === "ea_sent")?.id ?? NIL_UUID
+
+  // Count in the DB (head:true) so the KPIs stay correct past the 1000-row select cap.
+  const [openRes, eaRes] = await Promise.all([
+    supabase.from("leads").select("id", { count: "exact", head: true }).eq("archived", false).in("status_id", openIds),
+    supabase.from("leads").select("id", { count: "exact", head: true }).eq("archived", false).eq("status_id", eaId),
+  ])
+  if (openRes.error) throw openRes.error
+  if (eaRes.error) throw eaRes.error
+
+  return { openLeads: openRes.count ?? 0, eaOut: eaRes.count ?? 0, assignees, canCreateLead }
+}
+
+export default async function DashboardPage() {
+  const { openLeads, eaOut, assignees, canCreateLead } = await load()
   return (
-    <>
-      <PageHeader title="Dashboard" description="Firm-wide snapshot of leads, cases, and revenue.">
-        <ToastButton variant="outline" size="sm" message="Dashboard exported" description="Downloaded as PDF.">
-          <Download className="size-4" /> Export
-        </ToastButton>
-        <NewLeadDialog />
-      </PageHeader>
-
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
-        {kpis.map((kpi) => (
-          <KpiCard key={kpi.label} kpi={kpi} />
-        ))}
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Revenue trend</CardTitle>
-            <CardDescription>Monthly collected revenue, last 6 months</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <RevenueChart data={REVENUE_BY_MONTH} />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Consultation trends</CardTitle>
-            <CardDescription>Booked vs. paid vs. qualified</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ConsultationsChart data={CONSULTATIONS_BY_MONTH} />
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Lead conversion funnel</CardTitle>
-            <CardDescription>From first contact to retained client (last 90 days)</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ConversionFunnelChart data={CONVERSION_FUNNEL} />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Case type mix</CardTitle>
-            <CardDescription>Active cases by practice area</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <CaseMixChart data={CASE_TYPE_MIX} />
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle>Upcoming consultations</CardTitle>
-            <CardAction>
-              <Link href="/consultations" className="text-muted-foreground hover:text-foreground text-xs font-medium">
-                View all
-              </Link>
-            </CardAction>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3">
-            {upcoming.length === 0 ? (
-              <p className="text-muted-foreground text-sm">No upcoming consultations.</p>
-            ) : (
-              upcoming.slice(0, 5).map((c) => (
-                <div key={c.id} className="flex items-center gap-3">
-                  <Avatar className="size-8 rounded-md">
-                    <AvatarFallback className="rounded-md text-xs">
-                      {staffById(c.attorneyId)?.initials ?? "?"}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{c.leadName}</p>
-                    <p className="text-muted-foreground truncate text-xs">
-                      {staffName(c.attorneyId)} · {formatDateTime(c.startAt)}
-                    </p>
-                  </div>
-                  <StatusPill {...consultationStatusBadge(c.status)} />
-                </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Needs attention</CardTitle>
-            <CardAction>
-              <Link href="/cases/deadlines" className="text-muted-foreground hover:text-foreground text-xs font-medium">
-                View all
-              </Link>
-            </CardAction>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3">
-            {deadlines.map((d) => (
-              <div key={d.id} className="flex items-center gap-3">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">
-                    {d.kind} · {d.clientName}
-                  </p>
-                  <p className="text-muted-foreground truncate text-xs">{staffName(d.laId)}</p>
-                </div>
-                <StatusPill {...deadlineBadge(d)} />
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent activity</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3.5">
-            {ACTIVITY.map((a) => {
-              const Icon = ACTIVITY_ICON[a.kind]
-              return (
-                <div key={a.id} className="flex gap-3">
-                  <div className="bg-muted text-muted-foreground flex size-7 shrink-0 items-center justify-center rounded-full">
-                    <Icon className="size-3.5" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm leading-snug">{a.text}</p>
-                    <p className="text-muted-foreground text-xs">{a.at}</p>
-                  </div>
-                </div>
-              )
-            })}
-          </CardContent>
-        </Card>
-      </div>
-    </>
+    <DashboardView openLeads={openLeads} eaOut={eaOut} assignees={assignees} canCreateLead={canCreateLead} />
   )
 }

@@ -635,72 +635,98 @@ export type Database = {
           },
         ]
       }
+      lead_statuses: {
+        Row: {
+          created_at: string
+          firm_id: string
+          id: string
+          is_system: boolean
+          is_terminal: boolean
+          key: string
+          name: string
+          position: number
+          tone: string
+        }
+        Insert: {
+          created_at?: string
+          firm_id?: string
+          id?: string
+          is_system?: boolean
+          is_terminal?: boolean
+          key: string
+          name: string
+          position?: number
+          tone?: string
+        }
+        Update: {
+          created_at?: string
+          firm_id?: string
+          id?: string
+          is_system?: boolean
+          is_terminal?: boolean
+          key?: string
+          name?: string
+          position?: number
+          tone?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_statuses_firm_id_fkey"
+            columns: ["firm_id"]
+            isOneToOne: false
+            referencedRelation: "firms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leads: {
         Row: {
           archived: boolean
           assigned_to_id: string | null
-          case_type: string | null
-          city: string
-          country_of_origin: string
           created_at: string
+          data: Json
           email: string
           firm_id: string
           first_name: string
-          hierarchy: string | null
           id: string
           last_activity: string
           last_name: string
           notes: string | null
           phone: string
-          preferred_language: string
-          qualification: Database["public"]["Enums"]["qualification"]
           source: string
-          state: string
-          status: Database["public"]["Enums"]["lead_status"]
+          status_id: string
         }
         Insert: {
           archived?: boolean
           assigned_to_id?: string | null
-          case_type?: string | null
-          city?: string
-          country_of_origin?: string
           created_at?: string
+          data?: Json
           email?: string
           firm_id?: string
           first_name: string
-          hierarchy?: string | null
           id?: string
           last_activity?: string
           last_name: string
           notes?: string | null
           phone?: string
-          preferred_language?: string
-          qualification?: Database["public"]["Enums"]["qualification"]
           source: string
-          state?: string
-          status?: Database["public"]["Enums"]["lead_status"]
+          status_id: string
         }
         Update: {
           archived?: boolean
           assigned_to_id?: string | null
-          case_type?: string | null
-          city?: string
-          country_of_origin?: string
           created_at?: string
+          data?: Json
           email?: string
           firm_id?: string
           first_name?: string
-          hierarchy?: string | null
           id?: string
           last_activity?: string
           last_name?: string
           notes?: string | null
           phone?: string
-          preferred_language?: string
-          qualification?: Database["public"]["Enums"]["qualification"]
           source?: string
-          state?: string
-          status?: Database["public"]["Enums"]["lead_status"]
+          status_id?: string
         }
         Relationships: [
           {
@@ -716,6 +742,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "firms"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_status_firm_fk"
+            columns: ["status_id", "firm_id"]
+            isOneToOne: false
+            referencedRelation: "lead_statuses"
+            referencedColumns: ["id", "firm_id"]
           },
         ]
       }
@@ -958,6 +991,7 @@ export type Database = {
         Returns: boolean
       }
       invite_token_for: { Args: { p_user_id: string }; Returns: string }
+      seed_lead_statuses: { Args: { p_firm_id: string }; Returns: undefined }
       seed_system_roles: { Args: { p_firm_id: string }; Returns: undefined }
       set_role_permissions: {
         Args: {
@@ -1023,16 +1057,6 @@ export type Database = {
       deadline_status: "open" | "responded" | "overdue"
       doc_status: "pending" | "submitted" | "verified"
       invoice_status: "draft" | "sent" | "partial" | "paid" | "overdue" | "void"
-      lead_status:
-        | "new"
-        | "contacted"
-        | "consult_scheduled"
-        | "scheduled_paid"
-        | "qualified_followup"
-        | "ea_sent"
-        | "retained"
-        | "not_qualified"
-        | "lost"
       payment_status: "current" | "overdue" | "paid" | "payment_arrangement"
       payment_type:
         | "down_payment"
@@ -1041,7 +1065,6 @@ export type Database = {
         | "partial_down"
         | "consultation"
         | "filing_fee"
-      qualification: "qualified" | "not_qualified" | "pending"
       red_flag: "none" | "red_flag_client" | "red_flag_packet"
       staff_role:
         | "admin"
@@ -1239,17 +1262,6 @@ export const Constants = {
       deadline_status: ["open", "responded", "overdue"],
       doc_status: ["pending", "submitted", "verified"],
       invoice_status: ["draft", "sent", "partial", "paid", "overdue", "void"],
-      lead_status: [
-        "new",
-        "contacted",
-        "consult_scheduled",
-        "scheduled_paid",
-        "qualified_followup",
-        "ea_sent",
-        "retained",
-        "not_qualified",
-        "lost",
-      ],
       payment_status: ["current", "overdue", "paid", "payment_arrangement"],
       payment_type: [
         "down_payment",
@@ -1259,7 +1271,6 @@ export const Constants = {
         "consultation",
         "filing_fee",
       ],
-      qualification: ["qualified", "not_qualified", "pending"],
       red_flag: ["none", "red_flag_client", "red_flag_packet"],
       staff_role: [
         "admin",
