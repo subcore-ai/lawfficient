@@ -20,53 +20,82 @@ import {
   TableHeader,
   TableRow,
 } from "@workspace/ui/components/table"
+import { toast } from "@workspace/ui/components/sonner"
 import { cn } from "@workspace/ui/lib/utils"
 
-import { EntityRowActions } from "@/components/entity-row-actions"
+import { assignLead, setLeadStatus } from "@/app/(app)/leads/actions"
 import { InlineSelect } from "@/components/inline-select"
-import { EditLeadDialog } from "@/components/leads/edit-lead-dialog"
+import { LeadRowActions } from "@/components/leads/lead-row-actions"
 import { ShowArchivedToggle } from "@/components/show-archived-toggle"
 import { StatusPill } from "@/components/status-pill"
-import { LEAD_STATUS_LABELS, PIPELINE, STAFF, staffName } from "@/data"
-import { useStore } from "@/data/store"
-import type { LeadStatus } from "@/data/types"
+import type { AssigneeOption, LeadStatusView, LeadView } from "@/lib/leads/queries"
 import { formatDate } from "@/lib/format"
 import { qualificationBadge } from "@/lib/status"
 
-const STATUS_OPTIONS = Object.entries(LEAD_STATUS_LABELS).map(([value, label]) => ({ value, label }))
-const SALES_OPTIONS = STAFF.filter((u) => u.role === "sales").map((u) => ({ value: u.id, label: u.name }))
-const SOURCES = ["WhatsApp", "Facebook", "Instagram", "Call Rails", "Website", "Referral"]
+const ALL = "all"
+const UNASSIGNED = "none"
 
-export function LeadsTable() {
-  const { leads, updateLead } = useStore()
+export function LeadsTable({
+  leads,
+  statuses,
+  assignees,
+  canEdit,
+}: {
+  leads: LeadView[]
+  statuses: LeadStatusView[]
+  assignees: AssigneeOption[]
+  canEdit: boolean
+}) {
   const [query, setQuery] = React.useState("")
-  const [status, setStatus] = React.useState("all")
-  const [source, setSource] = React.useState("all")
+  const [status, setStatus] = React.useState(ALL)
+  const [source, setSource] = React.useState(ALL)
   const [showArchived, setShowArchived] = React.useState(false)
+  const [, startTransition] = React.useTransition()
+
+  const statusOptions = statuses.map((s) => ({ value: s.id, label: s.name }))
+  const assigneeName = new Map(assignees.map((a) => [a.id, a.name]))
+  const inlineAssignee = [
+    { value: UNASSIGNED, label: "Unassigned" },
+    ...assignees.map((a) => ({ value: a.id, label: a.name })),
+  ]
+  const sources = Array.from(new Set(leads.map((l) => l.source))).sort()
 
   const archivedCount = leads.filter((l) => l.archived).length
-  const counts = PIPELINE.map((stage) => ({
-    ...stage,
-    count: leads.filter((l) => !l.archived && l.status === stage.key).length,
+  const counts = statuses.map((s) => ({
+    ...s,
+    count: leads.filter((l) => !l.archived && l.status.id === s.id).length,
   }))
 
   const filtered = leads.filter((l) => {
     if (!showArchived && l.archived) return false
-    const haystack = `${l.firstName} ${l.lastName} ${l.email} ${l.phone} ${l.city}`.toLowerCase()
+    const haystack = `${l.firstName} ${l.lastName} ${l.email} ${l.phone} ${l.data.city ?? ""}`.toLowerCase()
     return (
       (query === "" || haystack.includes(query.toLowerCase())) &&
-      (status === "all" || l.status === status) &&
-      (source === "all" || l.source === source)
+      (status === ALL || l.status.id === status) &&
+      (source === ALL || l.source === source)
     )
   })
 
+  function onStatusChange(id: string, statusId: string) {
+    startTransition(async () => {
+      const result = await setLeadStatus(id, statusId)
+      if ("error" in result) toast.error(result.error)
+    })
+  }
+  function onAssign(id: string, value: string) {
+    startTransition(async () => {
+      const result = await assignLead(id, value === UNASSIGNED ? "" : value)
+      if ("error" in result) toast.error(result.error)
+    })
+  }
+
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
         {counts.map((stage) => (
-          <div key={stage.key} className="bg-card rounded-lg px-3 py-2.5 ring-1 ring-foreground/10">
+          <div key={stage.id} className="bg-card rounded-lg px-3 py-2.5 ring-1 ring-foreground/10">
             <div className="text-2xl font-semibold tabular-nums">{stage.count}</div>
-            <div className="text-muted-foreground mt-0.5 text-xs leading-tight">{stage.label}</div>
+            <div className="text-muted-foreground mt-0.5 text-xs leading-tight">{stage.name}</div>
           </div>
         ))}
       </div>
@@ -84,15 +113,15 @@ export function LeadsTable() {
         <div className="flex items-center gap-2">
           <Select
             value={status}
-            onValueChange={(v) => setStatus(v ?? "all")}
-            items={[{ value: "all", label: "All statuses" }, ...STATUS_OPTIONS]}
+            onValueChange={(v) => setStatus(v ?? ALL)}
+            items={[{ value: ALL, label: "All statuses" }, ...statusOptions]}
           >
             <SelectTrigger className="h-8" aria-label="Filter by status">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All statuses</SelectItem>
-              {STATUS_OPTIONS.map((o) => (
+              <SelectItem value={ALL}>All statuses</SelectItem>
+              {statusOptions.map((o) => (
                 <SelectItem key={o.value} value={o.value}>
                   {o.label}
                 </SelectItem>
@@ -101,15 +130,15 @@ export function LeadsTable() {
           </Select>
           <Select
             value={source}
-            onValueChange={(v) => setSource(v ?? "all")}
-            items={[{ value: "all", label: "All sources" }, ...SOURCES.map((s) => ({ value: s, label: s }))]}
+            onValueChange={(v) => setSource(v ?? ALL)}
+            items={[{ value: ALL, label: "All sources" }, ...sources.map((s) => ({ value: s, label: s }))]}
           >
             <SelectTrigger className="h-8" aria-label="Filter by source">
               <SelectValue placeholder="Source" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All sources</SelectItem>
-              {SOURCES.map((s) => (
+              <SelectItem value={ALL}>All sources</SelectItem>
+              {sources.map((s) => (
                 <SelectItem key={s} value={s}>
                   {s}
                 </SelectItem>
@@ -150,36 +179,39 @@ export function LeadsTable() {
                 <TableCell className="text-muted-foreground hidden md:table-cell">{l.source}</TableCell>
                 <TableCell>
                   <InlineSelect
-                    value={l.status}
-                    options={STATUS_OPTIONS}
+                    value={l.status.id}
+                    options={statusOptions}
                     ariaLabel="Status"
-                    onValueChange={(v) =>
-                      updateLead(l.id, { status: v as LeadStatus }, `Status → ${LEAD_STATUS_LABELS[v as LeadStatus]}`)
-                    }
+                    disabled={!canEdit}
+                    onValueChange={(v) => onStatusChange(l.id, v)}
                   />
                 </TableCell>
                 <TableCell className="hidden xl:table-cell">
-                  <StatusPill {...qualificationBadge(l.qualification)} />
+                  {l.data.qualification ? (
+                    <StatusPill {...qualificationBadge(l.data.qualification)} />
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
                 </TableCell>
                 <TableCell className="hidden lg:table-cell">
-                  <InlineSelect
-                    value={l.assignedToId}
-                    options={SALES_OPTIONS}
-                    ariaLabel="Assignee"
-                    onValueChange={(v) => updateLead(l.id, { assignedToId: v }, `Reassigned to ${staffName(v)}`)}
-                  />
+                  {canEdit ? (
+                    <InlineSelect
+                      value={l.assignedToId ?? UNASSIGNED}
+                      options={inlineAssignee}
+                      ariaLabel="Assignee"
+                      onValueChange={(v) => onAssign(l.id, v)}
+                    />
+                  ) : (
+                    <span className="text-sm">
+                      {l.assignedToId ? (assigneeName.get(l.assignedToId) ?? "—") : "Unassigned"}
+                    </span>
+                  )}
                 </TableCell>
                 <TableCell className="text-muted-foreground hidden text-sm sm:table-cell">
                   {formatDate(l.createdAt)}
                 </TableCell>
                 <TableCell>
-                  <EntityRowActions
-                    entity="lead"
-                    id={l.id}
-                    label={`${l.firstName} ${l.lastName}`}
-                    archived={l.archived}
-                    editDialog={(p) => <EditLeadDialog lead={l} {...p} />}
-                  />
+                  <LeadRowActions lead={l} assignees={assignees} canEdit={canEdit} />
                 </TableCell>
               </TableRow>
             ))}

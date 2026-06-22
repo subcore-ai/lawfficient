@@ -19,6 +19,9 @@ export type LeadStatusView = {
   position: number
 }
 
+// A staff member a lead can be assigned to (resolved from profiles).
+export type AssigneeOption = { id: string; name: string }
+
 export type LeadView = {
   id: string
   firstName: string
