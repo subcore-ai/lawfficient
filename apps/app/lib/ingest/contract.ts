@@ -42,7 +42,14 @@ function str(value: unknown): string {
   if (typeof value === "string") return value.trim()
   // Coerce JSON numbers (Zapier/CRM maps often send a numeric externalId or zip) so they aren't
   // silently dropped — losing externalId would break idempotency and re-create leads on retry.
-  if (typeof value === "number" && Number.isFinite(value)) return String(value)
+  if (typeof value === "number" && Number.isFinite(value)) {
+    // …but an integer beyond 2^53 ALREADY lost precision at JSON.parse (JS has no 64-bit int), so
+    // coercing it would risk a WRONG idempotency merge of two distinct deliveries. Refuse it — the
+    // caller then treats externalId as absent (insert, never a bad merge). Large numeric IDs
+    // should be sent as JSON strings.
+    if (Number.isInteger(value) && !Number.isSafeInteger(value)) return ""
+    return String(value)
+  }
   return ""
 }
 

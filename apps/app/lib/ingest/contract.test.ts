@@ -45,6 +45,11 @@ describe("parseCanonicalPayload", () => {
     expect(parsed.data.zip).toBe("90210")
   })
 
+  test("refuses an unsafe-integer externalId (>2^53) instead of coercing a precision-lost value", () => {
+    const parsed = parseCanonicalPayload({ firstName: "A", lastName: "B", externalId: Number.MAX_SAFE_INTEGER + 2 })
+    expect(parsed.externalId).toBeNull()
+  })
+
   test("normalizes constrained-field casing to the canonical vocabulary (hrc → HRC)", () => {
     const parsed = parseCanonicalPayload({ firstName: "A", lastName: "B", hierarchy: "hrc", qualification: "QUALIFIED" })
     expect(parsed.data.hierarchy).toBe("HRC")
