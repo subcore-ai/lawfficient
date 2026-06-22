@@ -991,7 +991,6 @@ export type Database = {
         Returns: boolean
       }
       invite_token_for: { Args: { p_user_id: string }; Returns: string }
-      lead_status_in_use: { Args: { p_status_id: string }; Returns: boolean }
       seed_lead_statuses: { Args: { p_firm_id: string }; Returns: undefined }
       seed_system_roles: { Args: { p_firm_id: string }; Returns: undefined }
       set_role_permissions: {

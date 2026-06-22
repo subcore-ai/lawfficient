@@ -7,6 +7,8 @@ import { createClient } from "@/lib/supabase/server"
 
 export const metadata = { title: "Dashboard" }
 
+const NIL_UUID = "00000000-0000-0000-0000-000000000000"
+
 type Loaded = {
   openLeads: number
   eaOut: number
@@ -28,23 +30,28 @@ async function load(): Promise<Loaded> {
 
   const me = await getCurrentUser()
   const supabase = await createClient()
-  const [statusesRes, leadsRes, assigneesRes] = await Promise.all([
+  const [statusesRes, assigneesRes] = await Promise.all([
     supabase.from("lead_statuses").select("id, key, is_terminal"),
-    supabase.from("leads").select("status_id, archived"),
     supabase.from("profiles").select("id, name").eq("status", "active").order("name"),
   ])
   if (statusesRes.error) throw statusesRes.error
-  if (leadsRes.error) throw leadsRes.error
   if (assigneesRes.error) throw assigneesRes.error
 
   const statuses = statusesRes.data ?? []
-  const terminal = new Set(statuses.filter((s) => s.is_terminal).map((s) => s.id))
-  const eaId = statuses.find((s) => s.key === "ea_sent")?.id ?? null
-  const leads = leadsRes.data ?? []
+  const openIds = statuses.filter((s) => !s.is_terminal).map((s) => s.id)
+  const eaId = statuses.find((s) => s.key === "ea_sent")?.id ?? NIL_UUID
+
+  // Count in the DB (head:true) so the KPIs stay correct past the 1000-row select cap.
+  const [openRes, eaRes] = await Promise.all([
+    supabase.from("leads").select("id", { count: "exact", head: true }).eq("archived", false).in("status_id", openIds),
+    supabase.from("leads").select("id", { count: "exact", head: true }).eq("archived", false).eq("status_id", eaId),
+  ])
+  if (openRes.error) throw openRes.error
+  if (eaRes.error) throw eaRes.error
 
   return {
-    openLeads: leads.filter((l) => !l.archived && !terminal.has(l.status_id)).length,
-    eaOut: leads.filter((l) => !l.archived && l.status_id === eaId).length,
+    openLeads: openRes.count ?? 0,
+    eaOut: eaRes.count ?? 0,
     assignees: (assigneesRes.data ?? []).map((p) => ({ id: p.id, name: p.name })),
     canCreateLead: me?.permissions?.includes("leads.edit") ?? false,
   }

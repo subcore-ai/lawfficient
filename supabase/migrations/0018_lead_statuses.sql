@@ -7,8 +7,8 @@
 create table public.lead_statuses (
   id uuid primary key default gen_random_uuid(),
   firm_id uuid not null default public.current_firm_id() references public.firms(id) on delete cascade,
-  key text not null,
-  name text not null,
+  key text not null check (key = btrim(key) and length(key) > 0),
+  name text not null check (name = btrim(name) and length(name) > 0),
   position int not null default 0,
   tone text not null default 'neutral'
     check (tone in ('neutral', 'info', 'success', 'warning', 'danger', 'purple')),

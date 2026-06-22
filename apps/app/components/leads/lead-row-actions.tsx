@@ -27,25 +27,29 @@ export function LeadRowActions({
   if (!canEdit) return null
   const label = `${lead.firstName} ${lead.lastName}`
 
+  // Toast only after the server action confirms — a failed archive must not look successful.
   function archive(next: boolean) {
     startTransition(async () => {
       const result = await setLeadArchived(lead.id, next, label)
-      if ("error" in result) toast.error(result.error)
-    })
-  }
-
-  function onArchive() {
-    const next = !lead.archived
-    archive(next)
-    toast.success(next ? "Archived" : "Restored", {
-      description: label,
-      action: next ? { label: "Undo", onClick: () => archive(false) } : undefined,
+      if ("error" in result) {
+        toast.error(result.error)
+        return
+      }
+      toast.success(next ? "Archived" : "Restored", {
+        description: label,
+        action: next ? { label: "Undo", onClick: () => archive(false) } : undefined,
+      })
     })
   }
 
   return (
     <>
-      <RowActions canEdit archived={lead.archived} onEdit={() => setEditOpen(true)} onArchive={onArchive} />
+      <RowActions
+        canEdit
+        archived={lead.archived}
+        onEdit={() => setEditOpen(true)}
+        onArchive={() => archive(!lead.archived)}
+      />
       <EditLeadDialog lead={lead} assignees={assignees} open={editOpen} onOpenChange={setEditOpen} />
     </>
   )

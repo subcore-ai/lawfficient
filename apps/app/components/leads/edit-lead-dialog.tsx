@@ -57,7 +57,9 @@ export function EditLeadDialog({
             </DialogDescription>
           </DialogHeader>
           <div className="max-h-[60vh] overflow-y-auto px-1 py-5">
-            <LeadFormFields lead={lead} assignees={assignees} />
+            {/* Re-key on the lead's version so reopening after an edit/inline change shows
+                fresh server values, not the state seeded at first mount. */}
+            <LeadFormFields key={`${lead.id}-${lead.lastActivity}`} lead={lead} assignees={assignees} />
           </div>
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>

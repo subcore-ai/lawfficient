@@ -56,8 +56,14 @@ export function LeadDetail({
 
   function onArchive() {
     const next = !lead.archived
-    run(() => setLeadArchived(lead.id, next, name))
-    toast.success(next ? "Archived" : "Restored", { description: name })
+    startTransition(async () => {
+      const result = await setLeadArchived(lead.id, next, name)
+      if ("error" in result) {
+        toast.error(result.error)
+        return
+      }
+      toast.success(next ? "Archived" : "Restored", { description: name })
+    })
   }
 
   return (

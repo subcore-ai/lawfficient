@@ -32,8 +32,9 @@ import type { AssigneeOption, LeadStatusView, LeadView } from "@/lib/leads/queri
 import { formatDate } from "@/lib/format"
 import { qualificationBadge } from "@/lib/status"
 
-const ALL = "all"
-const UNASSIGNED = "none"
+// Distinctive sentinels so a free-text lead source (or assignee) can't collide with them.
+const ALL = "__all__"
+const UNASSIGNED = "__none__"
 
 export function LeadsTable({
   leads,

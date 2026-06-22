@@ -60,17 +60,6 @@ create index leads_source_idx on public.leads (firm_id, source);
 -- 9) Guard the firm-defined statuses (now that leads.status_id exists). Mirrors
 --    guard_system_role: forge-block on insert, immutability on update, and block
 --    deleting a system status or one still in use.
-create or replace function public.lead_status_in_use(p_status_id uuid)
-returns boolean
-language sql
-stable
-security definer
-set search_path = ''
-as $$
-  select exists (select 1 from public.leads where status_id = p_status_id);
-$$;
-revoke execute on function public.lead_status_in_use(uuid) from public, anon, authenticated;
-
 create or replace function public.guard_lead_status()
 returns trigger
 language plpgsql
@@ -92,9 +81,12 @@ begin
     if old.is_system then
       raise exception 'system lead statuses cannot be deleted';
     end if;
-    -- lead_status_in_use bypasses RLS (DEFINER) so a settings.manage admin without
-    -- leads.view still gets an accurate in-use check.
-    if public.lead_status_in_use(old.id) then
+    -- The composite FK (leads_status_firm_fk, on delete restrict) is the hard backstop; this
+    -- inline check is firm-scoped so it uses the (firm_id, status_id) index, and runs as the
+    -- caller (INVOKER) just to raise a friendlier error than the raw FK violation.
+    if exists (
+      select 1 from public.leads where status_id = old.id and firm_id = old.firm_id
+    ) then
       raise exception 'cannot delete a lead status that still has leads';
     end if;
     return old;
