@@ -70,6 +70,22 @@ function asObject(value: Json | null | undefined): Record<string, Json> {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, Json>) : {}
 }
 
+type CorePatch = { first_name?: string; last_name?: string; email?: string; phone?: string; notes?: string }
+
+// On an idempotent re-delivery, overwrite ONLY the core columns the payload actually carries — an
+// omitted/empty field must not blank an existing value (the data jsonb is merged for the same
+// reason). first/last name are validated as required upstream, so they're always present; email,
+// phone, and notes are optional. Pure + exported for unit testing.
+export function coreUpdatePatch(core: UpsertArgs["core"]): CorePatch {
+  const patch: CorePatch = {}
+  if (core.firstName) patch.first_name = core.firstName
+  if (core.lastName) patch.last_name = core.lastName
+  if (core.email) patch.email = core.email
+  if (core.phone) patch.phone = core.phone
+  if (core.notes) patch.notes = core.notes
+  return patch
+}
+
 // Idempotent upsert keyed on (firm, source, externalId). Re-delivery updates the core fields +
 // merges data (new over old — never drops a field a human or prior event set) and bumps
 // last_activity, but never touches status_id / assigned_to_id. Without an externalId, always insert.
@@ -95,12 +111,14 @@ export async function upsertLead(admin: Admin, args: UpsertArgs): Promise<Upsert
   }
 
   async function update(id: string, existingData: Json) {
-    // .select().single() turns a 0-row / RLS-blocked / failed update into a real error instead
-    // of a silent success (which would mislead the caller + the event log).
+    // Patch only the core columns the payload carries (coreUpdatePatch) so a re-delivery that omits
+    // a field never blanks it; data is merged, not replaced, for the same reason.
+    // .select().single() turns a 0-row / RLS-blocked / failed update into a real error instead of a
+    // silent success (which would mislead the caller + the event log).
     const { error } = await admin
       .from("leads")
       .update({
-        ...core,
+        ...coreUpdatePatch(args.core),
         data: { ...asObject(existingData), ...args.data },
         last_activity: new Date().toISOString(),
       })
