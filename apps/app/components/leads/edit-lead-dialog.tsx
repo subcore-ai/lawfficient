@@ -31,6 +31,16 @@ export function EditLeadDialog({
   onOpenChange: (open: boolean) => void
 }) {
   const [pending, startTransition] = React.useTransition()
+  // Remount the fields on each open (like NewLeadDialog) so Cancel discards unsaved edits and
+  // reopening reflects the latest server values — Base UI keeps the closed subtree mounted.
+  // Adjust state during render on the open transition (React's documented pattern) rather than
+  // in an effect, since the parent opens this controlled dialog programmatically.
+  const [seq, setSeq] = React.useState(0)
+  const [wasOpen, setWasOpen] = React.useState(open)
+  if (open !== wasOpen) {
+    setWasOpen(open)
+    if (open) setSeq((s) => s + 1)
+  }
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -57,9 +67,7 @@ export function EditLeadDialog({
             </DialogDescription>
           </DialogHeader>
           <div className="max-h-[60vh] overflow-y-auto px-1 py-5">
-            {/* Re-key on the lead's version so reopening after an edit/inline change shows
-                fresh server values, not the state seeded at first mount. */}
-            <LeadFormFields key={`${lead.id}-${lead.lastActivity}`} lead={lead} assignees={assignees} />
+            <LeadFormFields key={seq} lead={lead} assignees={assignees} />
           </div>
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>

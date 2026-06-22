@@ -16,13 +16,19 @@ type Loaded = {
   canCreateLead: boolean
 }
 
+const MOCK_TERMINAL = ["retained", "lost", "not_qualified"]
+function mockLeadCounts() {
+  return {
+    openLeads: LEADS.filter((l) => !l.archived && !MOCK_TERMINAL.includes(l.status)).length,
+    eaOut: LEADS.filter((l) => !l.archived && l.status === "ea_sent").length,
+  }
+}
+
 // The two lead KPIs come from real counts; the rest of the dashboard stays on the mock store.
 async function load(): Promise<Loaded> {
   if (!isSupabaseConfigured()) {
-    const terminal = ["retained", "lost", "not_qualified"]
     return {
-      openLeads: LEADS.filter((l) => !l.archived && !terminal.includes(l.status)).length,
-      eaOut: LEADS.filter((l) => !l.archived && l.status === "ea_sent").length,
+      ...mockLeadCounts(),
       assignees: STAFF.filter((u) => u.role === "sales").map((u) => ({ id: u.id, name: u.name })),
       canCreateLead: false,
     }
@@ -30,13 +36,20 @@ async function load(): Promise<Loaded> {
 
   const me = await getCurrentUser()
   const supabase = await createClient()
-  const [statusesRes, assigneesRes] = await Promise.all([
-    supabase.from("lead_statuses").select("id, key, is_terminal"),
-    supabase.from("profiles").select("id, name").eq("status", "active").order("name"),
-  ])
-  if (statusesRes.error) throw statusesRes.error
-  if (assigneesRes.error) throw assigneesRes.error
+  const canCreateLead = me?.permissions?.includes("leads.edit") ?? false
 
+  const assigneesRes = await supabase.from("profiles").select("id, name").eq("status", "active").order("name")
+  if (assigneesRes.error) throw assigneesRes.error
+  const assignees = (assigneesRes.data ?? []).map((p) => ({ id: p.id, name: p.name }))
+
+  // The lead KPIs need leads.view. For roles without it (QA lead, creative writer, file clerk)
+  // keep them on the mock counts like the rest of the dashboard, rather than a misleading 0.
+  if (!(me?.permissions?.includes("leads.view") ?? false)) {
+    return { ...mockLeadCounts(), assignees, canCreateLead }
+  }
+
+  const statusesRes = await supabase.from("lead_statuses").select("id, key, is_terminal")
+  if (statusesRes.error) throw statusesRes.error
   const statuses = statusesRes.data ?? []
   const openIds = statuses.filter((s) => !s.is_terminal).map((s) => s.id)
   const eaId = statuses.find((s) => s.key === "ea_sent")?.id ?? NIL_UUID
@@ -49,12 +62,7 @@ async function load(): Promise<Loaded> {
   if (openRes.error) throw openRes.error
   if (eaRes.error) throw eaRes.error
 
-  return {
-    openLeads: openRes.count ?? 0,
-    eaOut: eaRes.count ?? 0,
-    assignees: (assigneesRes.data ?? []).map((p) => ({ id: p.id, name: p.name })),
-    canCreateLead: me?.permissions?.includes("leads.edit") ?? false,
-  }
+  return { openLeads: openRes.count ?? 0, eaOut: eaRes.count ?? 0, assignees, canCreateLead }
 }
 
 export default async function DashboardPage() {
