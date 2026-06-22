@@ -76,13 +76,17 @@ export function NotesTimeline({
     okMsg?: string
   ) {
     startTransition(async () => {
-      const result = await fn()
-      if ("error" in result) {
-        toast.error(result.error)
-        return
+      try {
+        const result = await fn()
+        if ("error" in result) {
+          toast.error(result.error)
+          return
+        }
+        onOk?.()
+        if (okMsg) toast.success(okMsg)
+      } catch {
+        toast.error("Something went wrong. Please try again.")
       }
-      onOk?.()
-      if (okMsg) toast.success(okMsg)
     })
   }
 

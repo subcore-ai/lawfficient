@@ -12,6 +12,7 @@ import {
   type LeadVocab,
 } from "@/lib/leads/data-schema"
 import { parseLeadInput } from "@/lib/leads/validation"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 import { groupTaxonomies, toLeadVocab } from "@/lib/taxonomies/queries"
 
@@ -41,15 +42,13 @@ async function audit(
   action: string
 ) {
   try {
-    const { error } = await supabase
-      .from("audit_log")
-      .insert({
-        entity: "lead",
-        entity_id: leadId,
-        label,
-        action,
-        by_user_id: byUserId,
-      })
+    const { error } = await supabase.from("audit_log").insert({
+      entity: "lead",
+      entity_id: leadId,
+      label,
+      action,
+      by_user_id: byUserId,
+    })
     // Best-effort: surface a returned error (RLS/constraint) in logs for visibility, but never
     // block the user's action on it.
     if (error) console.error("audit_log insert failed:", error.message)
@@ -61,21 +60,23 @@ async function audit(
 // Record a read-only lifecycle event on the lead's activity timeline (a kind='event' note row).
 // Best-effort — a failed event log must never fail the underlying action.
 async function recordEvent(
-  supabase: LeadsClient,
+  firmId: string,
   leadId: string,
   body: string,
   byUserId: string
 ) {
+  // kind='event' is blocked for authenticated users by guard_notes, so events are written via the
+  // service-role admin client — which bypasses RLS, so firm_id must be set explicitly.
   try {
-    const { error } = await supabase
-      .from("notes")
-      .insert({
-        entity_type: "lead",
-        entity_id: leadId,
-        kind: "event",
-        body,
-        created_by_id: byUserId,
-      })
+    const admin = createAdminClient()
+    const { error } = await admin.from("notes").insert({
+      firm_id: firmId,
+      entity_type: "lead",
+      entity_id: leadId,
+      kind: "event",
+      body,
+      created_by_id: byUserId,
+    })
     if (error) console.error("note event insert failed:", error.message)
   } catch (err) {
     console.error("note event insert threw:", err)
@@ -274,6 +275,15 @@ export async function setLeadStatus(
   if (!statusId) return { error: "Choose a status." }
 
   const supabase = await createClient()
+  // Skip a no-op move (and its duplicate timeline event) — only act on an actual change.
+  const { data: current, error: readErr } = await supabase
+    .from("leads")
+    .select("status_id")
+    .eq("id", id)
+    .single()
+  if (readErr || !current) return { error: "Couldn't update the status." }
+  if (current.status_id === statusId) return { ok: true }
+
   const { data: updated, error } = await supabase
     .from("leads")
     .update({ status_id: statusId, last_activity: new Date().toISOString() })
@@ -288,7 +298,7 @@ export async function setLeadStatus(
     .eq("id", statusId)
     .maybeSingle()
   await recordEvent(
-    supabase,
+    gate.user.firmId,
     id,
     `Moved to ${status?.name ?? "a new status"}`,
     gate.user.id
@@ -305,10 +315,20 @@ export async function assignLead(
   if (!gate.ok) return { error: gate.error }
 
   const supabase = await createClient()
+  const next = assigneeId || null
+  // Skip a no-op reassignment (and its duplicate timeline event).
+  const { data: current, error: readErr } = await supabase
+    .from("leads")
+    .select("assigned_to_id")
+    .eq("id", id)
+    .single()
+  if (readErr || !current) return { error: "Couldn't reassign the lead." }
+  if (current.assigned_to_id === next) return { ok: true }
+
   const { data: updated, error } = await supabase
     .from("leads")
     .update({
-      assigned_to_id: assigneeId || null,
+      assigned_to_id: next,
       last_activity: new Date().toISOString(),
     })
     .eq("id", id)
@@ -317,15 +337,15 @@ export async function assignLead(
   if (error || !updated) return { error: "Couldn't reassign the lead." }
 
   let body = "Unassigned the lead"
-  if (assigneeId) {
+  if (next) {
     const { data: assignee } = await supabase
       .from("profiles")
       .select("name")
-      .eq("id", assigneeId)
+      .eq("id", next)
       .maybeSingle()
     body = `Assigned to ${assignee?.name ?? "a teammate"}`
   }
-  await recordEvent(supabase, id, body, gate.user.id)
+  await recordEvent(gate.user.firmId, id, body, gate.user.id)
   revalidateLeads(id)
   return { ok: true }
 }
@@ -355,7 +375,7 @@ export async function setLeadArchived(
     archived ? "archived" : "unarchived"
   )
   await recordEvent(
-    supabase,
+    gate.user.firmId,
     id,
     archived ? "Archived the lead" : "Restored the lead",
     gate.user.id
