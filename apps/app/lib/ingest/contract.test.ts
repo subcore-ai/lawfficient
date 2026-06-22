@@ -44,4 +44,10 @@ describe("parseCanonicalPayload", () => {
     expect(parsed.externalId).toBe("12345")
     expect(parsed.data.zip).toBe("90210")
   })
+
+  test("normalizes constrained-field casing to the canonical vocabulary (hrc → HRC)", () => {
+    const parsed = parseCanonicalPayload({ firstName: "A", lastName: "B", hierarchy: "hrc", qualification: "QUALIFIED" })
+    expect(parsed.data.hierarchy).toBe("HRC")
+    expect(parsed.data.qualification).toBe("qualified")
+  })
 })

@@ -2,7 +2,8 @@
 // the anti-corruption boundary (spec 23, FR-ingest-1): every source normalizes to this shape
 // before it reaches the leads core. Known core/data fields are normalized + extracted; any
 // OTHER keys are kept verbatim in `extra` (FR-ingest-4: unmapped fields are never dropped).
-import type { LeadDataInput } from "@/lib/leads/data-schema"
+import { CASE_TYPES } from "@/data/types"
+import { HIERARCHIES, QUALIFICATIONS, type LeadDataInput } from "@/lib/leads/data-schema"
 import type { Json } from "@/lib/supabase/database.types"
 import { normalizeEmail } from "@/lib/users/validation"
 
@@ -45,6 +46,14 @@ function str(value: unknown): string {
   return ""
 }
 
+// Constrained fields arrive from external maps with arbitrary casing ("hrc" vs "HRC"); match the
+// canonical vocabulary case-insensitively so a valid value isn't 400'd over casing alone. An
+// unmatched value passes through unchanged → buildLeadData still rejects genuinely-invalid input.
+function matchVocab(value: string, allowed: readonly string[]): string {
+  if (!value) return value
+  return allowed.find((a) => a.toLowerCase() === value.toLowerCase()) ?? value
+}
+
 export function parseCanonicalPayload(
   payload: Record<string, unknown>,
   defaultCountry: "US" = "US"
@@ -65,9 +74,9 @@ export function parseCanonicalPayload(
       notes: str(payload.notes),
     },
     data: {
-      caseType: str(payload.caseType) || undefined,
-      hierarchy: str(payload.hierarchy) || undefined,
-      qualification: str(payload.qualification) || undefined,
+      caseType: matchVocab(str(payload.caseType), CASE_TYPES) || undefined,
+      hierarchy: matchVocab(str(payload.hierarchy), HIERARCHIES) || undefined,
+      qualification: matchVocab(str(payload.qualification), QUALIFICATIONS) || undefined,
       preferredLanguage: str(payload.preferredLanguage) || undefined,
       countryOfOrigin: str(payload.countryOfOrigin) || undefined,
       city: str(payload.city) || undefined,

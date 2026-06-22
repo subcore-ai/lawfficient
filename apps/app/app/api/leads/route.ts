@@ -25,7 +25,9 @@ function bearerKey(request: NextRequest): string | null {
 // Inbound lead webhook (spec 23, Tier 0). Auth via an opaque per-source key (Bearer); the firm
 // is resolved server-side from the key, NEVER the body. Idempotent on (firm, source, externalId).
 export async function POST(request: NextRequest) {
-  if (!isSupabaseConfigured()) {
+  // Needs the publishable env AND the server-only secret (the admin client throws without it);
+  // check both up front so a misconfig is a clear 503, not an uncaught 500 deeper in.
+  if (!isSupabaseConfigured() || !process.env.SUPABASE_SECRET_KEY) {
     return NextResponse.json({ error: "Ingestion is not configured." }, { status: 503 })
   }
 
