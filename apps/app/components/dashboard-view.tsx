@@ -12,7 +12,7 @@ import {
   Users,
 } from "lucide-react"
 
-import { Avatar, AvatarFallback } from "@workspace/ui/components/avatar"
+import { UserAvatar } from "@/components/user-avatar"
 import {
   Card,
   CardAction,
@@ -37,7 +37,6 @@ import {
   CONVERSION_FUNNEL,
   DEADLINES,
   REVENUE_BY_MONTH,
-  staffById,
   staffName,
 } from "@/data"
 import { useStore } from "@/data/store"
@@ -185,11 +184,7 @@ export function DashboardView({
             ) : (
               upcoming.slice(0, 5).map((c) => (
                 <div key={c.id} className="flex items-center gap-3">
-                  <Avatar className="size-8 rounded-md">
-                    <AvatarFallback className="rounded-md text-xs">
-                      {staffById(c.attorneyId)?.initials ?? "?"}
-                    </AvatarFallback>
-                  </Avatar>
+                  <UserAvatar name={staffName(c.attorneyId)} className="size-8" />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{c.leadName}</p>
                     <p className="text-muted-foreground truncate text-xs">

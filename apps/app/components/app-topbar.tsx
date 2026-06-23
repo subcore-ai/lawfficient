@@ -5,7 +5,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Bell, Eye, LogOut, Search, Settings, User } from "lucide-react"
 
-import { Avatar, AvatarFallback } from "@workspace/ui/components/avatar"
+import { UserAvatar } from "@/components/user-avatar"
 import { Button } from "@workspace/ui/components/button"
 import {
   Breadcrumb,
@@ -38,7 +38,6 @@ import { signOut } from "@/app/(auth)/actions"
 import { CURRENT_USER, ROLE_LABELS } from "@/data"
 import { useStore } from "@/data/store"
 import type { Role } from "@/data/types"
-import { initialsOf } from "@/lib/format"
 
 const ROLES = Object.keys(ROLE_LABELS) as Role[]
 
@@ -68,7 +67,11 @@ function labelFor(segment: string) {
   return SEGMENT_LABELS[segment] ?? "Details"
 }
 
-export function AppTopbar({ user }: { user?: { name: string; email: string } | null }) {
+export function AppTopbar({
+  user,
+}: {
+  user?: { name: string; email: string; avatarUrl?: string | null } | null
+}) {
   const pathname = usePathname()
   const segments = pathname.split("/").filter(Boolean)
   const { currentRole, setCurrentRole } = useStore()
@@ -76,7 +79,6 @@ export function AppTopbar({ user }: { user?: { name: string; email: string } | n
   // Real signed-in user when Supabase is wired; the mock keeps the Phase 0 demo working.
   const name = user?.name ?? CURRENT_USER.name
   const email = user?.email ?? CURRENT_USER.email
-  const initials = user ? initialsOf(user.name) : CURRENT_USER.initials
 
   return (
     <header className="bg-background/80 sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b px-4 backdrop-blur md:px-6">
@@ -133,11 +135,7 @@ export function AppTopbar({ user }: { user?: { name: string; email: string } | n
           <DropdownMenuTrigger
             render={<Button variant="ghost" className="h-9 gap-2 px-1.5" aria-label="Account" />}
           >
-            <Avatar className="size-7 rounded-md">
-              <AvatarFallback className="bg-primary text-primary-foreground rounded-md text-xs">
-                {initials}
-              </AvatarFallback>
-            </Avatar>
+            <UserAvatar name={name} src={user?.avatarUrl} className="size-7" />
             <span className="hidden text-sm font-medium lg:inline">{name}</span>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">

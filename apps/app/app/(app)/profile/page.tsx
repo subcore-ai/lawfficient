@@ -17,6 +17,7 @@ type ProfileView = {
   pod: string | null
   editable: boolean
   googleConnected: boolean
+  avatarUrl: string | null
 }
 
 async function load(): Promise<ProfileView> {
@@ -30,6 +31,7 @@ async function load(): Promise<ProfileView> {
       pod: null,
       editable: false,
       googleConnected: false,
+      avatarUrl: null,
     }
   }
 
@@ -49,7 +51,7 @@ async function load(): Promise<ProfileView> {
     pod = data?.name ?? null
   }
 
-  return { name: me.name, email: me.email, role: me.role, pod, editable: true, googleConnected }
+  return { name: me.name, email: me.email, role: me.role, pod, editable: true, googleConnected, avatarUrl: me.avatarUrl }
 }
 
 export default async function ProfilePage() {
@@ -57,7 +59,7 @@ export default async function ProfilePage() {
   return (
     <>
       <PageHeader title="My profile" description="Manage your display name and password." />
-      <div className="flex max-w-2xl flex-col gap-6">
+      <div className="max-w-5xl">
         <ProfileSettings {...view} />
       </div>
     </>

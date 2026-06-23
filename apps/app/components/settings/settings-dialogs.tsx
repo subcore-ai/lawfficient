@@ -42,7 +42,7 @@ import {
 const ROLES = Object.keys(ROLE_LABELS) as Role[]
 
 export type RoleOption = { id: string; key: string; name: string; isSystem: boolean }
-export type ManagedUser = StaffUser & { roleIds: string[] }
+export type ManagedUser = StaffUser & { roleIds: string[]; avatarUrl: string | null }
 
 function RoleSelect({ value, onChange }: { value: Role; onChange: (r: Role) => void }) {
   return (

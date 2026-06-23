@@ -35,7 +35,7 @@ async function load(): Promise<Loaded> {
   const [profilesRes, rolesRes, userRolesRes] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, name, email, initials, role, status, pod_id")
+      .select("id, name, email, initials, role, status, pod_id, avatar_path")
       .order("name"),
     supabase
       .from("roles")
@@ -66,6 +66,10 @@ async function load(): Promise<Loaded> {
     status: p.status as StaffUser["status"],
     podId: p.pod_id ?? undefined,
     roleIds: roleIdsByUser.get(p.id) ?? [],
+    // Public bucket → derive the URL with no network call (getPublicUrl is a string builder).
+    avatarUrl: p.avatar_path
+      ? supabase.storage.from("avatars").getPublicUrl(p.avatar_path).data.publicUrl
+      : null,
   }))
   const roles: RoleOption[] = (rolesRes.data ?? []).map((r) => ({
     id: r.id,

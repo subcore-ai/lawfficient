@@ -16,6 +16,8 @@ export type CurrentUser = {
   podId: string | null
   // RBAC permissions from the access-token hook; null until the hook is live.
   permissions: AppPermission[] | null
+  // Public URL of the uploaded avatar, or null to fall back to initials.
+  avatarUrl: string | null
 }
 
 // Returns the signed-in user's firm-scoped profile, or null when not
@@ -38,7 +40,7 @@ async function loadCurrentUser(): Promise<CurrentUser | null> {
   // even though Supabase Auth may still accept the credentials.
   const { data: profileRow } = await supabase
     .from("profiles")
-    .select("id, email, name, role, firm_id, pod_id")
+    .select("id, email, name, role, firm_id, pod_id, avatar_path")
     .eq("id", claims.sub)
     .eq("status", "active")
     .single()
@@ -51,6 +53,7 @@ async function loadCurrentUser(): Promise<CurrentUser | null> {
     role: string
     firm_id: string
     pod_id: string | null
+    avatar_path: string | null
   } | null
   if (!profile) return null
 
@@ -60,6 +63,12 @@ async function loadCurrentUser(): Promise<CurrentUser | null> {
     ?.permissions
   const permissions = Array.isArray(perms) ? (perms as AppPermission[]) : null
 
+  // Public bucket → a stable URL we can build without a network call (getPublicUrl is a pure
+  // string builder). null when no avatar is set, so the UI falls back to initials.
+  const avatarUrl = profile.avatar_path
+    ? supabase.storage.from("avatars").getPublicUrl(profile.avatar_path).data.publicUrl
+    : null
+
   return {
     id: profile.id,
     email: profile.email,
@@ -68,6 +77,7 @@ async function loadCurrentUser(): Promise<CurrentUser | null> {
     firmId: profile.firm_id,
     podId: profile.pod_id,
     permissions,
+    avatarUrl,
   }
 }
 

@@ -3,7 +3,7 @@
 import * as React from "react"
 import { ArrowRight } from "lucide-react"
 
-import { Avatar, AvatarFallback } from "@workspace/ui/components/avatar"
+import { UserAvatar } from "@/components/user-avatar"
 import { Button } from "@workspace/ui/components/button"
 import { toast } from "@workspace/ui/components/sonner"
 
@@ -55,9 +55,7 @@ export function DeclarationTab({ requiresDeclaration }: { requiresDeclaration: b
       <div className="flex h-fit flex-col gap-3 rounded-lg border p-4">
         <p className="text-sm font-medium">Creative writer</p>
         <div className="flex items-center gap-3">
-          <Avatar className="size-9 rounded-md">
-            <AvatarFallback className="bg-primary text-primary-foreground rounded-md text-xs">LH</AvatarFallback>
-          </Avatar>
+          <UserAvatar name="Lena Hoffmann" className="size-9" />
           <div>
             <p className="text-sm font-medium">Lena Hoffmann</p>
             <p className="text-muted-foreground text-xs">Creative Writer</p>
