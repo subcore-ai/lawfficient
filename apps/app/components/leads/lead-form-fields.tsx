@@ -55,6 +55,12 @@ export function LeadFormFields({
   const [hierarchy, setHierarchy] = React.useState<string>(lead?.data.hierarchy ?? NONE)
   const [qualification, setQualification] = React.useState<string>(lead?.data.qualification ?? NONE)
 
+  // Assignee + qualification are edited inline on the lead detail page ("Status & owner" card), so
+  // the EDIT dialog omits them — otherwise saving the dialog's open-time snapshot could silently
+  // revert an inline change. They stay in the NEW dialog: at creation there's no detail page yet and
+  // no concurrent inline editor, so there's no snapshot to go stale.
+  const isEditing = Boolean(lead)
+
   const sourceItems = LEAD_SOURCES.map((s) => ({ value: s, label: s }))
   const assigneeItems = [{ value: NONE, label: "Unassigned" }, ...assignees.map((a) => ({ value: a.id, label: a.name }))]
 
@@ -88,21 +94,23 @@ export function LeadFormFields({
         </Select>
         <input type="hidden" name="source" value={source} />
       </Field>
-      <Field label="Assign to">
-        <Select value={assignee} onValueChange={(v) => setAssignee(v ?? NONE)} items={assigneeItems}>
-          <SelectTrigger className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {assigneeItems.map((a) => (
-              <SelectItem key={a.value} value={a.value}>
-                {a.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <input type="hidden" name="assignedToId" value={assignee === NONE ? "" : assignee} />
-      </Field>
+      {!isEditing ? (
+        <Field label="Assign to">
+          <Select value={assignee} onValueChange={(v) => setAssignee(v ?? NONE)} items={assigneeItems}>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {assigneeItems.map((a) => (
+                <SelectItem key={a.value} value={a.value}>
+                  {a.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <input type="hidden" name="assignedToId" value={assignee === NONE ? "" : assignee} />
+        </Field>
+      ) : null}
 
       <Field label="Case type">
         <TaxonomySelect
@@ -129,18 +137,20 @@ export function LeadFormFields({
         <input type="hidden" name="hierarchy" value={hierarchy === NONE ? "" : hierarchy} />
       </Field>
 
-      <Field label="Qualification">
-        <TaxonomySelect
-          category="qualification"
-          value={qualification}
-          onValueChange={setQualification}
-          options={taxonomyItems(taxonomies.qualification, qualification)}
-          canManage={canManage}
-          addLabel="+ New qualification"
-          noneValue={NONE}
-        />
-        <input type="hidden" name="qualification" value={qualification === NONE ? "" : qualification} />
-      </Field>
+      {!isEditing ? (
+        <Field label="Qualification">
+          <TaxonomySelect
+            category="qualification"
+            value={qualification}
+            onValueChange={setQualification}
+            options={taxonomyItems(taxonomies.qualification, qualification)}
+            canManage={canManage}
+            addLabel="+ New qualification"
+            noneValue={NONE}
+          />
+          <input type="hidden" name="qualification" value={qualification === NONE ? "" : qualification} />
+        </Field>
+      ) : null}
       <Field label="Preferred language">
         <Input name="preferredLanguage" defaultValue={lead?.data.preferredLanguage} placeholder="Spanish" />
       </Field>
