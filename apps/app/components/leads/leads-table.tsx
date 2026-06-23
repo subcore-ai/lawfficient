@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Search } from "lucide-react"
 
 import { Input } from "@workspace/ui/components/input"
@@ -55,8 +56,10 @@ export function LeadsTable({
   const [query, setQuery] = React.useState("")
   const [status, setStatus] = React.useState(ALL)
   const [source, setSource] = React.useState(ALL)
+  const [assignee, setAssignee] = React.useState(ALL)
   const [showArchived, setShowArchived] = React.useState(false)
   const [, startTransition] = React.useTransition()
+  const router = useRouter()
 
   const statusOptions = statuses.map((s) => ({ value: s.id, label: s.name }))
   const assigneeName = new Map(assignees.map((a) => [a.id, a.name]))
@@ -78,7 +81,9 @@ export function LeadsTable({
     return (
       (query === "" || haystack.includes(query.toLowerCase())) &&
       (status === ALL || l.status.id === status) &&
-      (source === ALL || l.source === source)
+      (source === ALL || l.source === source) &&
+      (assignee === ALL ||
+        (assignee === UNASSIGNED ? !l.assignedToId : l.assignedToId === assignee))
     )
   })
 
@@ -151,6 +156,28 @@ export function LeadsTable({
               ))}
             </SelectContent>
           </Select>
+          <Select
+            value={assignee}
+            onValueChange={(v) => setAssignee(v ?? ALL)}
+            items={[
+              { value: ALL, label: "All assignees" },
+              { value: UNASSIGNED, label: "Unassigned" },
+              ...assignees.map((a) => ({ value: a.id, label: a.name })),
+            ]}
+          >
+            <SelectTrigger className="h-8" aria-label="Filter by assignee">
+              <SelectValue placeholder="Assigned" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>All assignees</SelectItem>
+              <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
+              {assignees.map((a) => (
+                <SelectItem key={a.id} value={a.id}>
+                  {a.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="flex items-center gap-3 sm:ml-auto">
           <ShowArchivedToggle checked={showArchived} onChange={setShowArchived} count={archivedCount} />
@@ -175,7 +202,38 @@ export function LeadsTable({
           </TableHeader>
           <TableBody>
             {filtered.map((l) => (
-              <TableRow key={l.id} className={cn("hover:bg-muted/40", l.archived && "opacity-50")}>
+              <TableRow
+                key={l.id}
+                // Whole-row click navigates to the lead (pointer convenience). The name <Link> stays
+                // the keyboard/screen-reader path; the interactive cells below stopPropagation so the
+                // Status/Assigned selects and the ⋯ menu work without navigating.
+                onClick={(e) => {
+                  // Let interactive controls handle their own clicks (the inline Status/Assigned
+                  // selects, the ⋯ menu, the name link); navigate from anywhere else in the row.
+                  if (
+                    e.target instanceof Element &&
+                    e.target.closest('a, button, [data-slot="select-trigger"]')
+                  )
+                    return
+                  // Modifier-clicks (open in a new tab/window) belong to the name <Link>, not the row.
+                  if (e.metaKey || e.ctrlKey || e.shiftKey) return
+                  // Don't hijack a text selection made *within this row* (e.g. copying an email);
+                  // a selection elsewhere on the page shouldn't block row navigation.
+                  const sel = window.getSelection()
+                  if (
+                    sel &&
+                    !sel.isCollapsed &&
+                    (e.currentTarget.contains(sel.anchorNode) ||
+                      e.currentTarget.contains(sel.focusNode))
+                  )
+                    return
+                  router.push(`/leads/${l.id}`)
+                }}
+                className={cn(
+                  "hover:bg-muted/40 cursor-pointer",
+                  l.archived && "opacity-50",
+                )}
+              >
                 <TableCell>
                   <Link href={`/leads/${l.id}`} className="font-medium hover:underline">
                     {l.firstName} {l.lastName}
@@ -184,13 +242,16 @@ export function LeadsTable({
                 </TableCell>
                 <TableCell className="text-muted-foreground hidden md:table-cell">{l.source}</TableCell>
                 <TableCell>
-                  <InlineSelect
-                    value={l.status.id}
-                    options={statusOptions}
-                    ariaLabel="Status"
-                    disabled={!canEdit}
-                    onValueChange={(v) => onStatusChange(l.id, v)}
-                  />
+                  {canEdit ? (
+                    <InlineSelect
+                      value={l.status.id}
+                      options={statusOptions}
+                      ariaLabel="Status"
+                      onValueChange={(v) => onStatusChange(l.id, v)}
+                    />
+                  ) : (
+                    <StatusPill label={l.status.name} tone={l.status.tone} />
+                  )}
                 </TableCell>
                 <TableCell className="hidden xl:table-cell">
                   {l.data.qualification ? (
