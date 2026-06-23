@@ -3,7 +3,8 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Bell, Eye, LogOut, Search, Settings, User } from "lucide-react"
+import { Bell, LogOut, Monitor, Moon, Search, Sun, User } from "lucide-react"
+import { useTheme } from "next-themes"
 
 import { UserAvatar } from "@/components/user-avatar"
 import { Button } from "@workspace/ui/components/button"
@@ -21,8 +22,6 @@ import {
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubContent,
@@ -33,13 +32,8 @@ import { Input } from "@workspace/ui/components/input"
 import { Separator } from "@workspace/ui/components/separator"
 import { SidebarTrigger } from "@workspace/ui/components/sidebar"
 
-import { ThemeToggle } from "@/components/theme-toggle"
 import { signOut } from "@/app/(auth)/actions"
-import { CURRENT_USER, ROLE_LABELS } from "@/data"
-import { useStore } from "@/data/store"
-import type { Role } from "@/data/types"
-
-const ROLES = Object.keys(ROLE_LABELS) as Role[]
+import { CURRENT_USER } from "@/data"
 
 const SEGMENT_LABELS: Record<string, string> = {
   leads: "Leads",
@@ -74,7 +68,7 @@ export function AppTopbar({
 }) {
   const pathname = usePathname()
   const segments = pathname.split("/").filter(Boolean)
-  const { currentRole, setCurrentRole } = useStore()
+  const { setTheme } = useTheme()
 
   // Real signed-in user when Supabase is wired; the mock keeps the Phase 0 demo working.
   const name = user?.name ?? CURRENT_USER.name
@@ -129,8 +123,6 @@ export function AppTopbar({
           <span className="bg-destructive absolute top-1.5 right-1.5 size-1.5 rounded-full" />
         </Button>
 
-        <ThemeToggle />
-
         <DropdownMenu>
           <DropdownMenuTrigger
             render={<Button variant="ghost" className="h-9 gap-2 px-1.5" aria-label="Account" />}
@@ -144,28 +136,24 @@ export function AppTopbar({
                 <div className="flex flex-col">
                   <span className="text-sm font-medium">{name}</span>
                   <span className="text-muted-foreground text-xs font-normal">{email}</span>
-                  <span className="text-muted-foreground mt-1 text-xs font-normal">
-                    Viewing as {ROLE_LABELS[currentRole]}
-                  </span>
                 </div>
               </DropdownMenuLabel>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuSub>
               <DropdownMenuSubTrigger>
-                <Eye className="size-4" /> View as role
+                <Moon className="size-4" /> Theme
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
-                <DropdownMenuRadioGroup
-                  value={currentRole}
-                  onValueChange={(v) => setCurrentRole((v ?? currentRole) as Role)}
-                >
-                  {ROLES.map((r) => (
-                    <DropdownMenuRadioItem key={r} value={r}>
-                      {ROLE_LABELS[r]}
-                    </DropdownMenuRadioItem>
-                  ))}
-                </DropdownMenuRadioGroup>
+                <DropdownMenuItem onClick={() => setTheme("light")}>
+                  <Sun className="size-4" /> Light
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTheme("dark")}>
+                  <Moon className="size-4" /> Dark
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTheme("system")}>
+                  <Monitor className="size-4" /> System
+                </DropdownMenuItem>
               </DropdownMenuSubContent>
             </DropdownMenuSub>
             <DropdownMenuItem render={<Link href="/profile" />}>
