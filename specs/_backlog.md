@@ -104,3 +104,24 @@ Data-API grant quirk** that blocks `authenticated` DML locally.
 
 **Promote when:** the security-sensitive surface grows (more entities adopt notes; billing/payments
 land) — that's when locking RLS invariants in CI earns its keep.
+
+---
+
+## Leads — `updateLead` whole-`data` read-modify-write race (low importance)
+
+_Added 2026-06-22 (declined cubic-P2 on the #28 review)._
+
+**What:** `updateLead` (the Edit lead dialog's Save) updates `leads.data` (jsonb) by reading the
+current blob, merging in memory, then writing the whole column back. A write that lands between the
+read and the write is overwritten — a classic lost-update race. It applies to every `data` field; the
+visible case is `qualification`, which now has a dedicated inline writer (`set_lead_qualification`),
+so an inline change made during that window could be reverted.
+
+**Why deferred:** #28 already shrank the window from the dialog-open→save span (seconds–minutes) to
+the action's own read→write (sub-second), and there are no concurrent users at v1. It's a pre-existing,
+generic jsonb read-modify-write pattern, not specific to that change.
+
+**Fix:** do the `data` merge in the database — an RPC using `jsonb_set` / `||` so read+write are atomic
+in one statement (mirrors the `set_lead_qualification` RPC, `0031`).
+
+**Priority:** **Low.** Revisit only if multiple staff routinely edit the same lead concurrently.
