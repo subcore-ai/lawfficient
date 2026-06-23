@@ -159,19 +159,22 @@ export async function removeMyAvatar(): Promise<{ ok: true; changed: boolean } |
     .eq("avatar_path", oldPath)
     .select("id")
   if (error) return { error: "Couldn't remove your photo. Please try again." }
-  if ((cleared?.length ?? 0) === 0) return { ok: true, changed: false }
+  const changed = (cleared?.length ?? 0) > 0
 
-  await supabase.storage.from(AVATAR_BUCKET).remove([oldPath]) // best-effort
+  if (changed) {
+    await supabase.storage.from(AVATAR_BUCKET).remove([oldPath]) // best-effort
+    await supabase.from("audit_log").insert({
+      entity: "user",
+      entity_id: user.id,
+      label: user.name,
+      action: "profile_updated",
+      by_user_id: user.id,
+    })
+  }
 
-  await supabase.from("audit_log").insert({
-    entity: "user",
-    entity_id: user.id,
-    label: user.name,
-    action: "profile_updated",
-    by_user_id: user.id,
-  })
-
+  // Always revalidate — even on a no-op (a concurrent upload moved the pointer) the view must
+  // refresh to the current avatar rather than keep showing a stale one.
   revalidatePath(PROFILE_PATH)
   revalidatePath("/", "layout")
-  return { ok: true, changed: true }
+  return { ok: true, changed }
 }
