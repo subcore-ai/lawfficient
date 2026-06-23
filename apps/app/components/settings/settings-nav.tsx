@@ -19,7 +19,8 @@ import { DataStatusDot } from "@/components/dev/data-status-dot"
 import { type DataStatus } from "@/lib/dev/data-status"
 
 // `data` is the build-time wiring status (see lib/dev/data-status.ts) — flip to "live" as a tab is
-// wired. Templates + Packet pipeline are still mock; General, Team, Roles, Taxonomies, Integrations are live.
+// wired. Templates + Packet pipeline are mock; Integrations is partial (lead sources live,
+// connected-systems cards mock); General, Team, Roles, Taxonomies are live.
 const ITEMS: {
   href: string
   label: string
@@ -32,7 +33,7 @@ const ITEMS: {
   { href: "/settings/taxonomies", label: "Case taxonomies", icon: Tags, data: "live" },
   { href: "/settings/templates", label: "Templates", icon: FileText, data: "mock" },
   { href: "/settings/pipeline", label: "Packet pipeline", icon: ListChecks, data: "mock" },
-  { href: "/settings/integrations", label: "Integrations", icon: Plug, data: "live" },
+  { href: "/settings/integrations", label: "Integrations", icon: Plug, data: "partial" },
 ]
 
 export function SettingsNav() {

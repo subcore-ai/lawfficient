@@ -8,6 +8,7 @@ import {
   CardTitle,
 } from "@workspace/ui/components/card"
 
+import { MockTag } from "@/components/dev/mock-tag"
 import { ConfigureIntegrationDialog } from "@/components/settings/settings-dialogs"
 import { LeadSourcesSection, type LeadSourceRow } from "@/components/settings/lead-sources-editor"
 import { StatusPill } from "@/components/status-pill"
@@ -121,7 +122,10 @@ export default async function SettingsIntegrationsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Connected systems</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            Connected systems
+            <MockTag />
+          </CardTitle>
           <CardDescription>Third-party tools and migration status</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 sm:grid-cols-2">
