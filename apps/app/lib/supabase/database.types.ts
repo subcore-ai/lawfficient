@@ -1000,6 +1000,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          avatar_path: string | null
           created_at: string
           email: string
           firm_id: string
@@ -1011,6 +1012,7 @@ export type Database = {
           status: Database["public"]["Enums"]["staff_status"]
         }
         Insert: {
+          avatar_path?: string | null
           created_at?: string
           email: string
           firm_id: string
@@ -1022,6 +1024,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["staff_status"]
         }
         Update: {
+          avatar_path?: string | null
           created_at?: string
           email?: string
           firm_id?: string

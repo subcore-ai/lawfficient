@@ -5,7 +5,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Bell, Eye, LogOut, Search, Settings, User } from "lucide-react"
 
-import { Avatar, AvatarFallback } from "@workspace/ui/components/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui/components/avatar"
 import { Button } from "@workspace/ui/components/button"
 import {
   Breadcrumb,
@@ -68,7 +68,11 @@ function labelFor(segment: string) {
   return SEGMENT_LABELS[segment] ?? "Details"
 }
 
-export function AppTopbar({ user }: { user?: { name: string; email: string } | null }) {
+export function AppTopbar({
+  user,
+}: {
+  user?: { name: string; email: string; avatarUrl?: string | null } | null
+}) {
   const pathname = usePathname()
   const segments = pathname.split("/").filter(Boolean)
   const { currentRole, setCurrentRole } = useStore()
@@ -134,6 +138,9 @@ export function AppTopbar({ user }: { user?: { name: string; email: string } | n
             render={<Button variant="ghost" className="h-9 gap-2 px-1.5" aria-label="Account" />}
           >
             <Avatar className="size-7 rounded-md">
+              {user?.avatarUrl ? (
+                <AvatarImage src={user.avatarUrl} alt="" className="rounded-md" />
+              ) : null}
               <AvatarFallback className="bg-primary text-primary-foreground rounded-md text-xs">
                 {initials}
               </AvatarFallback>

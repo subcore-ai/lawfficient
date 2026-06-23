@@ -4,6 +4,11 @@ import * as React from "react"
 import { Mail } from "lucide-react"
 
 import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "@workspace/ui/components/avatar"
+import {
   Card,
   CardContent,
   CardDescription,
@@ -19,7 +24,13 @@ import { GoogleIcon } from "@/components/google-icon"
 import { StatusPill } from "@/components/status-pill"
 import { ROLE_LABELS } from "@/data"
 import type { Role } from "@/data/types"
-import { changeMyPassword, updateMyName } from "@/app/(app)/profile/actions"
+import { initialsOf } from "@/lib/format"
+import {
+  changeMyPassword,
+  removeMyAvatar,
+  updateMyAvatar,
+  updateMyName,
+} from "@/app/(app)/profile/actions"
 
 export function ProfileSettings({
   name,
@@ -28,6 +39,7 @@ export function ProfileSettings({
   pod,
   editable,
   googleConnected,
+  avatarUrl,
 }: {
   name: string
   email: string
@@ -35,19 +47,23 @@ export function ProfileSettings({
   pod: string | null
   editable: boolean
   googleConnected: boolean
+  avatarUrl: string | null
 }) {
   return (
-    <>
-      <ProfileCard
-        name={name}
-        email={email}
-        role={role}
-        pod={pod}
-        editable={editable}
-        googleConnected={googleConnected}
-      />
-      {editable ? <PasswordCard /> : null}
-    </>
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
+      <div className="flex flex-col gap-6">
+        <ProfileCard
+          name={name}
+          email={email}
+          role={role}
+          pod={pod}
+          editable={editable}
+          googleConnected={googleConnected}
+        />
+        {editable ? <PasswordCard /> : null}
+      </div>
+      <AvatarCard name={name} avatarUrl={avatarUrl} editable={editable} />
+    </div>
   )
 }
 
@@ -206,6 +222,105 @@ function PasswordCard() {
             </Button>
           </div>
         </form>
+      </CardContent>
+    </Card>
+  )
+}
+
+const AVATAR_TYPES = ["image/png", "image/jpeg", "image/webp"]
+const AVATAR_MAX_BYTES = 4 * 1024 * 1024
+
+function AvatarCard({
+  name,
+  avatarUrl,
+  editable,
+}: {
+  name: string
+  avatarUrl: string | null
+  editable: boolean
+}) {
+  const [pending, startTransition] = React.useTransition()
+  // Local object-URL for instant feedback while the upload is in flight; the
+  // server's revalidated avatarUrl takes over once the action resolves.
+  const [preview, setPreview] = React.useState<string | null>(null)
+  const inputRef = React.useRef<HTMLInputElement>(null)
+
+  function onPick(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = "" // let the same file be re-picked after an error
+    if (!file) return
+    if (!AVATAR_TYPES.includes(file.type)) {
+      toast.error("Use a PNG, JPG, or WEBP image.")
+      return
+    }
+    if (file.size > AVATAR_MAX_BYTES) {
+      toast.error("That image is larger than 4 MB.")
+      return
+    }
+    const localUrl = URL.createObjectURL(file)
+    setPreview(localUrl)
+    const fd = new FormData()
+    fd.append("avatar", file)
+    startTransition(async () => {
+      const res = await updateMyAvatar(fd)
+      URL.revokeObjectURL(localUrl)
+      setPreview(null)
+      if ("error" in res) {
+        toast.error(res.error)
+        return
+      }
+      toast.success("Photo updated")
+    })
+  }
+
+  function onRemove() {
+    startTransition(async () => {
+      const res = await removeMyAvatar()
+      if ("error" in res) {
+        toast.error(res.error)
+        return
+      }
+      toast.success("Photo removed")
+    })
+  }
+
+  const shown = preview ?? avatarUrl
+
+  return (
+    <Card className="lg:self-start">
+      <CardHeader>
+        <CardTitle>Photo</CardTitle>
+        <CardDescription>Shown on your profile and in the top bar.</CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col items-center gap-4">
+        <Avatar className="size-28">
+          {shown ? <AvatarImage src={shown} alt="" /> : null}
+          <AvatarFallback className="text-2xl">{initialsOf(name)}</AvatarFallback>
+        </Avatar>
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          className="hidden"
+          onChange={onPick}
+          disabled={!editable || pending}
+        />
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!editable || pending}
+            onClick={() => inputRef.current?.click()}
+          >
+            {pending ? "Uploading…" : avatarUrl ? "Change photo" : "Upload photo"}
+          </Button>
+          {avatarUrl ? (
+            <Button variant="ghost" size="sm" disabled={pending} onClick={onRemove}>
+              Remove
+            </Button>
+          ) : null}
+        </div>
+        <p className="text-muted-foreground text-center text-xs">PNG, JPG, or WEBP. Up to 4 MB.</p>
       </CardContent>
     </Card>
   )
