@@ -10,6 +10,11 @@ import {
   type LeadView,
 } from "@/lib/leads/queries"
 import { mapNoteRow, type NoteView } from "@/lib/notes/queries"
+import {
+  getFirmStaff,
+  getFirmStatusRows,
+  getFirmTaxonomyRows,
+} from "@/lib/reference"
 import { createClient } from "@/lib/supabase/server"
 import { groupTaxonomies, type FirmTaxonomies } from "@/lib/taxonomies/queries"
 
@@ -20,49 +25,51 @@ type Loaded = {
   taxonomies: FirmTaxonomies
   notes: NoteView[]
   currentUserId: string | null
+  currentUserName: string | null
   canEdit: boolean
   canManage: boolean
 }
 
 async function load(id: string): Promise<Loaded | null> {
   const me = await getCurrentUser()
+  if (!me) return null
   const supabase = await createClient()
-  const [leadRes, statusesRes, assigneesRes, taxRes, notesRes, namesRes] = await Promise.all([
+  // Lead + notes are per-record → RLS client. Statuses / taxonomies / staff are firm reference data
+  // → per-firm cache (lib/reference.ts). All five still resolve in parallel.
+  const [leadRes, notesRes, statusRows, taxRows, staff] = await Promise.all([
     supabase.from("leads").select("*").eq("id", id).maybeSingle(),
-    supabase.from("lead_statuses").select("*").order("position"),
-    supabase.from("profiles").select("id, name").eq("status", "active").order("name"),
-    supabase.from("firm_taxonomies").select("*").order("position"),
     supabase
       .from("notes")
       .select("*")
       .eq("entity_type", "lead")
       .eq("entity_id", id)
       .order("created_at", { ascending: false }),
-    supabase.from("profiles").select("id, name"),
+    getFirmStatusRows(me.firmId),
+    getFirmTaxonomyRows(me.firmId),
+    getFirmStaff(me.firmId),
   ])
   if (leadRes.error) throw leadRes.error
-  if (statusesRes.error) throw statusesRes.error
-  if (assigneesRes.error) throw assigneesRes.error
-  if (taxRes.error) throw taxRes.error
   if (notesRes.error) throw notesRes.error
-  if (namesRes.error) throw namesRes.error
   if (!leadRes.data) return null
 
-  const statuses = (statusesRes.data ?? []).map(mapLeadStatus)
+  const statuses = statusRows.map(mapLeadStatus)
   const byId = new Map(statuses.map((s) => [s.id, s]))
   const lead = mapLeadRow(leadRes.data, byId)
   if (!lead) return null
-  const namesById = new Map((namesRes.data ?? []).map((p) => [p.id, p.name]))
+  const namesById = new Map(staff.map((p) => [p.id, p.name]))
 
   return {
     lead,
     statuses,
-    assignees: (assigneesRes.data ?? []).map((p) => ({ id: p.id, name: p.name })),
-    taxonomies: groupTaxonomies(taxRes.data ?? []),
+    assignees: staff
+      .filter((p) => p.status === "active")
+      .map((p) => ({ id: p.id, name: p.name })),
+    taxonomies: groupTaxonomies(taxRows),
     notes: (notesRes.data ?? []).map((r) => mapNoteRow(r, namesById)),
-    currentUserId: me?.id ?? null,
-    canEdit: me?.permissions?.includes("leads.edit") ?? false,
-    canManage: me?.permissions?.includes("settings.manage") ?? false,
+    currentUserId: me.id,
+    currentUserName: me.name,
+    canEdit: me.permissions?.includes("leads.edit") ?? false,
+    canManage: me.permissions?.includes("settings.manage") ?? false,
   }
 }
 
@@ -78,6 +85,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       taxonomies={data.taxonomies}
       notes={data.notes}
       currentUserId={data.currentUserId}
+      currentUserName={data.currentUserName}
       canEdit={data.canEdit}
       canManage={data.canManage}
     />

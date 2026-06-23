@@ -1,8 +1,9 @@
 "use server"
 
-import { revalidatePath } from "next/cache"
+import { revalidatePath, revalidateTag } from "next/cache"
 
 import { getCurrentUser, type CurrentUser } from "@/lib/auth/session"
+import { taxonomiesTag } from "@/lib/reference"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 import { TAXONOMY_CATEGORIES, type TaxonomyCategory } from "@/lib/taxonomies/queries"
@@ -14,7 +15,8 @@ export type CreateResult = { ok: true; id: string; label: string } | { error: st
 const PATH = "/settings/taxonomies"
 
 // Taxonomy values surface in Settings, the leads board, and the dashboard quick-add — revalidate all.
-function revalidateTaxonomyViews() {
+function revalidateTaxonomyViews(firmId: string) {
+  revalidateTag(taxonomiesTag(firmId), { expire: 0 }) // purge the per-firm taxonomy cache (lib/reference.ts)
   revalidatePath(PATH)
   revalidatePath("/")
   revalidatePath("/leads")
@@ -80,7 +82,7 @@ async function insertTaxonomy(category: TaxonomyCategory, label: string, notes: 
   }
 
   await audit(supabase, gate.user.id, data.id, trimmed, "created")
-  revalidateTaxonomyViews()
+  revalidateTaxonomyViews(gate.user.firmId)
   return { ok: true, id: data.id, label: trimmed }
 }
 
@@ -133,7 +135,7 @@ export async function editTaxonomy(id: string, formData: FormData): Promise<Acti
   }
 
   await audit(supabase, gate.user.id, id, label, "updated")
-  revalidateTaxonomyViews()
+  revalidateTaxonomyViews(gate.user.firmId)
   return { ok: true }
 }
 
@@ -150,7 +152,7 @@ export async function setTaxonomyActive(id: string, isActive: boolean): Promise<
   if (error || !data || data.length === 0) return { error: "Couldn't update the value." }
 
   await audit(supabase, gate.user.id, id, data[0]!.label, isActive ? "activated" : "deactivated")
-  revalidateTaxonomyViews()
+  revalidateTaxonomyViews(gate.user.firmId)
   return { ok: true }
 }
 
@@ -180,7 +182,7 @@ export async function reorderTaxonomy(id: string, direction: "up" | "down"): Pro
   if (swap1.error) return { error: "Couldn't reorder." }
   const swap2 = await supabase.from("firm_taxonomies").update({ position: row.position }).eq("id", neighbor.id)
   if (swap2.error) return { error: "Couldn't reorder." }
-  revalidateTaxonomyViews()
+  revalidateTaxonomyViews(gate.user.firmId)
   return { ok: true }
 }
 
@@ -215,6 +217,6 @@ export async function deleteTaxonomy(id: string): Promise<ActionResult> {
   if (error || !data || data.length === 0) return { error: "Couldn't delete the value." }
 
   await audit(supabase, gate.user.id, id, row.label, "deleted")
-  revalidateTaxonomyViews()
+  revalidateTaxonomyViews(gate.user.firmId)
   return { ok: true }
 }

@@ -9,6 +9,11 @@ import {
   type LeadStatusView,
   type LeadView,
 } from "@/lib/leads/queries"
+import {
+  getFirmStaff,
+  getFirmStatusRows,
+  getFirmTaxonomyRows,
+} from "@/lib/reference"
 import { createClient } from "@/lib/supabase/server"
 import { groupTaxonomies, type FirmTaxonomies } from "@/lib/taxonomies/queries"
 
@@ -25,28 +30,38 @@ type Loaded = {
 
 async function load(): Promise<Loaded> {
   const me = await getCurrentUser()
+  if (!me)
+    return {
+      leads: [],
+      statuses: [],
+      assignees: [],
+      taxonomies: groupTaxonomies([]),
+      canEdit: false,
+      canManage: false,
+    }
   const supabase = await createClient()
-  // RLS scopes all three to the caller's firm.
-  const [leadsRes, statusesRes, assigneesRes, taxRes] = await Promise.all([
+  // Leads stay on the RLS client; statuses / staff / taxonomies come from the per-firm cache.
+  const [leadsRes, statusRows, staff, taxRows] = await Promise.all([
     supabase.from("leads").select("*").order("last_activity", { ascending: false }),
-    supabase.from("lead_statuses").select("*").order("position"),
-    supabase.from("profiles").select("id, name").eq("status", "active").order("name"),
-    supabase.from("firm_taxonomies").select("*").order("position"),
+    getFirmStatusRows(me.firmId),
+    getFirmStaff(me.firmId),
+    getFirmTaxonomyRows(me.firmId),
   ])
   if (leadsRes.error) throw leadsRes.error
-  if (statusesRes.error) throw statusesRes.error
-  if (assigneesRes.error) throw assigneesRes.error
-  if (taxRes.error) throw taxRes.error
 
-  const statuses = (statusesRes.data ?? []).map(mapLeadStatus)
+  const statuses = statusRows.map(mapLeadStatus)
   const byId = new Map(statuses.map((s) => [s.id, s]))
   return {
-    leads: (leadsRes.data ?? []).map((r) => mapLeadRow(r, byId)).filter((l): l is LeadView => l !== null),
+    leads: (leadsRes.data ?? [])
+      .map((r) => mapLeadRow(r, byId))
+      .filter((l): l is LeadView => l !== null),
     statuses,
-    assignees: (assigneesRes.data ?? []).map((p) => ({ id: p.id, name: p.name })),
-    taxonomies: groupTaxonomies(taxRes.data ?? []),
-    canEdit: me?.permissions?.includes("leads.edit") ?? false,
-    canManage: me?.permissions?.includes("settings.manage") ?? false,
+    assignees: staff
+      .filter((p) => p.status === "active")
+      .map((p) => ({ id: p.id, name: p.name })),
+    taxonomies: groupTaxonomies(taxRows),
+    canEdit: me.permissions?.includes("leads.edit") ?? false,
+    canManage: me.permissions?.includes("settings.manage") ?? false,
   }
 }
 

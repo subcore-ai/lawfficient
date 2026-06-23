@@ -1,7 +1,9 @@
 "use server"
 
+import { revalidateTag } from "next/cache"
 import { redirect } from "next/navigation"
 
+import { staffTag } from "@/lib/reference"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 
@@ -50,6 +52,12 @@ export async function activateAccount(
   if (updateError) {
     return { error: "We couldn't activate your account just now. Please try again." }
   }
+
+  // The profile just flipped invited → active (0005 trigger) — purge the per-firm staff cache so the
+  // newly active teammate shows up in assignee pickers immediately, not after the 120s TTL.
+  const firmId = (data.user.app_metadata as { firm_id?: string } | undefined)
+    ?.firm_id
+  if (firmId) revalidateTag(staffTag(firmId), { expire: 0 })
 
   redirect("/")
 }

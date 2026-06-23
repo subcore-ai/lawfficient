@@ -1,9 +1,10 @@
 "use server"
 
 import { headers } from "next/headers"
-import { revalidatePath } from "next/cache"
+import { revalidatePath, revalidateTag } from "next/cache"
 
 import { getCurrentUser, type CurrentUser } from "@/lib/auth/session"
+import { staffTag } from "@/lib/reference"
 import type { AppPermission } from "@/lib/rbac/permissions"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
@@ -97,6 +98,7 @@ export async function inviteUser(formData: FormData): Promise<ActionResult> {
     by_user_id: admin.id,
   })
 
+  revalidateTag(staffTag(gate.user.firmId), { expire: 0 }) // purge the per-firm staff cache (lib/reference.ts)
   revalidatePath(USERS_PATH)
   return { ok: true }
 }
@@ -151,6 +153,7 @@ export async function resendInvite(userId: string): Promise<ActionResult> {
     by_user_id: admin.id,
   })
 
+  revalidateTag(staffTag(gate.user.firmId), { expire: 0 }) // purge the per-firm staff cache (lib/reference.ts)
   revalidatePath(USERS_PATH)
   return { ok: true }
 }
@@ -182,6 +185,7 @@ export async function revokeInvite(userId: string): Promise<ActionResult> {
   const { error } = await adminClient.auth.admin.deleteUser(userId)
   if (error) return { error: "Could not revoke the invite. Please try again." }
 
+  revalidateTag(staffTag(gate.user.firmId), { expire: 0 }) // purge the per-firm staff cache (lib/reference.ts)
   revalidatePath(USERS_PATH)
   return { ok: true }
 }
@@ -242,6 +246,7 @@ export async function setUserStatus(
     by_user_id: admin.id,
   })
 
+  revalidateTag(staffTag(gate.user.firmId), { expire: 0 }) // purge the per-firm staff cache (lib/reference.ts)
   revalidatePath(USERS_PATH)
   return { ok: true }
 }
@@ -285,6 +290,7 @@ export async function updateUserProfile(
     by_user_id: admin.id,
   })
 
+  revalidateTag(staffTag(gate.user.firmId), { expire: 0 }) // purge the per-firm staff cache (lib/reference.ts)
   revalidatePath(USERS_PATH)
   return { ok: true }
 }
@@ -320,6 +326,7 @@ export async function setUserRoles(userId: string, roleIds: string[]): Promise<A
     by_user_id: admin.id,
   })
 
+  revalidateTag(staffTag(gate.user.firmId), { expire: 0 }) // purge the per-firm staff cache (lib/reference.ts)
   revalidatePath(USERS_PATH)
   return { ok: true }
 }
