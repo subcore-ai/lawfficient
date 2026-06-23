@@ -92,6 +92,14 @@ is the front door of the client lifecycle.
 - [ ] Similar-but-distinct leads are flagged, not merged or overwritten.
 - [ ] Conversion rate per attorney and per sales agent is reportable (see [20](20-reporting-analytics.md)).
 
+## API & webhooks
+
+Leads are exposed via the public REST API ([26-public-api](26-public-api.md)) — list / get / create /
+update / archive under `/api/**` with per-firm API keys — and emit `lead.*` events via outbound webhooks
+([27-webhooks](27-webhooks.md)). Both share this module's `lib/leads` core with the app's Server Actions,
+so the API, the webhooks, and the UI never diverge. `POST /api/leads` is the single lead-push endpoint
+for ingestion sources and API clients alike (see [23-lead-ingestion](23-lead-ingestion.md)).
+
 ## Out of scope (v1) / future
 
 - Automated lead scoring / AI prioritization.

@@ -14,8 +14,9 @@ keys**. It is an *additional* surface, not a replacement — the web app keeps i
 **both the API and the actions call the same `lib/<domain>` core** (validation, queries, writes) so the
 two can never diverge.
 
-**Policy: every new app capability ships with a matching documented API endpoint** (+ OpenAPI + tests).
-A PR that adds a capability without its endpoint is incomplete.
+**Policy: every new app capability ships with a matching documented API endpoint** (+ OpenAPI + tests)
+**and emits the corresponding webhook events** ([27-webhooks](27-webhooks.md), the outbound counterpart).
+A PR that adds a capability without its endpoint + events is incomplete.
 
 ## Principles / decisions
 
@@ -70,14 +71,20 @@ A PR that adds a capability without its endpoint is incomplete.
 - **vs. ingestion keys ([23]):** those are *per-source*, ingestion-only (`lead_sources`). API keys are
   *per-firm*, scoped to the REST API. Separate tables — same hashing + firm-from-key model.
 
-## Coexistence with the ingestion webhook ([23])
+## One way to push a lead
 
-The ingestion webhook currently sits at `POST /api/leads`, which would collide with the public CRUD
-`POST /api/leads` (create). Resolution: **move ingestion to its own path** `POST /api/ingest/leads`
-(its original intent in [23]), leaving `/api/leads` as the clean REST resource. Pre-launch the only
-consumer is a test Zapier source, so the move is low-risk (relocate the route + update the webhook URL
-shown in Settings → Integrations). The CRUD **read** endpoints don't collide with the POST, so they
-ship first; the move happens with the write phase.
+There is a **single** endpoint for creating a lead — `POST /api/leads` — no matter who calls it.
+Pushing a lead is pushing a lead; the platform does **not** split "ingestion" from "API create" into
+different URLs. The handler resolves the firm from whichever Bearer key is presented:
+
+- a **per-source ingestion key** ([23], `lead_sources`) → the lead is attributed to that source,
+  idempotent on its `externalId`, and the delivery is logged to `webhook_events` (inbound dispositions);
+- a **per-firm API key** (`api_keys`, scope `leads:write`) → a direct create, optionally idempotent via
+  an `Idempotency-Key` header.
+
+Both normalize to the same canonical payload and the same `lib/leads` core, so a lead is a lead however
+it arrived. The existing `POST /api/leads` therefore **stays put** and is *extended* to also accept API
+keys (Phase 2) — nothing is relocated.
 
 ## Rollout (phased)
 
@@ -85,8 +92,9 @@ ship first; the move happens with the write phase.
   (key→firm+scopes auth, error envelope, version header, rate limit), `GET /api/leads` (paginated,
   filterable) + `GET /api/leads/{id}`, OpenAPI scaffold + `GET /api/openapi.json`, tests. Read-only →
   low-risk; establishes every convention.
-- **Phase 2 — leads writes.** `POST /api/leads` (create — reuse `parseLeadInput` + the leads insert),
-  `PATCH /api/leads/{id}`, archive; relocate ingestion to `/api/ingest/leads`.
+- **Phase 2 — leads writes.** Generalize `POST /api/leads` to also accept per-firm API keys (create —
+  reuse `parseLeadInput` + the leads insert/upsert), `PATCH /api/leads/{id}`, archive — and emit the
+  `lead.*` webhook events ([27]). The existing ingestion POST is unchanged; nothing relocates.
 - **Phase 3 — API-key management UI** in Settings → Integrations.
 - **Phase 4+ — the rest, per the policy:** consultations, clients, cases, documents, … each shipped
   with its endpoints + OpenAPI + tests as the app feature lands.
@@ -108,10 +116,16 @@ ship first; the move happens with the write phase.
 ## Out of scope (v1) / future
 
 - OAuth2 / per-user tokens (third-party apps acting on a user's behalf) — keys only for now.
-- Outbound webhooks (event subscriptions), GraphQL, bulk endpoints, published SDKs.
+- OAuth2 / per-user tokens, GraphQL, bulk endpoints, published SDKs. (Outbound webhooks are **in**
+  scope — see [27-webhooks](27-webhooks.md).)
+
+## Resolved decisions
+
+- **Versioning:** date-stamped header `Lawfficient-Version: <YYYY-MM-DD>` — not an integer, not a path
+  segment (confirmed).
+- **Lead push:** one endpoint `POST /api/leads` for both ingestion keys and API keys — no
+  `/api/ingest/leads`, no route relocation (confirmed).
 
 ## Open questions
 
-- Version header format — `Lawfficient-Version: <date>` proposed; confirm date- vs integer-based.
-- Idempotency-Key storage + TTL.
-- Relocate ingestion to `/api/ingest/leads` now (recommended) vs. dispatch by key prefix on POST.
+- `Idempotency-Key` storage + TTL.
