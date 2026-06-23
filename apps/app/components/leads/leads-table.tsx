@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Search } from "lucide-react"
+import { Mail, Phone, Search } from "lucide-react"
 
 import { Input } from "@workspace/ui/components/input"
 import {
@@ -22,6 +22,11 @@ import {
   TableRow,
 } from "@workspace/ui/components/table"
 import { toast } from "@workspace/ui/components/sonner"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { assignLead, setLeadStatus } from "@/app/(app)/leads/actions"
@@ -238,7 +243,42 @@ export function LeadsTable({
                   <Link href={`/leads/${l.id}`} className="font-medium hover:underline">
                     {l.firstName} {l.lastName}
                   </Link>
-                  <div className="text-muted-foreground text-xs">{l.email}</div>
+                  {/* Compact, actionable contact icons: mailto / tel links, value on hover. The
+                      whole-row click handler skips <a> targets, so these don't trigger navigation. */}
+                  <div className="text-muted-foreground mt-1 flex items-center gap-3">
+                    {l.email ? (
+                      <Tooltip>
+                        <TooltipTrigger
+                          render={
+                            <a
+                              href={`mailto:${l.email}`}
+                              aria-label={`Email ${l.email}`}
+                              className="hover:text-foreground inline-flex"
+                            />
+                          }
+                        >
+                          <Mail className="size-3.5" />
+                        </TooltipTrigger>
+                        <TooltipContent>{l.email}</TooltipContent>
+                      </Tooltip>
+                    ) : null}
+                    {l.phone ? (
+                      <Tooltip>
+                        <TooltipTrigger
+                          render={
+                            <a
+                              href={`tel:${l.phone}`}
+                              aria-label={`Call ${l.phone}`}
+                              className="hover:text-foreground inline-flex"
+                            />
+                          }
+                        >
+                          <Phone className="size-3.5" />
+                        </TooltipTrigger>
+                        <TooltipContent>{l.phone}</TooltipContent>
+                      </Tooltip>
+                    ) : null}
+                  </div>
                 </TableCell>
                 <TableCell className="text-muted-foreground hidden md:table-cell">{l.source}</TableCell>
                 <TableCell>
