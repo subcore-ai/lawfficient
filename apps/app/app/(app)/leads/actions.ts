@@ -216,14 +216,15 @@ export async function updateLead(
   if (!core.ok) return { error: core.error }
 
   const supabase = await createClient()
-  // Read existing first: for the jsonb merge below, the assignee/qualification event diff, and so an
-  // unchanged deactivated/legacy taxonomy value still validates (the form resubmits current values).
+  // Read existing first: for the jsonb merge below, to preserve the inline-only qualification, and so
+  // an unchanged deactivated/legacy taxonomy value still validates (the form resubmits current values).
   const { data: existing, error: readErr } = await supabase
     .from("leads")
-    .select("data, assigned_to_id")
+    .select("data")
     .eq("id", id)
     .single()
   if (readErr || !existing) return { error: "Couldn't update the lead." }
+  const existingData = parseLeadData(existing.data)
 
   let vocab: LeadVocab
   try {
@@ -233,9 +234,18 @@ export async function updateLead(
   }
   const data = buildLeadData(
     readDataFields(formData),
-    withExistingValues(vocab, parseLeadData(existing.data))
+    withExistingValues(vocab, existingData)
   )
   if (!data.ok) return { error: data.error }
+
+  // Assignee + qualification are edited inline (sidebar), never via this dialog. assigned_to_id is
+  // never written here; qualification is stripped from the dialog payload — so a crafted or stale
+  // submit can't set or change it (which would bypass the inline-only path and its timeline event) —
+  // then re-applied from the stored value (mergeLeadData strips all known data keys). assignLead /
+  // setLeadQualification own these edits and their events.
+  delete data.value.qualification
+  const mergedData = mergeLeadData(existing.data, data.value)
+  if (existingData.qualification) mergedData.qualification = existingData.qualification
 
   // .select().single() makes a 0-row update (RLS / wrong id) a real error, not a silent ok.
   const { data: updated, error } = await supabase
@@ -246,8 +256,7 @@ export async function updateLead(
       phone: core.value.phone,
       email: core.value.email,
       source: core.value.source,
-      assigned_to_id: core.value.assignedToId,
-      data: mergeLeadData(existing.data, data.value),
+      data: mergedData,
       last_activity: new Date().toISOString(),
     })
     .eq("id", id)
@@ -262,29 +271,6 @@ export async function updateLead(
     `${core.value.firstName} ${core.value.lastName}`,
     "updated"
   )
-  // Mirror the inline controls' timeline events for the fields the dialog can also change.
-  if (existing.assigned_to_id !== core.value.assignedToId) {
-    let body = "Unassigned the lead"
-    if (core.value.assignedToId) {
-      const { data: assignee } = await supabase
-        .from("profiles")
-        .select("name")
-        .eq("id", core.value.assignedToId)
-        .maybeSingle()
-      body = `Assigned to ${assignee?.name ?? "a teammate"}`
-    }
-    await recordEvent(gate.user.firmId, id, body, gate.user.id)
-  }
-  const oldQual = parseLeadData(existing.data).qualification ?? ""
-  const newQual = data.value.qualification ?? ""
-  if (oldQual !== newQual) {
-    await recordEvent(
-      gate.user.firmId,
-      id,
-      newQual ? `Qualification → ${newQual}` : "Qualification cleared",
-      gate.user.id
-    )
-  }
   revalidateLeads(id)
   return { ok: true }
 }
