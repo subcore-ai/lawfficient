@@ -1,7 +1,7 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "ui": "tui",
-  "globalEnv": ["SUPABASE_SECRET_KEY"],
+  "globalEnv": ["NODE_ENV", "SUPABASE_SECRET_KEY"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],

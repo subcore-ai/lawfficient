@@ -10,9 +10,10 @@ import {
 } from "@workspace/ui/components/card"
 import { cn } from "@workspace/ui/lib/utils"
 
+import { MockTag } from "@/components/dev/mock-tag"
 import type { Kpi } from "@/data/types"
 
-export function KpiCard({ kpi }: { kpi: Kpi }) {
+export function KpiCard({ kpi, mock = false }: { kpi: Kpi; mock?: boolean }) {
   const negative = kpi.delta < 0
   const flat = kpi.delta === 0
   const Icon = negative ? ArrowDownRight : ArrowUpRight
@@ -20,7 +21,10 @@ export function KpiCard({ kpi }: { kpi: Kpi }) {
   return (
     <Card className="gap-2">
       <CardHeader>
-        <CardDescription>{kpi.label}</CardDescription>
+        <CardDescription className="flex items-center gap-1.5">
+          {kpi.label}
+          {mock ? <MockTag /> : null}
+        </CardDescription>
         <CardTitle className="text-2xl tracking-tight tabular-nums">{kpi.value}</CardTitle>
         {flat ? null : (
           <CardAction>

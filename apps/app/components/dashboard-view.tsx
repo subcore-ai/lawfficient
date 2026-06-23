@@ -23,6 +23,7 @@ import {
 } from "@workspace/ui/components/card"
 
 import { CaseMixChart, ConsultationsChart, ConversionFunnelChart, RevenueChart } from "@/components/charts"
+import { MockTag } from "@/components/dev/mock-tag"
 import { KpiCard } from "@/components/kpi-card"
 import { NewLeadDialog } from "@/components/leads/new-lead-dialog"
 import { PageHeader } from "@/components/page-header"
@@ -81,13 +82,14 @@ export function DashboardView({
   const overdue = invoices.filter((i) => i.status === "overdue").reduce((sum, i) => sum + i.remaining, 0)
   const redFlags = cases.filter((c) => c.redFlag !== "none").length
 
-  const kpis: Kpi[] = [
-    { label: "Leads in pipeline", value: String(openLeads), delta: 0, hint: "active leads" },
-    { label: "Upcoming consultations", value: String(upcoming.length), delta: 20, hint: "scheduled & paid" },
-    { label: "Pending retainers (EA out)", value: String(eaOut), delta: 0, hint: "awaiting signature" },
-    { label: "Retained clients", value: String(clients.length), delta: 9.1, hint: "active engagements" },
-    { label: "Overdue balance", value: formatCurrency(overdue), delta: 4.2, hint: "across clients" },
-    { label: "Red-flag cases", value: String(redFlags), delta: 0, hint: "need attention" },
+  // openLeads + eaOut are real Supabase counts; the rest are still derived from the mock store.
+  const kpis: { kpi: Kpi; mock?: boolean }[] = [
+    { kpi: { label: "Leads in pipeline", value: String(openLeads), delta: 0, hint: "active leads" } },
+    { kpi: { label: "Upcoming consultations", value: String(upcoming.length), delta: 20, hint: "scheduled & paid" }, mock: true },
+    { kpi: { label: "Pending retainers (EA out)", value: String(eaOut), delta: 0, hint: "awaiting signature" } },
+    { kpi: { label: "Retained clients", value: String(clients.length), delta: 9.1, hint: "active engagements" }, mock: true },
+    { kpi: { label: "Overdue balance", value: formatCurrency(overdue), delta: 4.2, hint: "across clients" }, mock: true },
+    { kpi: { label: "Red-flag cases", value: String(redFlags), delta: 0, hint: "need attention" }, mock: true },
   ]
 
   const deadlines = DEADLINES.slice().sort((a, b) => a.dueInDays - b.dueInDays).slice(0, 5)
@@ -102,15 +104,18 @@ export function DashboardView({
       </PageHeader>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
-        {kpis.map((kpi) => (
-          <KpiCard key={kpi.label} kpi={kpi} />
+        {kpis.map(({ kpi, mock }) => (
+          <KpiCard key={kpi.label} kpi={kpi} mock={mock} />
         ))}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Revenue trend</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              Revenue trend
+              <MockTag />
+            </CardTitle>
             <CardDescription>Monthly collected revenue, last 6 months</CardDescription>
           </CardHeader>
           <CardContent>
@@ -119,7 +124,10 @@ export function DashboardView({
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Consultation trends</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              Consultation trends
+              <MockTag />
+            </CardTitle>
             <CardDescription>Booked vs. paid vs. qualified</CardDescription>
           </CardHeader>
           <CardContent>
@@ -131,7 +139,10 @@ export function DashboardView({
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>Lead conversion funnel</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              Lead conversion funnel
+              <MockTag />
+            </CardTitle>
             <CardDescription>From first contact to retained client (last 90 days)</CardDescription>
           </CardHeader>
           <CardContent>
@@ -140,7 +151,10 @@ export function DashboardView({
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Case type mix</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              Case type mix
+              <MockTag />
+            </CardTitle>
             <CardDescription>Active cases by practice area</CardDescription>
           </CardHeader>
           <CardContent>
@@ -152,7 +166,10 @@ export function DashboardView({
       <div className="grid gap-4 lg:grid-cols-3">
         <Card>
           <CardHeader>
-            <CardTitle>Upcoming consultations</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              Upcoming consultations
+              <MockTag />
+            </CardTitle>
             <CardAction>
               <Link href="/consultations" className="text-muted-foreground hover:text-foreground text-xs font-medium">
                 View all
@@ -185,7 +202,10 @@ export function DashboardView({
 
         <Card>
           <CardHeader>
-            <CardTitle>Needs attention</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              Needs attention
+              <MockTag />
+            </CardTitle>
             <CardAction>
               <Link href="/cases/deadlines" className="text-muted-foreground hover:text-foreground text-xs font-medium">
                 View all
@@ -209,7 +229,10 @@ export function DashboardView({
 
         <Card>
           <CardHeader>
-            <CardTitle>Recent activity</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              Recent activity
+              <MockTag />
+            </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-3.5">
             {ACTIVITY.map((a) => {
