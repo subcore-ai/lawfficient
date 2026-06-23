@@ -22,6 +22,7 @@ import {
 import { DetailList, DetailRow } from "@/components/detail-list"
 import { EditLeadDialog } from "@/components/leads/edit-lead-dialog"
 import { InlineSelect } from "@/components/inline-select"
+import { LocalTime } from "@/components/local-time"
 import { NoteComposer } from "@/components/notes/note-composer"
 import { NotesTimeline } from "@/components/notes/notes-timeline"
 import { StatusPill } from "@/components/status-pill"
@@ -31,7 +32,6 @@ import type {
   LeadView,
 } from "@/lib/leads/queries"
 import type { NoteView } from "@/lib/notes/queries"
-import { formatDate } from "@/lib/format"
 import { qualificationBadge } from "@/lib/status"
 import type { FirmTaxonomies } from "@/lib/taxonomies/queries"
 
@@ -191,10 +191,10 @@ export function LeadDetail({
                 {data.referralSource ?? "—"}
               </DetailRow>
               <DetailRow label="Created">
-                {formatDate(lead.createdAt)}
+                <LocalTime iso={lead.createdAt} mode="date" />
               </DetailRow>
               <DetailRow label="Last activity">
-                {formatDate(lead.lastActivity)}
+                <LocalTime iso={lead.lastActivity} mode="date" />
               </DetailRow>
             </DetailList>
           </CardContent>
