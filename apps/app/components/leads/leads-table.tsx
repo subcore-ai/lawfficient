@@ -221,7 +221,12 @@ export function LeadsTable({
                   // Don't hijack a text selection made *within this row* (e.g. copying an email);
                   // a selection elsewhere on the page shouldn't block row navigation.
                   const sel = window.getSelection()
-                  if (sel && !sel.isCollapsed && e.currentTarget.contains(sel.anchorNode))
+                  if (
+                    sel &&
+                    !sel.isCollapsed &&
+                    (e.currentTarget.contains(sel.anchorNode) ||
+                      e.currentTarget.contains(sel.focusNode))
+                  )
                     return
                   router.push(`/leads/${l.id}`)
                 }}
