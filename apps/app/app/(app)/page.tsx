@@ -2,6 +2,11 @@ import { DashboardView } from "@/components/dashboard-view"
 import { LEADS } from "@/data"
 import { getCurrentUser } from "@/lib/auth/session"
 import type { AssigneeOption } from "@/lib/leads/queries"
+import {
+  getFirmStaff,
+  getFirmStatusRows,
+  getFirmTaxonomyRows,
+} from "@/lib/reference"
 import { createClient } from "@/lib/supabase/server"
 import { groupTaxonomies, type FirmTaxonomies } from "@/lib/taxonomies/queries"
 
@@ -29,28 +34,35 @@ function mockLeadCounts() {
 // The two lead KPIs come from real counts; the rest of the dashboard stays on the mock store.
 async function load(): Promise<Loaded> {
   const me = await getCurrentUser()
+  if (!me)
+    return {
+      ...mockLeadCounts(),
+      assignees: [],
+      taxonomies: groupTaxonomies([]),
+      canCreateLead: false,
+      canManage: false,
+    }
   const supabase = await createClient()
-  const canCreateLead = me?.permissions?.includes("leads.edit") ?? false
-  const canManage = me?.permissions?.includes("settings.manage") ?? false
+  const canCreateLead = me.permissions?.includes("leads.edit") ?? false
+  const canManage = me.permissions?.includes("settings.manage") ?? false
 
-  const [assigneesRes, taxRes] = await Promise.all([
-    supabase.from("profiles").select("id, name").eq("status", "active").order("name"),
-    supabase.from("firm_taxonomies").select("*").order("position"),
+  // Assignees + taxonomies from the per-firm cache.
+  const [staff, taxRows] = await Promise.all([
+    getFirmStaff(me.firmId),
+    getFirmTaxonomyRows(me.firmId),
   ])
-  if (assigneesRes.error) throw assigneesRes.error
-  if (taxRes.error) throw taxRes.error
-  const assignees = (assigneesRes.data ?? []).map((p) => ({ id: p.id, name: p.name }))
-  const taxonomies = groupTaxonomies(taxRes.data ?? [])
+  const assignees = staff
+    .filter((p) => p.status === "active")
+    .map((p) => ({ id: p.id, name: p.name }))
+  const taxonomies = groupTaxonomies(taxRows)
 
   // The lead KPIs need leads.view. For roles without it (QA lead, creative writer, file clerk)
   // keep them on the mock counts like the rest of the dashboard, rather than a misleading 0.
-  if (!(me?.permissions?.includes("leads.view") ?? false)) {
+  if (!(me.permissions?.includes("leads.view") ?? false)) {
     return { ...mockLeadCounts(), assignees, taxonomies, canCreateLead, canManage }
   }
 
-  const statusesRes = await supabase.from("lead_statuses").select("id, key, is_terminal")
-  if (statusesRes.error) throw statusesRes.error
-  const statuses = statusesRes.data ?? []
+  const statuses = await getFirmStatusRows(me.firmId)
   const openIds = statuses.filter((s) => !s.is_terminal).map((s) => s.id)
   const eaId = statuses.find((s) => s.key === "ea_sent")?.id ?? NIL_UUID
 

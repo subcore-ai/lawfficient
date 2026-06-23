@@ -1,8 +1,9 @@
 "use server"
 
-import { revalidatePath } from "next/cache"
+import { revalidatePath, revalidateTag } from "next/cache"
 
 import { getCurrentUser } from "@/lib/auth/session"
+import { staffTag } from "@/lib/reference"
 import { createClient } from "@/lib/supabase/server"
 
 export type ActionResult = { ok: true } | { error: string }
@@ -36,6 +37,7 @@ export async function updateMyName(formData: FormData): Promise<NameResult> {
     by_user_id: user.id,
   })
 
+  revalidateTag(staffTag(user.firmId), { expire: 0 }) // purge the per-firm staff cache (assignee names)
   revalidatePath(PROFILE_PATH)
   // The app-shell topbar resolves the display name via getCurrentUser().
   revalidatePath("/", "layout")

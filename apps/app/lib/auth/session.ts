@@ -1,5 +1,7 @@
 // Server-side session helpers. Feature code should resolve the current user
 // through these so role + firm scoping stay consistent everywhere.
+import { cache } from "react"
+
 import { createClient } from "@/lib/supabase/server"
 import { isSupabaseConfigured } from "@/lib/supabase/env"
 import type { AppPermission } from "@/lib/rbac/permissions"
@@ -39,7 +41,7 @@ function permissionsFromAccessToken(accessToken: string | undefined): AppPermiss
 
 // Returns the signed-in user's firm-scoped profile, or null when not
 // authenticated (or while Supabase isn't configured yet).
-export async function getCurrentUser(): Promise<CurrentUser | null> {
+async function loadCurrentUser(): Promise<CurrentUser | null> {
   if (!isSupabaseConfigured()) return null
 
   const supabase = await createClient()
@@ -85,3 +87,8 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     permissions,
   }
 }
+
+// Memoized per request with React `cache()` so the (app) layout, each page's loader, and any other
+// server component that needs the user share ONE auth round-trip + profile query — instead of
+// repeating `auth.getUser()` (a network call) and the profile read at every call site in a render.
+export const getCurrentUser = cache(loadCurrentUser)

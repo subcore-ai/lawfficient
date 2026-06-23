@@ -7,17 +7,24 @@ import { toast } from "@workspace/ui/components/sonner"
 import { Textarea } from "@workspace/ui/components/textarea"
 
 import { addNote } from "@/lib/notes/actions"
-import type { NoteEntityType } from "@/lib/notes/queries"
+import type { NoteEntityType, NoteView } from "@/lib/notes/queries"
 
 // Standalone note composer, split from the activity list so the box can live in its own section.
-// Adding a note revalidates the page, so the list re-renders from server data — no shared state.
-// Cmd/Ctrl+Enter submits.
+// Cmd/Ctrl+Enter submits. When `onOptimisticAdd` is provided (lead detail), the note appears in the
+// timeline + the box clears immediately, reverting if the write fails; otherwise the page revalidate
+// refreshes the list.
 export function NoteComposer({
   entityType,
   entityId,
+  currentUserId = null,
+  currentUserName = null,
+  onOptimisticAdd,
 }: {
   entityType: NoteEntityType
   entityId: string
+  currentUserId?: string | null
+  currentUserName?: string | null
+  onOptimisticAdd?: (note: NoteView) => void
 }) {
   const [body, setBody] = React.useState("")
   const [pending, startTransition] = React.useTransition()
@@ -28,16 +35,33 @@ export function NoteComposer({
     const text = body.trim()
     if (!text) return
     startTransition(async () => {
+      onOptimisticAdd?.({
+        id: `optimistic-${Date.now()}`,
+        entityType,
+        entityId,
+        kind: "note",
+        body: text,
+        authorId: currentUserId,
+        authorName: currentUserName ?? "You",
+        createdAt: new Date().toISOString(),
+        editedAt: null,
+        resolvedAt: null,
+        resolvedById: null,
+        hiddenAt: null,
+        hiddenById: null,
+      })
+      setBody("")
       try {
         const result = await addNote(entityType, entityId, text)
         if ("error" in result) {
           toast.error(result.error)
+          setBody(text) // restore — the optimistic note reverts when the transition ends
           return
         }
-        setBody("")
         toast.success("Note added")
       } catch {
         toast.error("Something went wrong. Please try again.")
+        setBody(text)
       }
     })
   }

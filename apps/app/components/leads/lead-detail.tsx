@@ -40,6 +40,11 @@ const UNASSIGNED = "none"
 const NO_QUALIFICATION = "__none__"
 
 type Result = { ok: true } | { error: string }
+type Edits = {
+  statusId: string
+  assignedToId: string | null
+  qualification: string | null
+}
 
 export function LeadDetail({
   lead,
@@ -48,6 +53,7 @@ export function LeadDetail({
   taxonomies,
   notes,
   currentUserId,
+  currentUserName,
   canEdit,
   canManage,
 }: {
@@ -57,11 +63,27 @@ export function LeadDetail({
   taxonomies: FirmTaxonomies
   notes: NoteView[]
   currentUserId: string | null
+  currentUserName: string | null
   canEdit: boolean
   canManage: boolean
 }) {
   const [editOpen, setEditOpen] = React.useState(false)
   const [, startTransition] = React.useTransition()
+
+  // Optimistic overlay so inline edits + new notes show instantly instead of after the round-trip;
+  // React reverts them if the action rejects (or the revalidated props come back unchanged).
+  const [edits, applyEdit] = React.useOptimistic(
+    {
+      statusId: lead.status.id,
+      assignedToId: lead.assignedToId,
+      qualification: lead.data.qualification ?? null,
+    },
+    (state, patch: Partial<Edits>) => ({ ...state, ...patch }),
+  )
+  const [optimisticNotes, addOptimisticNote] = React.useOptimistic(
+    notes,
+    (prev, note: NoteView) => [note, ...prev],
+  )
 
   const name = `${lead.firstName} ${lead.lastName}`
   const { data } = lead
@@ -91,8 +113,12 @@ export function LeadDetail({
       label: lead.data.qualification,
     })
 
-  function run(fn: () => Promise<Result>) {
+  const optimisticStatus =
+    statuses.find((s) => s.id === edits.statusId) ?? lead.status
+
+  function run(patch: Partial<Edits>, fn: () => Promise<Result>) {
     startTransition(async () => {
+      applyEdit(patch)
       const result = await fn()
       if ("error" in result) toast.error(result.error)
     })
@@ -123,9 +149,12 @@ export function LeadDetail({
         <div className="space-y-2">
           <h1 className="text-2xl font-semibold tracking-tight">{name}</h1>
           <div className="flex flex-wrap items-center gap-2">
-            <StatusPill label={lead.status.name} tone={lead.status.tone} />
-            {data.qualification ? (
-              <StatusPill {...qualificationBadge(data.qualification)} />
+            <StatusPill
+              label={optimisticStatus.name}
+              tone={optimisticStatus.tone}
+            />
+            {edits.qualification ? (
+              <StatusPill {...qualificationBadge(edits.qualification)} />
             ) : null}
             {data.caseType ? (
               <StatusPill label={data.caseType} tone="neutral" />
@@ -210,10 +239,12 @@ export function LeadDetail({
                 <span className="text-sm text-muted-foreground">Status</span>
                 {canEdit ? (
                   <InlineSelect
-                    value={lead.status.id}
+                    value={edits.statusId}
                     options={statusOptions}
                     ariaLabel="Status"
-                    onValueChange={(v) => run(() => setLeadStatus(lead.id, v))}
+                    onValueChange={(v) =>
+                      run({ statusId: v }, () => setLeadStatus(lead.id, v))
+                    }
                   />
                 ) : (
                   <StatusPill
@@ -228,11 +259,13 @@ export function LeadDetail({
                 </span>
                 {canEdit ? (
                   <InlineSelect
-                    value={lead.assignedToId ?? UNASSIGNED}
+                    value={edits.assignedToId ?? UNASSIGNED}
                     options={inlineAssignee}
                     ariaLabel="Assignee"
                     onValueChange={(v) =>
-                      run(() => assignLead(lead.id, v === UNASSIGNED ? "" : v))
+                      run({ assignedToId: v === UNASSIGNED ? null : v }, () =>
+                        assignLead(lead.id, v === UNASSIGNED ? "" : v),
+                      )
                     }
                   />
                 ) : (
@@ -245,15 +278,17 @@ export function LeadDetail({
                 </span>
                 {canEdit ? (
                   <InlineSelect
-                    value={lead.data.qualification ?? NO_QUALIFICATION}
+                    value={edits.qualification ?? NO_QUALIFICATION}
                     options={qualificationOptions}
                     ariaLabel="Qualification"
                     onValueChange={(v) =>
-                      run(() =>
-                        setLeadQualification(
-                          lead.id,
-                          v === NO_QUALIFICATION ? "" : v
-                        )
+                      run(
+                        { qualification: v === NO_QUALIFICATION ? null : v },
+                        () =>
+                          setLeadQualification(
+                            lead.id,
+                            v === NO_QUALIFICATION ? "" : v,
+                          ),
                       )
                     }
                   />
@@ -274,7 +309,13 @@ export function LeadDetail({
                 <CardTitle>Add a note</CardTitle>
               </CardHeader>
               <CardContent>
-                <NoteComposer entityType="lead" entityId={lead.id} />
+                <NoteComposer
+                  entityType="lead"
+                  entityId={lead.id}
+                  currentUserId={currentUserId}
+                  currentUserName={currentUserName}
+                  onOptimisticAdd={addOptimisticNote}
+                />
               </CardContent>
             </Card>
           ) : null}
@@ -287,7 +328,7 @@ export function LeadDetail({
         </CardHeader>
         <CardContent>
           <NotesTimeline
-            notes={notes}
+            notes={optimisticNotes}
             createdAt={lead.createdAt}
             currentUserId={currentUserId}
             canEdit={canEdit}
