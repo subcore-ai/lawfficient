@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Search } from "lucide-react"
 
 import { Input } from "@workspace/ui/components/input"
@@ -57,6 +58,7 @@ export function LeadsTable({
   const [source, setSource] = React.useState(ALL)
   const [showArchived, setShowArchived] = React.useState(false)
   const [, startTransition] = React.useTransition()
+  const router = useRouter()
 
   const statusOptions = statuses.map((s) => ({ value: s.id, label: s.name }))
   const assigneeName = new Map(assignees.map((a) => [a.id, a.name]))
@@ -175,15 +177,32 @@ export function LeadsTable({
           </TableHeader>
           <TableBody>
             {filtered.map((l) => (
-              <TableRow key={l.id} className={cn("hover:bg-muted/40", l.archived && "opacity-50")}>
+              <TableRow
+                key={l.id}
+                // Whole-row click navigates to the lead (pointer convenience). The name <Link> stays
+                // the keyboard/screen-reader path; the interactive cells below stopPropagation so the
+                // Status/Assigned selects and the ⋯ menu work without navigating.
+                onClick={() => {
+                  if (window.getSelection()?.toString()) return // let users select/copy text
+                  router.push(`/leads/${l.id}`)
+                }}
+                className={cn(
+                  "hover:bg-muted/40 cursor-pointer",
+                  l.archived && "opacity-50",
+                )}
+              >
                 <TableCell>
-                  <Link href={`/leads/${l.id}`} className="font-medium hover:underline">
+                  <Link
+                    href={`/leads/${l.id}`}
+                    className="font-medium hover:underline"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     {l.firstName} {l.lastName}
                   </Link>
                   <div className="text-muted-foreground text-xs">{l.email}</div>
                 </TableCell>
                 <TableCell className="text-muted-foreground hidden md:table-cell">{l.source}</TableCell>
-                <TableCell>
+                <TableCell onClick={(e) => e.stopPropagation()}>
                   <InlineSelect
                     value={l.status.id}
                     options={statusOptions}
@@ -199,7 +218,10 @@ export function LeadsTable({
                     <span className="text-muted-foreground">—</span>
                   )}
                 </TableCell>
-                <TableCell className="hidden lg:table-cell">
+                <TableCell
+                  className="hidden lg:table-cell"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   {canEdit ? (
                     <InlineSelect
                       value={l.assignedToId ?? UNASSIGNED}
@@ -216,7 +238,7 @@ export function LeadsTable({
                 <TableCell className="text-muted-foreground hidden text-sm sm:table-cell">
                   {formatDate(l.createdAt)}
                 </TableCell>
-                <TableCell>
+                <TableCell onClick={(e) => e.stopPropagation()}>
                   <LeadRowActions
                     lead={l}
                     assignees={assignees}
