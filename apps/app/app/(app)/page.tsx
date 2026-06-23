@@ -46,10 +46,11 @@ async function load(): Promise<Loaded> {
   const canCreateLead = me.permissions?.includes("leads.edit") ?? false
   const canManage = me.permissions?.includes("settings.manage") ?? false
 
-  // Assignees + taxonomies from the per-firm cache.
-  const [staff, taxRows] = await Promise.all([
+  // Assignees, taxonomies, and pipeline statuses from the per-firm cache (all cache hits).
+  const [staff, taxRows, statuses] = await Promise.all([
     getFirmStaff(me.firmId),
     getFirmTaxonomyRows(me.firmId),
+    getFirmStatusRows(me.firmId),
   ])
   const assignees = staff
     .filter((p) => p.status === "active")
@@ -62,7 +63,6 @@ async function load(): Promise<Loaded> {
     return { ...mockLeadCounts(), assignees, taxonomies, canCreateLead, canManage }
   }
 
-  const statuses = await getFirmStatusRows(me.firmId)
   const openIds = statuses.filter((s) => !s.is_terminal).map((s) => s.id)
   const eaId = statuses.find((s) => s.key === "ea_sent")?.id ?? NIL_UUID
 

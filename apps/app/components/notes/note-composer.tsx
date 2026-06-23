@@ -55,13 +55,15 @@ export function NoteComposer({
         const result = await addNote(entityType, entityId, text)
         if ("error" in result) {
           toast.error(result.error)
-          setBody(text) // restore — the optimistic note reverts when the transition ends
+          // Restore the draft only if the box is still empty — don't clobber a new note the user
+          // started typing while this submit was pending. (The optimistic note reverts on its own.)
+          setBody((cur) => (cur === "" ? text : cur))
           return
         }
         toast.success("Note added")
       } catch {
         toast.error("Something went wrong. Please try again.")
-        setBody(text)
+        setBody((cur) => (cur === "" ? text : cur))
       }
     })
   }
