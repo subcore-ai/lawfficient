@@ -38,6 +38,7 @@ Each module spec follows the same template (see [`_template.md`](_template.md)).
 | 22 | [Admin & Settings](22-admin-settings.md) | UC23, UC24, UC25 |
 | 23 | [Lead Ingestion & Source Connectors](23-lead-ingestion.md) | UC2, UC3, UC6, UC7, UC43 (multi-source contract) |
 | 24 | [User Management](24-user-management.md) | UC25, UC1 (activation) |
+| 26 | [Public API Platform](26-public-api.md) | Programmatic access to every capability (per-firm API keys) |
 
 ## Conventions
 
