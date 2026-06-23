@@ -32,7 +32,7 @@ import {
   setNoteResolved,
   type ActionResult,
 } from "@/lib/notes/actions"
-import { formatDate, formatDateTime } from "@/lib/format"
+import { LocalTime } from "@/components/local-time"
 import { partitionNotes, type NoteView } from "@/lib/notes/queries"
 
 type Filter = "all" | "note" | "event"
@@ -138,7 +138,7 @@ export function NotesTimeline({
                   <span className="absolute top-1.5 -left-[1.3rem] size-2 rounded-full bg-muted-foreground/40 ring-4 ring-background" />
                   <p className="text-sm">{note.body}</p>
                   <p className="text-xs text-muted-foreground">
-                    {note.authorName} · {formatDateTime(note.createdAt)}
+                    {note.authorName} · <LocalTime iso={note.createdAt} />
                   </p>
                 </li>
               )
@@ -167,7 +167,7 @@ export function NotesTimeline({
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
                     <span className="font-medium">{note.authorName}</span>
                     <span className="text-muted-foreground">
-                      {formatDateTime(note.createdAt)}
+                      <LocalTime iso={note.createdAt} />
                     </span>
                     {note.editedAt ? (
                       <span className="text-muted-foreground">· edited</span>
@@ -317,7 +317,7 @@ export function NotesTimeline({
               <span className="absolute top-1.5 -left-[1.3rem] size-2 rounded-full bg-muted ring-4 ring-background" />
               <p className="text-sm">Record created</p>
               <p className="text-xs text-muted-foreground">
-                {formatDate(createdAt)}
+                <LocalTime iso={createdAt} mode="date" />
               </p>
             </li>
           ) : null}
