@@ -216,11 +216,11 @@ export async function updateLead(
   if (!core.ok) return { error: core.error }
 
   const supabase = await createClient()
-  // Read existing first: for the jsonb merge below, and so an unchanged deactivated/legacy taxonomy
-  // value still validates (loadVocab returns only ACTIVE labels; the form resubmits current values).
+  // Read existing first: for the jsonb merge below, the assignee/qualification event diff, and so an
+  // unchanged deactivated/legacy taxonomy value still validates (the form resubmits current values).
   const { data: existing, error: readErr } = await supabase
     .from("leads")
-    .select("data")
+    .select("data, assigned_to_id")
     .eq("id", id)
     .single()
   if (readErr || !existing) return { error: "Couldn't update the lead." }
@@ -262,6 +262,29 @@ export async function updateLead(
     `${core.value.firstName} ${core.value.lastName}`,
     "updated"
   )
+  // Mirror the inline controls' timeline events for the fields the dialog can also change.
+  if (existing.assigned_to_id !== core.value.assignedToId) {
+    let body = "Unassigned the lead"
+    if (core.value.assignedToId) {
+      const { data: assignee } = await supabase
+        .from("profiles")
+        .select("name")
+        .eq("id", core.value.assignedToId)
+        .maybeSingle()
+      body = `Assigned to ${assignee?.name ?? "a teammate"}`
+    }
+    await recordEvent(gate.user.firmId, id, body, gate.user.id)
+  }
+  const oldQual = parseLeadData(existing.data).qualification ?? ""
+  const newQual = data.value.qualification ?? ""
+  if (oldQual !== newQual) {
+    await recordEvent(
+      gate.user.firmId,
+      id,
+      newQual ? `Qualification → ${newQual}` : "Qualification cleared",
+      gate.user.id
+    )
+  }
   revalidateLeads(id)
   return { ok: true }
 }
