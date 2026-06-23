@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Bell, LogOut, Monitor, Moon, Search, Sun, User } from "lucide-react"
+import { Bell, Check, LogOut, Monitor, Moon, Search, Sun, User } from "lucide-react"
 import { useTheme } from "next-themes"
 
 import { UserAvatar } from "@/components/user-avatar"
@@ -68,7 +68,7 @@ export function AppTopbar({
 }) {
   const pathname = usePathname()
   const segments = pathname.split("/").filter(Boolean)
-  const { setTheme } = useTheme()
+  const { theme, setTheme } = useTheme()
 
   // Real signed-in user when Supabase is wired; the mock keeps the Phase 0 demo working.
   const name = user?.name ?? CURRENT_USER.name
@@ -147,12 +147,15 @@ export function AppTopbar({
               <DropdownMenuSubContent>
                 <DropdownMenuItem onClick={() => setTheme("light")}>
                   <Sun className="size-4" /> Light
+                  {theme === "light" ? <Check className="ml-auto size-4" /> : null}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setTheme("dark")}>
                   <Moon className="size-4" /> Dark
+                  {theme === "dark" ? <Check className="ml-auto size-4" /> : null}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setTheme("system")}>
                   <Monitor className="size-4" /> System
+                  {theme === "system" ? <Check className="ml-auto size-4" /> : null}
                 </DropdownMenuItem>
               </DropdownMenuSubContent>
             </DropdownMenuSub>

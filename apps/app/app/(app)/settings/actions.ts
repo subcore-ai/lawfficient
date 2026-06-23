@@ -30,9 +30,14 @@ export async function updateFirmProfile(formData: FormData): Promise<ActionResul
   if (!name) return { error: "Firm name is required." }
   if (name.length > MAX.name) return { error: `Firm name must be ${MAX.name} characters or fewer.` }
 
-  const contactEmail = field(formData, "contactEmail", MAX.email)
-  if (contactEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(contactEmail)) {
-    return { error: "Enter a valid contact email." }
+  const contactEmail = String(formData.get("contactEmail") ?? "").trim() || null
+  if (contactEmail) {
+    if (contactEmail.length > MAX.email) {
+      return { error: `Contact email must be ${MAX.email} characters or fewer.` }
+    }
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(contactEmail)) {
+      return { error: "Enter a valid contact email." }
+    }
   }
 
   const timezone = String(formData.get("timezone") ?? "").trim() || null
@@ -42,14 +47,15 @@ export async function updateFirmProfile(formData: FormData): Promise<ActionResul
   let consultationFee: number | null = null
   if (feeRaw.length > 0) {
     const n = Number(feeRaw)
-    if (!Number.isInteger(n) || n < 0) {
-      return { error: "Consultation fee must be a whole dollar amount." }
+    // Cap at the PostgreSQL 32-bit integer max so an oversized value can't throw "integer out of range".
+    if (!Number.isInteger(n) || n < 0 || n > 2_147_483_647) {
+      return { error: "Consultation fee must be a valid whole dollar amount." }
     }
     consultationFee = n
   }
 
   const supabase = await createClient()
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("firms")
     .update({
       name,
@@ -61,7 +67,13 @@ export async function updateFirmProfile(formData: FormData): Promise<ActionResul
       office_address: field(formData, "address", MAX.address),
     })
     .eq("id", me.firmId)
+    .select("id")
   if (error) return { error: "Couldn't save the firm profile. Please try again." }
+  // A zero-row update (e.g. an RLS denial) returns no error in PostgREST — treat it as a failure
+  // rather than reporting a false success.
+  if (!data || data.length === 0) {
+    return { error: "Couldn't save the firm profile — you may not have permission." }
+  }
 
   revalidatePath(SETTINGS_PATH)
   // The app shell brand isn't firm-driven yet, so no layout revalidate is needed.

@@ -11,11 +11,14 @@ export default async function SettingsGeneralPage() {
   if (!me) redirect("/login")
 
   const supabase = await createClient()
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("firms")
     .select("name, contact_email, phone, timezone, default_language, consultation_fee, office_address")
     .eq("id", me.firmId)
     .maybeSingle()
+  // Surface RLS/network failures via the error boundary rather than rendering the form with empty
+  // defaults — which an admin could then save and overwrite real profile fields with nulls.
+  if (error) throw error
 
   const row = data as {
     name: string

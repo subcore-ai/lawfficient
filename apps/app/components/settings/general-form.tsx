@@ -121,6 +121,7 @@ export function GeneralForm({
                   name="consultationFee"
                   type="number"
                   min={0}
+                  max={2147483647}
                   step={1}
                   inputMode="numeric"
                   defaultValue={initial.consultationFee ?? ""}
