@@ -42,9 +42,14 @@ export function GeneralForm({
   canManage: boolean
 }) {
   const [pending, startTransition] = React.useTransition()
-  // The Select isn't a native form control, so its value is tracked here and set
-  // onto the FormData at submit time.
-  const [timezone, setTimezone] = React.useState(firm.timezone ?? "")
+  // Snapshot the firm at mount. A successful save revalidates this page and re-feeds props, but
+  // the fields below are uncontrolled — re-feeding a changed defaultValue would trip Base UI's
+  // "changed defaultValue after init" warning (and be ignored anyway, since the DOM already holds
+  // the user's edits, which equal what was just saved).
+  const initial = React.useRef(firm).current
+  // The Select isn't a native form control, so its value is tracked here and set onto the
+  // FormData at submit time.
+  const [timezone, setTimezone] = React.useState(initial.timezone ?? "")
   const disabled = !canManage || pending
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -71,19 +76,19 @@ export function GeneralForm({
         <form onSubmit={onSubmit} className="flex flex-col gap-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Firm name">
-              <Input name="name" defaultValue={firm.name} required maxLength={200} disabled={disabled} />
+              <Input name="name" defaultValue={initial.name} required maxLength={200} disabled={disabled} />
             </Field>
             <Field label="Contact email">
               <Input
                 name="contactEmail"
                 type="email"
-                defaultValue={firm.contactEmail ?? ""}
+                defaultValue={initial.contactEmail ?? ""}
                 maxLength={254}
                 disabled={disabled}
               />
             </Field>
             <Field label="Phone">
-              <Input name="phone" type="tel" defaultValue={firm.phone ?? ""} maxLength={40} disabled={disabled} />
+              <Input name="phone" type="tel" defaultValue={initial.phone ?? ""} maxLength={40} disabled={disabled} />
             </Field>
             <Field label="Default time zone">
               <Select
@@ -105,7 +110,7 @@ export function GeneralForm({
               </Select>
             </Field>
             <Field label="Default language">
-              <Input name="language" defaultValue={firm.language ?? ""} maxLength={60} disabled={disabled} />
+              <Input name="language" defaultValue={initial.language ?? ""} maxLength={60} disabled={disabled} />
             </Field>
             <Field label="Default consultation fee">
               <div className="relative">
@@ -118,7 +123,7 @@ export function GeneralForm({
                   min={0}
                   step={1}
                   inputMode="numeric"
-                  defaultValue={firm.consultationFee ?? ""}
+                  defaultValue={initial.consultationFee ?? ""}
                   className="pl-7"
                   disabled={disabled}
                 />
@@ -127,7 +132,7 @@ export function GeneralForm({
             <Field label="Office address" className="sm:col-span-2">
               <Input
                 name="address"
-                defaultValue={firm.officeAddress ?? ""}
+                defaultValue={initial.officeAddress ?? ""}
                 maxLength={300}
                 disabled={disabled}
               />
