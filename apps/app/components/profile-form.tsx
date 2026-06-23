@@ -240,6 +240,7 @@ function AvatarCard({
   editable: boolean
 }) {
   const [pending, startTransition] = React.useTransition()
+  const [actionType, setActionType] = React.useState<"upload" | "remove" | null>(null)
   // Local object-URL for instant feedback while the upload is in flight; the
   // server's revalidated avatarUrl takes over once the action resolves.
   const [preview, setPreview] = React.useState<string | null>(null)
@@ -259,28 +260,38 @@ function AvatarCard({
     }
     const localUrl = URL.createObjectURL(file)
     setPreview(localUrl)
+    setActionType("upload")
     const fd = new FormData()
     fd.append("avatar", file)
     startTransition(async () => {
-      const res = await updateMyAvatar(fd)
-      URL.revokeObjectURL(localUrl)
-      setPreview(null)
-      if ("error" in res) {
-        toast.error(res.error)
-        return
+      try {
+        const res = await updateMyAvatar(fd)
+        if ("error" in res) toast.error(res.error)
+        else toast.success("Photo updated")
+      } catch {
+        toast.error("Couldn't upload your photo. Please try again.")
+      } finally {
+        // Always revoke + clear, even if the action threw, so we never leak the
+        // object URL or strand the preview over the (unchanged) avatar.
+        URL.revokeObjectURL(localUrl)
+        setPreview(null)
+        setActionType(null)
       }
-      toast.success("Photo updated")
     })
   }
 
   function onRemove() {
+    setActionType("remove")
     startTransition(async () => {
-      const res = await removeMyAvatar()
-      if ("error" in res) {
-        toast.error(res.error)
-        return
+      try {
+        const res = await removeMyAvatar()
+        if ("error" in res) toast.error(res.error)
+        else toast.success("Photo removed")
+      } catch {
+        toast.error("Couldn't remove your photo. Please try again.")
+      } finally {
+        setActionType(null)
       }
-      toast.success("Photo removed")
     })
   }
 
@@ -312,11 +323,11 @@ function AvatarCard({
             disabled={!editable || pending}
             onClick={() => inputRef.current?.click()}
           >
-            {pending ? "Uploading…" : avatarUrl ? "Change photo" : "Upload photo"}
+            {actionType === "upload" ? "Uploading…" : avatarUrl ? "Change photo" : "Upload photo"}
           </Button>
           {avatarUrl ? (
             <Button variant="ghost" size="sm" disabled={pending} onClick={onRemove}>
-              Remove
+              {actionType === "remove" ? "Removing…" : "Remove"}
             </Button>
           ) : null}
         </div>
