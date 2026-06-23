@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Mail, Phone, Search } from "lucide-react"
+import { Phone, Search } from "lucide-react"
 
 import { Input } from "@workspace/ui/components/input"
 import {
@@ -243,25 +243,10 @@ export function LeadsTable({
                   <Link href={`/leads/${l.id}`} className="font-medium hover:underline">
                     {l.firstName} {l.lastName}
                   </Link>
-                  {/* Compact, actionable contact icons: mailto / tel links, value on hover. The
-                      whole-row click handler skips <a> targets, so these don't trigger navigation. */}
-                  <div className="text-muted-foreground mt-1 flex items-center gap-3">
-                    {l.email ? (
-                      <Tooltip>
-                        <TooltipTrigger
-                          render={
-                            <a
-                              href={`mailto:${l.email}`}
-                              aria-label={`Email ${l.email}`}
-                              className="hover:text-foreground inline-flex"
-                            />
-                          }
-                        >
-                          <Mail className="size-3.5" />
-                        </TooltipTrigger>
-                        <TooltipContent>{l.email}</TooltipContent>
-                      </Tooltip>
-                    ) : null}
+                  {/* Email stays visible as text; phone shows as a tel: icon that reveals the
+                      number on hover. The whole-row click handler skips <a> targets, so it dials. */}
+                  <div className="text-muted-foreground mt-0.5 flex items-center gap-2 text-xs">
+                    {l.email ? <span>{l.email}</span> : null}
                     {l.phone ? (
                       <Tooltip>
                         <TooltipTrigger
@@ -269,7 +254,7 @@ export function LeadsTable({
                             <a
                               href={`tel:${l.phone}`}
                               aria-label={`Call ${l.phone}`}
-                              className="hover:text-foreground inline-flex"
+                              className="hover:text-foreground inline-flex shrink-0"
                             />
                           }
                         >
