@@ -31,33 +31,46 @@ import {
   useSidebar,
 } from "@workspace/ui/components/sidebar"
 
-type NavItem = { title: string; href: string; icon: React.ComponentType<{ className?: string }> }
+import { DataStatusDot } from "@/components/dev/data-status-dot"
+import {
+  DATA_STATUS_LABEL,
+  SHOW_DATA_STATUS,
+  type DataStatus,
+} from "@/lib/dev/data-status"
+
+type NavItem = {
+  title: string
+  href: string
+  icon: React.ComponentType<{ className?: string }>
+  // Build-time data-wiring status (see lib/dev/data-status.ts). Flip to "live" as a section is wired.
+  data: DataStatus
+}
 
 const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   {
     label: "Overview",
-    items: [{ title: "Dashboard", href: "/", icon: LayoutDashboard }],
+    items: [{ title: "Dashboard", href: "/", icon: LayoutDashboard, data: "partial" }],
   },
   {
     label: "Clients & Cases",
     items: [
-      { title: "Leads", href: "/leads", icon: Users },
-      { title: "Consultations", href: "/consultations", icon: CalendarClock },
-      { title: "Clients", href: "/clients", icon: UserCheck },
-      { title: "Cases", href: "/cases", icon: FolderKanban },
+      { title: "Leads", href: "/leads", icon: Users, data: "live" },
+      { title: "Consultations", href: "/consultations", icon: CalendarClock, data: "mock" },
+      { title: "Clients", href: "/clients", icon: UserCheck, data: "mock" },
+      { title: "Cases", href: "/cases", icon: FolderKanban, data: "mock" },
     ],
   },
   {
     label: "Operations",
     items: [
-      { title: "Documents", href: "/documents", icon: FileText },
-      { title: "Billing", href: "/billing", icon: Receipt },
-      { title: "Communications", href: "/communications", icon: MessageSquare },
+      { title: "Documents", href: "/documents", icon: FileText, data: "mock" },
+      { title: "Billing", href: "/billing", icon: Receipt, data: "mock" },
+      { title: "Communications", href: "/communications", icon: MessageSquare, data: "mock" },
     ],
   },
   {
     label: "Insights",
-    items: [{ title: "Reporting", href: "/reporting", icon: BarChart3 }],
+    items: [{ title: "Reporting", href: "/reporting", icon: BarChart3, data: "mock" }],
   },
 ]
 
@@ -104,6 +117,7 @@ export function AppSidebar() {
                   >
                     <item.icon className="size-4" />
                     <span>{item.title}</span>
+                    <DataStatusDot status={item.data} className="ml-auto group-data-[collapsible=icon]:hidden" />
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
@@ -122,9 +136,20 @@ export function AppSidebar() {
             >
               <Settings className="size-4" />
               <span>Settings</span>
+              <DataStatusDot status="partial" className="ml-auto group-data-[collapsible=icon]:hidden" />
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
+        {SHOW_DATA_STATUS ? (
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 px-2 py-1 text-[10px] text-muted-foreground group-data-[collapsible=icon]:hidden">
+            {(["live", "partial", "mock"] as const).map((s) => (
+              <span key={s} className="inline-flex items-center gap-1">
+                <DataStatusDot status={s} />
+                {DATA_STATUS_LABEL[s]}
+              </span>
+            ))}
+          </div>
+        ) : null}
       </SidebarFooter>
 
       <SidebarRail />
