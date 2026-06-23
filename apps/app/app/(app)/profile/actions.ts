@@ -149,10 +149,22 @@ export async function removeMyAvatar(): Promise<ActionResult> {
   const oldPath = (prev as { avatar_path: string | null } | null)?.avatar_path ?? null
   if (!oldPath) return { ok: true }
 
-  const { error } = await supabase.from("profiles").update({ avatar_path: null }).eq("id", user.id)
+  // Compare-and-set on avatar_path: if a concurrent upload moved the pointer to a newer
+  // object between the read above and here, this matches 0 rows and we leave the new photo
+  // intact instead of clobbering it.
+  const { data: cleared, error } = await supabase
+    .from("profiles")
+    .update({ avatar_path: null })
+    .eq("id", user.id)
+    .eq("avatar_path", oldPath)
+    .select("id")
   if (error) return { error: "Couldn't remove your photo. Please try again." }
 
-  await supabase.storage.from(AVATAR_BUCKET).remove([oldPath]) // best-effort
+  // Only delete the object if we actually nulled the pointer — otherwise a newer upload owns
+  // the avatar now (and already cleaned up this old object).
+  if (cleared && cleared.length > 0) {
+    await supabase.storage.from(AVATAR_BUCKET).remove([oldPath]) // best-effort
+  }
 
   await supabase.from("audit_log").insert({
     entity: "user",
