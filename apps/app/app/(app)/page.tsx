@@ -17,6 +17,7 @@ const NIL_UUID = "00000000-0000-0000-0000-000000000000"
 type Loaded = {
   openLeads: number
   eaOut: number
+  leadKpisMock: boolean
   assignees: AssigneeOption[]
   taxonomies: FirmTaxonomies
   canCreateLead: boolean
@@ -37,6 +38,7 @@ async function load(): Promise<Loaded> {
   if (!me)
     return {
       ...mockLeadCounts(),
+      leadKpisMock: true,
       assignees: [],
       taxonomies: groupTaxonomies([]),
       canCreateLead: false,
@@ -60,7 +62,7 @@ async function load(): Promise<Loaded> {
   // The lead KPIs need leads.view. For roles without it (QA lead, creative writer, file clerk)
   // keep them on the mock counts like the rest of the dashboard, rather than a misleading 0.
   if (!(me.permissions?.includes("leads.view") ?? false)) {
-    return { ...mockLeadCounts(), assignees, taxonomies, canCreateLead, canManage }
+    return { ...mockLeadCounts(), leadKpisMock: true, assignees, taxonomies, canCreateLead, canManage }
   }
 
   const openIds = statuses.filter((s) => !s.is_terminal).map((s) => s.id)
@@ -74,15 +76,16 @@ async function load(): Promise<Loaded> {
   if (openRes.error) throw openRes.error
   if (eaRes.error) throw eaRes.error
 
-  return { openLeads: openRes.count ?? 0, eaOut: eaRes.count ?? 0, assignees, taxonomies, canCreateLead, canManage }
+  return { openLeads: openRes.count ?? 0, eaOut: eaRes.count ?? 0, leadKpisMock: false, assignees, taxonomies, canCreateLead, canManage }
 }
 
 export default async function DashboardPage() {
-  const { openLeads, eaOut, assignees, taxonomies, canCreateLead, canManage } = await load()
+  const { openLeads, eaOut, leadKpisMock, assignees, taxonomies, canCreateLead, canManage } = await load()
   return (
     <DashboardView
       openLeads={openLeads}
       eaOut={eaOut}
+      leadKpisMock={leadKpisMock}
       assignees={assignees}
       taxonomies={taxonomies}
       canCreateLead={canCreateLead}

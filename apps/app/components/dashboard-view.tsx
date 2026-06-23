@@ -60,6 +60,7 @@ const ACTIVITY_ICON: Record<Activity["kind"], React.ComponentType<{ className?: 
 export function DashboardView({
   openLeads,
   eaOut,
+  leadKpisMock,
   assignees,
   taxonomies,
   canCreateLead,
@@ -67,6 +68,7 @@ export function DashboardView({
 }: {
   openLeads: number
   eaOut: number
+  leadKpisMock: boolean
   assignees: AssigneeOption[]
   taxonomies: FirmTaxonomies
   canCreateLead: boolean
@@ -82,11 +84,12 @@ export function DashboardView({
   const overdue = invoices.filter((i) => i.status === "overdue").reduce((sum, i) => sum + i.remaining, 0)
   const redFlags = cases.filter((c) => c.redFlag !== "none").length
 
-  // openLeads + eaOut are real Supabase counts; the rest are still derived from the mock store.
+  // openLeads + eaOut are real Supabase counts — unless the viewer lacks leads.view, in which case
+  // they fall back to mock counts (leadKpisMock) like the rest of the dashboard.
   const kpis: { kpi: Kpi; mock?: boolean }[] = [
-    { kpi: { label: "Leads in pipeline", value: String(openLeads), delta: 0, hint: "active leads" } },
+    { kpi: { label: "Leads in pipeline", value: String(openLeads), delta: 0, hint: "active leads" }, mock: leadKpisMock },
     { kpi: { label: "Upcoming consultations", value: String(upcoming.length), delta: 20, hint: "scheduled & paid" }, mock: true },
-    { kpi: { label: "Pending retainers (EA out)", value: String(eaOut), delta: 0, hint: "awaiting signature" } },
+    { kpi: { label: "Pending retainers (EA out)", value: String(eaOut), delta: 0, hint: "awaiting signature" }, mock: leadKpisMock },
     { kpi: { label: "Retained clients", value: String(clients.length), delta: 9.1, hint: "active engagements" }, mock: true },
     { kpi: { label: "Overdue balance", value: formatCurrency(overdue), delta: 4.2, hint: "across clients" }, mock: true },
     { kpi: { label: "Red-flag cases", value: String(redFlags), delta: 0, hint: "need attention" }, mock: true },

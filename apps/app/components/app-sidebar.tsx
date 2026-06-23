@@ -117,7 +117,7 @@ export function AppSidebar() {
                   >
                     <item.icon className="size-4" />
                     <span>{item.title}</span>
-                    <DataStatusDot status={item.data} className="ml-auto" />
+                    <DataStatusDot status={item.data} className="ml-auto group-data-[collapsible=icon]:hidden" />
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
@@ -136,7 +136,7 @@ export function AppSidebar() {
             >
               <Settings className="size-4" />
               <span>Settings</span>
-              <DataStatusDot status="partial" className="ml-auto" />
+              <DataStatusDot status="partial" className="ml-auto group-data-[collapsible=icon]:hidden" />
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
