@@ -238,10 +238,12 @@ export async function updateLead(
   )
   if (!data.ok) return { error: data.error }
 
-  // Assignee + qualification are edited inline on the detail page (sidebar), never via this dialog —
-  // so updateLead doesn't write assigned_to_id, and preserves the stored qualification. mergeLeadData
-  // strips every known data key, so re-apply qualification or the dialog's stale snapshot would
-  // silently clear/revert an inline change. (assignLead / setLeadQualification own those edits + events.)
+  // Assignee + qualification are edited inline (sidebar), never via this dialog. assigned_to_id is
+  // never written here; qualification is stripped from the dialog payload — so a crafted or stale
+  // submit can't set or change it (which would bypass the inline-only path and its timeline event) —
+  // then re-applied from the stored value (mergeLeadData strips all known data keys). assignLead /
+  // setLeadQualification own these edits and their events.
+  delete data.value.qualification
   const mergedData = mergeLeadData(existing.data, data.value)
   if (existingData.qualification) mergedData.qualification = existingData.qualification
 
