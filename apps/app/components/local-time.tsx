@@ -35,14 +35,13 @@ export function LocalTime({
   iso: string
   mode?: "date" | "datetime"
 }) {
-  const text = React.useSyncExternalStore(
-    subscribe,
-    () => {
-      const d = new Date(iso)
-      if (Number.isNaN(d.getTime())) return utc(iso, mode)
-      return d.toLocaleString("en-US", mode === "date" ? DATE_OPTS : DATETIME_OPTS)
-    },
-    () => utc(iso, mode)
-  )
+  // Stable per (iso, mode) so useSyncExternalStore isn't handed fresh snapshot fns each render.
+  const getSnapshot = React.useCallback(() => {
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return utc(iso, mode)
+    return d.toLocaleString("en-US", mode === "date" ? DATE_OPTS : DATETIME_OPTS)
+  }, [iso, mode])
+  const getServerSnapshot = React.useCallback(() => utc(iso, mode), [iso, mode])
+  const text = React.useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
   return <time dateTime={iso}>{text}</time>
 }
