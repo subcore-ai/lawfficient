@@ -1,4 +1,4 @@
-import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui/components/avatar"
+import { UserAvatar } from "@/components/user-avatar"
 import {
   Table,
   TableBody,
@@ -58,12 +58,7 @@ export function UsersTable({
             <TableRow key={u.id} className="hover:bg-muted/40">
               <TableCell className="pl-4">
                 <div className="flex items-center gap-2.5">
-                  <Avatar className="size-7 rounded-md">
-                    {u.avatarUrl ? (
-                      <AvatarImage src={u.avatarUrl} alt="" className="rounded-md" />
-                    ) : null}
-                    <AvatarFallback className="rounded-md text-[10px]">{u.initials}</AvatarFallback>
-                  </Avatar>
+                  <UserAvatar name={u.name} src={u.avatarUrl} className="size-7" />
                   <div>
                     <div className="text-sm font-medium">{u.name}</div>
                     <div className="text-muted-foreground text-xs">{u.email}</div>

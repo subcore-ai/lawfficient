@@ -3,11 +3,7 @@
 import * as React from "react"
 import { Mail } from "lucide-react"
 
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@workspace/ui/components/avatar"
+import { UserAvatar } from "@/components/user-avatar"
 import {
   Card,
   CardContent,
@@ -24,7 +20,6 @@ import { GoogleIcon } from "@/components/google-icon"
 import { StatusPill } from "@/components/status-pill"
 import { ROLE_LABELS } from "@/data"
 import type { Role } from "@/data/types"
-import { initialsOf } from "@/lib/format"
 import {
   changeMyPassword,
   removeMyAvatar,
@@ -306,10 +301,7 @@ function AvatarCard({
         <CardDescription>Shown on your profile and in the top bar.</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col items-center gap-4">
-        <Avatar className="size-28">
-          {shown ? <AvatarImage src={shown} alt="" /> : null}
-          <AvatarFallback className="text-2xl">{initialsOf(name)}</AvatarFallback>
-        </Avatar>
+        <UserAvatar name={name} src={shown} className="size-28" fallbackClassName="text-2xl" />
         <input
           ref={inputRef}
           type="file"

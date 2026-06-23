@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 
-import { Avatar, AvatarFallback } from "@workspace/ui/components/avatar"
+import { UserAvatar } from "@/components/user-avatar"
 import {
   Select,
   SelectContent,
@@ -27,7 +27,7 @@ import { InlineSelect } from "@/components/inline-select"
 import { CONSULT_STATUS_OPTIONS } from "@/components/select-field"
 import { ShowArchivedToggle } from "@/components/show-archived-toggle"
 import { StatStrip } from "@/components/stat-strip"
-import { staffById, staffName } from "@/data"
+import { staffName } from "@/data"
 import { useStore } from "@/data/store"
 import type { ConsultationStatus } from "@/data/types"
 import { formatCurrency, formatDateTime } from "@/lib/format"
@@ -103,11 +103,7 @@ export function ConsultationsTable() {
                 </TableCell>
                 <TableCell className="hidden md:table-cell">
                   <div className="flex items-center gap-2">
-                    <Avatar className="size-6 rounded-md">
-                      <AvatarFallback className="rounded-md text-[10px]">
-                        {staffById(c.attorneyId)?.initials ?? "?"}
-                      </AvatarFallback>
-                    </Avatar>
+                    <UserAvatar name={staffName(c.attorneyId)} className="size-6" />
                     <span className="text-sm">{staffName(c.attorneyId)}</span>
                   </div>
                 </TableCell>
