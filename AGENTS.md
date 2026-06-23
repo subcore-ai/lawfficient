@@ -71,3 +71,20 @@ Test coverage is being built out with `bun test` — until it's broad, treat the
 ---
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites from overcomplication, and clarifying questions come before implementation rather than after mistakes.
+
+# Dev data-status indicators (mock vs. live)
+
+While the app is half-built, a **dev-only** indicator shows which sections are wired to real Supabase data vs. still on the mock store. It's visible in local dev automatically, on a deployed build only when `NEXT_PUBLIC_SHOW_DATA_STATUS=1` (set it in the staging Vercel env to demo there), and never in real production. **Keep it current as you wire each section** — it's a build tracker, so a stale flag misleads.
+
+Three states (`apps/app/lib/dev/data-status.ts` — the vocabulary + the `SHOW_DATA_STATUS` gate live here):
+
+- 🟢 `"live"` — real data end-to-end.
+- 🟡 `"partial"` — page mixes real and mock sections (e.g. the Dashboard: real lead KPIs, mock everything else).
+- ⚪️ `"mock"` — no real data yet.
+
+Two levels render it:
+
+- **Sidebar dots = page rollup.** One dot per nav item, driven by the `data:` field on the items in `apps/app/components/app-sidebar.tsx` and, for the Settings tabs, `apps/app/components/settings/settings-nav.tsx`. A footer legend explains the colours. (`components/dev/data-status-dot.tsx`.)
+- **`<MockTag>` = within-page marker** for a `"partial"` page. Drop it next to a `CardTitle` (or pass `mock` to `KpiCard`) on each section still on mock data; live sections get no tag. The Dashboard is the worked example. (`components/dev/mock-tag.tsx`.)
+
+**When you wire a section to real data:** remove its `<MockTag>`, and when a page's last mock section goes live flip that nav item's `data:` flag to `"live"` (use `"partial"` while a page is still mixed). At launch, delete the `NEXT_PUBLIC_SHOW_DATA_STATUS` flag and the `lib/dev` + `components/dev` helpers.
