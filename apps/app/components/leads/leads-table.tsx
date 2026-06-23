@@ -211,9 +211,8 @@ export function LeadsTable({
                   // Let interactive controls handle their own clicks (the inline Status/Assigned
                   // selects, the ⋯ menu, the name link); navigate from anywhere else in the row.
                   if (
-                    (e.target as HTMLElement).closest(
-                      'a, button, [data-slot="select-trigger"]',
-                    )
+                    e.target instanceof Element &&
+                    e.target.closest('a, button, [data-slot="select-trigger"]')
                   )
                     return
                   // Modifier-clicks (open in a new tab/window) belong to the name <Link>, not the row.
@@ -243,13 +242,16 @@ export function LeadsTable({
                 </TableCell>
                 <TableCell className="text-muted-foreground hidden md:table-cell">{l.source}</TableCell>
                 <TableCell>
-                  <InlineSelect
-                    value={l.status.id}
-                    options={statusOptions}
-                    ariaLabel="Status"
-                    disabled={!canEdit}
-                    onValueChange={(v) => onStatusChange(l.id, v)}
-                  />
+                  {canEdit ? (
+                    <InlineSelect
+                      value={l.status.id}
+                      options={statusOptions}
+                      ariaLabel="Status"
+                      onValueChange={(v) => onStatusChange(l.id, v)}
+                    />
+                  ) : (
+                    <StatusPill label={l.status.name} tone={l.status.tone} />
+                  )}
                 </TableCell>
                 <TableCell className="hidden xl:table-cell">
                   {l.data.qualification ? (
