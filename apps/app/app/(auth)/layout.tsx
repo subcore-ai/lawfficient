@@ -10,7 +10,6 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         </div>
         <div className="flex flex-col leading-none">
           <span className="text-lg font-semibold">Lawfficient</span>
-          <span className="text-muted-foreground text-xs">Immigration LMES</span>
         </div>
       </Link>
       {children}

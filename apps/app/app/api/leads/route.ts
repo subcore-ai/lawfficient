@@ -107,7 +107,6 @@ export async function POST(request: NextRequest) {
     phone: parsedPayload.core.phone,
     email: parsedPayload.core.email,
     source: source.key, // resolved from the key, never the body
-    notes: parsedPayload.core.notes,
   })
   const builtData = buildLeadData(parsedPayload.data, vocab)
 

@@ -15,7 +15,6 @@ const KNOWN_KEYS = new Set<string>([
   "email",
   "phone",
   "externalId",
-  "notes",
   // data
   "caseType",
   "hierarchy",
@@ -31,7 +30,7 @@ const KNOWN_KEYS = new Set<string>([
 ])
 
 export type ParsedPayload = {
-  core: { firstName: string; lastName: string; email: string; phone: string; notes: string }
+  core: { firstName: string; lastName: string; email: string; phone: string }
   data: LeadDataInput
   extra: Record<string, Json>
   externalId: string | null
@@ -78,7 +77,6 @@ export function parseCanonicalPayload(
       email: normalizeEmail(payload.email),
       // E.164 when parseable, else the raw string so nothing is lost.
       phone: rawPhone ? (toE164(rawPhone, defaultCountry) ?? rawPhone) : "",
-      notes: str(payload.notes),
     },
     data: {
       caseType: matchVocab(str(payload.caseType), vocab.caseType) || undefined,

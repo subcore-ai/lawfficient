@@ -84,7 +84,6 @@ export function AppSidebar() {
               </div>
               <div className="flex flex-col gap-0.5 leading-none">
                 <span className="font-semibold">Lawfficient</span>
-                <span className="text-muted-foreground text-xs">Immigration LMES</span>
               </div>
             </SidebarMenuButton>
           </SidebarMenuItem>

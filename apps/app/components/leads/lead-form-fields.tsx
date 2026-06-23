@@ -167,9 +167,6 @@ export function LeadFormFields({
       <Field label="Referral source" className="sm:col-span-2">
         <Input name="referralSource" defaultValue={lead?.data.referralSource} placeholder="Who referred them?" />
       </Field>
-      <Field label="Notes" className="sm:col-span-2">
-        <Input name="notes" defaultValue={lead?.notes ?? undefined} placeholder="Anything useful for the team" />
-      </Field>
     </div>
   )
 }

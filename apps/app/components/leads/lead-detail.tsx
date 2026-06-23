@@ -5,21 +5,39 @@ import Link from "next/link"
 import { Archive, ArchiveRestore, ArrowLeft, Pencil } from "lucide-react"
 
 import { Button } from "@workspace/ui/components/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card"
-import { Separator } from "@workspace/ui/components/separator"
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@workspace/ui/components/card"
 import { toast } from "@workspace/ui/components/sonner"
 
-import { assignLead, setLeadArchived, setLeadStatus } from "@/app/(app)/leads/actions"
+import {
+  assignLead,
+  setLeadArchived,
+  setLeadQualification,
+  setLeadStatus,
+} from "@/app/(app)/leads/actions"
 import { DetailList, DetailRow } from "@/components/detail-list"
 import { EditLeadDialog } from "@/components/leads/edit-lead-dialog"
 import { InlineSelect } from "@/components/inline-select"
+import { NoteComposer } from "@/components/notes/note-composer"
+import { NotesTimeline } from "@/components/notes/notes-timeline"
 import { StatusPill } from "@/components/status-pill"
-import type { AssigneeOption, LeadStatusView, LeadView } from "@/lib/leads/queries"
+import type {
+  AssigneeOption,
+  LeadStatusView,
+  LeadView,
+} from "@/lib/leads/queries"
+import type { NoteView } from "@/lib/notes/queries"
 import { formatDate } from "@/lib/format"
 import { qualificationBadge } from "@/lib/status"
 import type { FirmTaxonomies } from "@/lib/taxonomies/queries"
 
 const UNASSIGNED = "none"
+// Sentinel for "clear qualification" — the reserved "__" prefix can't collide with a taxonomy label.
+const NO_QUALIFICATION = "__none__"
 
 type Result = { ok: true } | { error: string }
 
@@ -28,6 +46,8 @@ export function LeadDetail({
   statuses,
   assignees,
   taxonomies,
+  notes,
+  currentUserId,
   canEdit,
   canManage,
 }: {
@@ -35,6 +55,8 @@ export function LeadDetail({
   statuses: LeadStatusView[]
   assignees: AssigneeOption[]
   taxonomies: FirmTaxonomies
+  notes: NoteView[]
+  currentUserId: string | null
   canEdit: boolean
   canManage: boolean
 }) {
@@ -51,6 +73,23 @@ export function LeadDetail({
   const assigneeName = lead.assignedToId
     ? (assignees.find((a) => a.id === lead.assignedToId)?.name ?? "—")
     : "Unassigned"
+
+  // Qualification options = the firm's active labels, plus the lead's current value if it's been
+  // deactivated, so it still renders.
+  const qualificationOptions = [
+    { value: NO_QUALIFICATION, label: "Not set" },
+    ...taxonomies.qualification
+      .filter((o) => o.isActive)
+      .map((o) => ({ value: o.label, label: o.label })),
+  ]
+  if (
+    lead.data.qualification &&
+    !qualificationOptions.some((o) => o.value === lead.data.qualification)
+  )
+    qualificationOptions.push({
+      value: lead.data.qualification,
+      label: lead.data.qualification,
+    })
 
   function run(fn: () => Promise<Result>) {
     startTransition(async () => {
@@ -75,7 +114,7 @@ export function LeadDetail({
     <>
       <Link
         href="/leads"
-        className="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1.5 text-sm"
+        className="inline-flex w-fit items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="size-4" /> Leads
       </Link>
@@ -85,14 +124,24 @@ export function LeadDetail({
           <h1 className="text-2xl font-semibold tracking-tight">{name}</h1>
           <div className="flex flex-wrap items-center gap-2">
             <StatusPill label={lead.status.name} tone={lead.status.tone} />
-            {data.qualification ? <StatusPill {...qualificationBadge(data.qualification)} /> : null}
-            {data.caseType ? <StatusPill label={data.caseType} tone="neutral" /> : null}
-            {lead.archived ? <StatusPill label="Archived" tone="neutral" /> : null}
+            {data.qualification ? (
+              <StatusPill {...qualificationBadge(data.qualification)} />
+            ) : null}
+            {data.caseType ? (
+              <StatusPill label={data.caseType} tone="neutral" />
+            ) : null}
+            {lead.archived ? (
+              <StatusPill label="Archived" tone="neutral" />
+            ) : null}
           </div>
         </div>
         {canEdit ? (
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setEditOpen(true)}
+            >
               <Pencil className="size-4" /> Edit
             </Button>
             <Button variant="outline" size="sm" onClick={onArchive}>
@@ -123,61 +172,129 @@ export function LeadDetail({
                 {[data.city, data.state].filter(Boolean).join(", ") || "—"}
               </DetailRow>
               <DetailRow label="ZIP">{data.zip ?? "—"}</DetailRow>
-              <DetailRow label="Country of origin">{data.countryOfOrigin ?? "—"}</DetailRow>
-              <DetailRow label="Preferred language">{data.preferredLanguage ?? "—"}</DetailRow>
+              <DetailRow label="Country of origin">
+                {data.countryOfOrigin ?? "—"}
+              </DetailRow>
+              <DetailRow label="Preferred language">
+                {data.preferredLanguage ?? "—"}
+              </DetailRow>
               <DetailRow label="Source">{lead.source}</DetailRow>
-              <DetailRow label="Case type">{data.caseType ?? "Not set"}</DetailRow>
-              <DetailRow label="Case hierarchy">{data.hierarchy ?? "Not set"}</DetailRow>
+              <DetailRow label="Case type">
+                {data.caseType ?? "Not set"}
+              </DetailRow>
+              <DetailRow label="Case hierarchy">
+                {data.hierarchy ?? "Not set"}
+              </DetailRow>
               <DetailRow label="Gender">{data.gender ?? "—"}</DetailRow>
               <DetailRow label="Date of birth">{data.dob ?? "—"}</DetailRow>
-              <DetailRow label="Referral source">{data.referralSource ?? "—"}</DetailRow>
-              <DetailRow label="Created">{formatDate(lead.createdAt)}</DetailRow>
-              <DetailRow label="Last activity">{formatDate(lead.lastActivity)}</DetailRow>
+              <DetailRow label="Referral source">
+                {data.referralSource ?? "—"}
+              </DetailRow>
+              <DetailRow label="Created">
+                {formatDate(lead.createdAt)}
+              </DetailRow>
+              <DetailRow label="Last activity">
+                {formatDate(lead.lastActivity)}
+              </DetailRow>
             </DetailList>
-            {lead.notes ? (
-              <>
-                <Separator className="my-5" />
-                <p className="text-muted-foreground text-xs">Notes</p>
-                <p className="mt-1 text-sm">{lead.notes}</p>
-              </>
-            ) : null}
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Status &amp; owner</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground text-sm">Status</span>
-              {canEdit ? (
-                <InlineSelect
-                  value={lead.status.id}
-                  options={statusOptions}
-                  ariaLabel="Status"
-                  onValueChange={(v) => run(() => setLeadStatus(lead.id, v))}
-                />
-              ) : (
-                <StatusPill label={lead.status.name} tone={lead.status.tone} />
-              )}
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground text-sm">Assigned to</span>
-              {canEdit ? (
-                <InlineSelect
-                  value={lead.assignedToId ?? UNASSIGNED}
-                  options={inlineAssignee}
-                  ariaLabel="Assignee"
-                  onValueChange={(v) => run(() => assignLead(lead.id, v === UNASSIGNED ? "" : v))}
-                />
-              ) : (
-                <span className="text-sm">{assigneeName}</span>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+        <div className="flex flex-col gap-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Status &amp; owner</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Status</span>
+                {canEdit ? (
+                  <InlineSelect
+                    value={lead.status.id}
+                    options={statusOptions}
+                    ariaLabel="Status"
+                    onValueChange={(v) => run(() => setLeadStatus(lead.id, v))}
+                  />
+                ) : (
+                  <StatusPill
+                    label={lead.status.name}
+                    tone={lead.status.tone}
+                  />
+                )}
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">
+                  Assigned to
+                </span>
+                {canEdit ? (
+                  <InlineSelect
+                    value={lead.assignedToId ?? UNASSIGNED}
+                    options={inlineAssignee}
+                    ariaLabel="Assignee"
+                    onValueChange={(v) =>
+                      run(() => assignLead(lead.id, v === UNASSIGNED ? "" : v))
+                    }
+                  />
+                ) : (
+                  <span className="text-sm">{assigneeName}</span>
+                )}
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">
+                  Qualification
+                </span>
+                {canEdit ? (
+                  <InlineSelect
+                    value={lead.data.qualification ?? NO_QUALIFICATION}
+                    options={qualificationOptions}
+                    ariaLabel="Qualification"
+                    onValueChange={(v) =>
+                      run(() =>
+                        setLeadQualification(
+                          lead.id,
+                          v === NO_QUALIFICATION ? "" : v
+                        )
+                      )
+                    }
+                  />
+                ) : lead.data.qualification ? (
+                  <StatusPill
+                    {...qualificationBadge(lead.data.qualification)}
+                  />
+                ) : (
+                  <span className="text-sm">—</span>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {canEdit ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Add a note</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <NoteComposer entityType="lead" entityId={lead.id} />
+              </CardContent>
+            </Card>
+          ) : null}
+        </div>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Activity</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <NotesTimeline
+            notes={notes}
+            createdAt={lead.createdAt}
+            currentUserId={currentUserId}
+            canEdit={canEdit}
+            isAdmin={canManage}
+          />
+        </CardContent>
+      </Card>
 
       {canEdit ? (
         <EditLeadDialog
