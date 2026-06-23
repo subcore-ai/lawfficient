@@ -260,7 +260,9 @@ export function LeadsTable({
                         >
                           <Phone className="size-3.5" />
                         </TooltipTrigger>
-                        <TooltipContent>{l.phone}</TooltipContent>
+                        {/* The tooltip is portaled; stop clicks inside it from bubbling (via React's
+                            event tree) to the row's navigation handler. */}
+                        <TooltipContent onClick={(e) => e.stopPropagation()}>{l.phone}</TooltipContent>
                       </Tooltip>
                     ) : null}
                   </div>
