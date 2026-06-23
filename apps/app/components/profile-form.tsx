@@ -281,12 +281,14 @@ function AvatarCard({
   }
 
   function onRemove() {
+    if (!editable || pending) return
     setActionType("remove")
     startTransition(async () => {
       try {
         const res = await removeMyAvatar()
         if ("error" in res) toast.error(res.error)
-        else toast.success("Photo removed")
+        else if (res.changed) toast.success("Photo removed")
+        else toast.info("No changes to save")
       } catch {
         toast.error("Couldn't remove your photo. Please try again.")
       } finally {
@@ -326,7 +328,7 @@ function AvatarCard({
             {actionType === "upload" ? "Uploading…" : avatarUrl ? "Change photo" : "Upload photo"}
           </Button>
           {avatarUrl ? (
-            <Button variant="ghost" size="sm" disabled={pending} onClick={onRemove}>
+            <Button variant="ghost" size="sm" disabled={!editable || pending} onClick={onRemove}>
               {actionType === "remove" ? "Removing…" : "Remove"}
             </Button>
           ) : null}
