@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Search } from "lucide-react"
+import { Phone, Search } from "lucide-react"
 
 import { Input } from "@workspace/ui/components/input"
 import {
@@ -22,6 +22,11 @@ import {
   TableRow,
 } from "@workspace/ui/components/table"
 import { toast } from "@workspace/ui/components/sonner"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { assignLead, setLeadStatus } from "@/app/(app)/leads/actions"
@@ -238,7 +243,29 @@ export function LeadsTable({
                   <Link href={`/leads/${l.id}`} className="font-medium hover:underline">
                     {l.firstName} {l.lastName}
                   </Link>
-                  <div className="text-muted-foreground text-xs">{l.email}</div>
+                  {/* Email stays visible as text; phone shows as a tel: icon that reveals the
+                      number on hover. The whole-row click handler skips <a> targets, so it dials. */}
+                  <div className="text-muted-foreground mt-0.5 flex items-center gap-2 text-xs">
+                    {l.email ? <span>{l.email}</span> : null}
+                    {l.phone ? (
+                      <Tooltip>
+                        <TooltipTrigger
+                          render={
+                            <a
+                              href={`tel:${l.phone}`}
+                              aria-label={`Call ${l.phone}`}
+                              className="hover:text-foreground inline-flex shrink-0"
+                            />
+                          }
+                        >
+                          <Phone className="size-3.5" />
+                        </TooltipTrigger>
+                        {/* The tooltip is portaled; stop clicks inside it from bubbling (via React's
+                            event tree) to the row's navigation handler. */}
+                        <TooltipContent onClick={(e) => e.stopPropagation()}>{l.phone}</TooltipContent>
+                      </Tooltip>
+                    ) : null}
+                  </div>
                 </TableCell>
                 <TableCell className="text-muted-foreground hidden md:table-cell">{l.source}</TableCell>
                 <TableCell>
