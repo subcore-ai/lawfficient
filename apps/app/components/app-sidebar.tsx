@@ -136,7 +136,7 @@ export function AppSidebar() {
             >
               <Settings className="size-4" />
               <span>Settings</span>
-              <DataStatusDot status="live" className="ml-auto" />
+              <DataStatusDot status="partial" className="ml-auto" />
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
