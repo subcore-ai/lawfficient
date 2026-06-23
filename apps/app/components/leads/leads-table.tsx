@@ -56,6 +56,7 @@ export function LeadsTable({
   const [query, setQuery] = React.useState("")
   const [status, setStatus] = React.useState(ALL)
   const [source, setSource] = React.useState(ALL)
+  const [assignee, setAssignee] = React.useState(ALL)
   const [showArchived, setShowArchived] = React.useState(false)
   const [, startTransition] = React.useTransition()
   const router = useRouter()
@@ -80,7 +81,9 @@ export function LeadsTable({
     return (
       (query === "" || haystack.includes(query.toLowerCase())) &&
       (status === ALL || l.status.id === status) &&
-      (source === ALL || l.source === source)
+      (source === ALL || l.source === source) &&
+      (assignee === ALL ||
+        (assignee === UNASSIGNED ? !l.assignedToId : l.assignedToId === assignee))
     )
   })
 
@@ -153,6 +156,28 @@ export function LeadsTable({
               ))}
             </SelectContent>
           </Select>
+          <Select
+            value={assignee}
+            onValueChange={(v) => setAssignee(v ?? ALL)}
+            items={[
+              { value: ALL, label: "All assignees" },
+              { value: UNASSIGNED, label: "Unassigned" },
+              ...assignees.map((a) => ({ value: a.id, label: a.name })),
+            ]}
+          >
+            <SelectTrigger className="h-8" aria-label="Filter by assignee">
+              <SelectValue placeholder="Assigned" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>All assignees</SelectItem>
+              <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
+              {assignees.map((a) => (
+                <SelectItem key={a.id} value={a.id}>
+                  {a.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="flex items-center gap-3 sm:ml-auto">
           <ShowArchivedToggle checked={showArchived} onChange={setShowArchived} count={archivedCount} />
@@ -191,7 +216,13 @@ export function LeadsTable({
                     )
                   )
                     return
-                  if (window.getSelection()?.toString()) return // let users select/copy text
+                  // Modifier-clicks (open in a new tab/window) belong to the name <Link>, not the row.
+                  if (e.metaKey || e.ctrlKey || e.shiftKey) return
+                  // Don't hijack a text selection made *within this row* (e.g. copying an email);
+                  // a selection elsewhere on the page shouldn't block row navigation.
+                  const sel = window.getSelection()
+                  if (sel && !sel.isCollapsed && e.currentTarget.contains(sel.anchorNode))
+                    return
                   router.push(`/leads/${l.id}`)
                 }}
                 className={cn(
