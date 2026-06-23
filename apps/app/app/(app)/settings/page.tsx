@@ -1,52 +1,45 @@
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@workspace/ui/components/card"
-import { Input } from "@workspace/ui/components/input"
+import { redirect } from "next/navigation"
 
-import { Field } from "@/components/form-field"
-import { ToastButton } from "@/components/toast-button"
+import { GeneralForm, type FirmProfile } from "@/components/settings/general-form"
+import { getCurrentUser } from "@/lib/auth/session"
+import { createClient } from "@/lib/supabase/server"
 
 export const metadata = { title: "Settings · General" }
 
-export default function SettingsGeneralPage() {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Firm profile</CardTitle>
-        <CardDescription>Your firm&apos;s name, contact details, and defaults.</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Firm name">
-            <Input defaultValue="The Chidolue Law Firm" />
-          </Field>
-          <Field label="Contact email">
-            <Input type="email" defaultValue="office@chidoluelaw.com" />
-          </Field>
-          <Field label="Phone">
-            <Input type="tel" defaultValue="(305) 555-0100" />
-          </Field>
-          <Field label="Default time zone">
-            <Input defaultValue="Eastern (ET)" />
-          </Field>
-          <Field label="Default language">
-            <Input defaultValue="English" />
-          </Field>
-          <Field label="Default consultation fee">
-            <Input defaultValue="$150" />
-          </Field>
-          <Field label="Office address" className="sm:col-span-2">
-            <Input defaultValue="123 Biscayne Blvd, Suite 400, Miami, FL 33131" />
-          </Field>
-        </div>
-        <ToastButton className="w-fit" message="Firm profile saved" description="Changes are live for the team.">
-          Save changes
-        </ToastButton>
-      </CardContent>
-    </Card>
-  )
+export default async function SettingsGeneralPage() {
+  const me = await getCurrentUser()
+  if (!me) redirect("/login")
+
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from("firms")
+    .select("name, contact_email, phone, timezone, default_language, consultation_fee, office_address")
+    .eq("id", me.firmId)
+    .maybeSingle()
+  // Surface RLS/network failures via the error boundary rather than rendering the form with empty
+  // defaults — which an admin could then save and overwrite real profile fields with nulls.
+  if (error) throw error
+
+  const row = data as {
+    name: string
+    contact_email: string | null
+    phone: string | null
+    timezone: string | null
+    default_language: string | null
+    consultation_fee: number | null
+    office_address: string | null
+  } | null
+
+  const firm: FirmProfile = {
+    name: row?.name ?? "",
+    contactEmail: row?.contact_email ?? null,
+    phone: row?.phone ?? null,
+    timezone: row?.timezone ?? null,
+    language: row?.default_language ?? null,
+    consultationFee: row?.consultation_fee ?? null,
+    officeAddress: row?.office_address ?? null,
+  }
+  const canManage = me.permissions?.includes("settings.manage") ?? false
+
+  return <GeneralForm firm={firm} canManage={canManage} />
 }

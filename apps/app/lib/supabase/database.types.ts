@@ -458,19 +458,37 @@ export type Database = {
       }
       firms: {
         Row: {
+          consultation_fee: number | null
+          contact_email: string | null
           created_at: string
+          default_language: string | null
           id: string
           name: string
+          office_address: string | null
+          phone: string | null
+          timezone: string | null
         }
         Insert: {
+          consultation_fee?: number | null
+          contact_email?: string | null
           created_at?: string
+          default_language?: string | null
           id?: string
           name: string
+          office_address?: string | null
+          phone?: string | null
+          timezone?: string | null
         }
         Update: {
+          consultation_fee?: number | null
+          contact_email?: string | null
           created_at?: string
+          default_language?: string | null
           id?: string
           name?: string
+          office_address?: string | null
+          phone?: string | null
+          timezone?: string | null
         }
         Relationships: []
       }
