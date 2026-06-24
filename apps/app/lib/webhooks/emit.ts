@@ -10,7 +10,10 @@
 //
 // Delivery uses the service-role admin client (no user session), so every read/write is scoped to
 // `firmId` EXPLICITLY (RLS does not apply here).
-import { lookup } from "node:dns/promises"
+import { lookup as dnsLookup, type LookupAddress } from "node:dns"
+import { request as httpRequest } from "node:http"
+import { request as httpsRequest } from "node:https"
+import type { LookupFunction } from "node:net"
 
 import type { createAdminClient } from "@/lib/supabase/admin"
 import type { Json } from "@/lib/supabase/database.types"
@@ -38,55 +41,70 @@ type DeliveryOutcome = {
   error: string | null
 }
 
+// A DNS resolver that runs every candidate address through isBlockedIp and fails the lookup if any is
+// internal. Used as the request's own `lookup`, so the address we CONNECT to is the address we vetted
+// — there is no rebinding window between a separate pre-check and the connection (the connection *is*
+// the check). This is the SSRF defense for a public hostname that resolves to private space.
+const guardedLookup: LookupFunction = (hostname, options, callback) => {
+  dnsLookup(hostname, options, (err, address, family) => {
+    if (err) return callback(err, address as string, family)
+    const addresses: LookupAddress[] = Array.isArray(address)
+      ? address
+      : [{ address: address as string, family: family as number }]
+    if (addresses.some((a) => isBlockedIp(a.address))) {
+      return callback(new Error("blocked_destination"), "", 0)
+    }
+    return callback(err, address as string, family)
+  })
+}
+
 // POST the signed event to one endpoint, returning the outcome (never throws). Exported for the
-// follow-up worker + tests; the body is signed exactly as a consumer must verify it.
+// follow-up worker + tests; the body is signed exactly as a consumer must verify it. Uses node:http(s)
+// with guardedLookup so the SSRF check binds to the connected IP (no rebinding TOCTOU), and node does
+// not auto-follow redirects, so a 30x can't escape to an internal target either.
 export async function deliverOnce(target: DeliveryTarget, body: string): Promise<DeliveryOutcome> {
-  // SSRF defense at delivery: resolve the host and refuse if any resolved address is internal — a
-  // public hostname can point at private space, and IP literals have encodings the registration-time
-  // check can't normalize. `redirect: "error"` below stops a 30x from escaping this to an internal IP.
-  let host: string
+  let url: URL
   try {
-    host = new URL(target.url).hostname
-    if (host.startsWith("[") && host.endsWith("]")) host = host.slice(1, -1)
+    url = new URL(target.url)
   } catch {
     return { status: "failed", responseStatus: null, error: "invalid_url" }
   }
-  try {
-    const addresses = await lookup(host, { all: true })
-    if (addresses.length === 0 || addresses.some((a) => isBlockedIp(a.address))) {
-      return { status: "failed", responseStatus: null, error: "blocked_destination" }
-    }
-  } catch {
-    return { status: "failed", responseStatus: null, error: "dns_resolution_failed" }
-  }
+  const requestFn = url.protocol === "https:" ? httpsRequest : httpRequest
 
   const timestamp = Math.floor(Date.now() / 1000)
   const signature = signPayload(target.secret, body, timestamp)
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), DELIVERY_TIMEOUT_MS)
-  try {
-    const res = await fetch(target.url, {
-      method: "POST",
-      headers: { "content-type": "application/json", [SIGNATURE_HEADER]: signature },
-      body,
-      redirect: "error",
-      signal: controller.signal,
-    })
-    // 2xx = delivered; any other status is a failed attempt (the consumer rejected / errored).
-    return {
-      status: res.ok ? "success" : "failed",
-      responseStatus: res.status,
-      error: res.ok ? null : `Endpoint responded ${res.status}`,
-    }
-  } catch (err) {
-    return {
-      status: "failed",
-      responseStatus: null,
-      error: err instanceof Error ? err.message : "delivery_failed",
-    }
-  } finally {
-    clearTimeout(timer)
-  }
+
+  return new Promise<DeliveryOutcome>((resolve) => {
+    const req = requestFn(
+      url,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          [SIGNATURE_HEADER]: signature,
+          "content-length": Buffer.byteLength(body),
+        },
+        lookup: guardedLookup,
+        timeout: DELIVERY_TIMEOUT_MS,
+      },
+      (res) => {
+        const status = res.statusCode ?? 0
+        res.resume() // drain so the socket frees; we don't need the body
+        const ok = status >= 200 && status < 300 // node doesn't auto-follow redirects → a 3xx is failed
+        resolve({
+          status: ok ? "success" : "failed",
+          responseStatus: status,
+          error: ok ? null : `Endpoint responded ${status}`,
+        })
+      },
+    )
+    req.on("timeout", () => req.destroy(new Error("timeout")))
+    req.on("error", (err) =>
+      resolve({ status: "failed", responseStatus: null, error: err.message || "delivery_failed" }),
+    )
+    req.write(body)
+    req.end()
+  })
 }
 
 // Best-effort log of a delivery attempt; a logging failure must never fail anything.
