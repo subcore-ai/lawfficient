@@ -39,8 +39,13 @@ same public shape the API returns> }`. The catalog is the union of every capabil
 
 ## Data model
 
-- **`webhook_endpoints`** (per firm): `id`, `firm_id`, `url`, `secret_hash` (signing secret, hashed),
-  `secret_last4`, `event_types text[]` (or `*` = all), `enabled`, `disabled_reason`, `created_at`.
+- **`webhook_endpoints`** (per firm): `id`, `firm_id`, `url`, `secret_encrypted` (the HMAC signing
+  secret stored **encrypted at rest** — Supabase Vault, or app-level AEAD with a server-held key —
+  **not hashed**: the delivery worker must recover the *raw* secret to compute the `Lawfficient-Signature`
+  HMAC on every send and replay. This is the opposite of the *inbound* api_keys / ingestion keys
+  ([23], [26]), which are one-way hashed because the server only ever *verifies* an incoming key, never
+  reproduces it), `secret_last4` (display only), `event_types text[]` (or `*` = all), `enabled`,
+  `disabled_reason`, `created_at`.
 - **`webhook_deliveries`** (the log): `id`, `firm_id`, `endpoint_id`, `event_type`, `payload jsonb`,
   `status` (pending | delivered | failed), `attempts`, `response_code`, `last_error`, `next_attempt_at`,
   `created_at`. Reuses the disposition/observability pattern of the inbound `webhook_events` ([23]).
