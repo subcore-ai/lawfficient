@@ -144,10 +144,13 @@ async function load(): Promise<Loaded> {
 
   // Per-firm public-API keys (the api_keys_rw RLS policy scopes to the firm + settings.manage, so a
   // non-admin sees an empty list).
-  const { data: apiKeyRows } = await supabase
+  const { data: apiKeyRows, error: apiKeysError } = await supabase
     .from("api_keys")
     .select("id, name, key_last4, scopes, enabled, created_at, last_used_at")
     .order("created_at")
+  // Fail fast like the lead_sources / profiles reads — a swallowed error would show admins a false
+  // "no keys" empty state on an RLS regression or DB blip.
+  if (apiKeysError) throw apiKeysError
   const apiKeys: ApiKeyRow[] = (apiKeyRows ?? []).map((k) => ({
     id: k.id,
     name: k.name,

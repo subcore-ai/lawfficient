@@ -1567,6 +1567,7 @@ export type Database = {
         | "role"
         | "lead_source"
         | "taxonomy"
+        | "api_key"
       case_status:
         | "onboarding"
         | "packet_prep"
@@ -1770,6 +1771,7 @@ export const Constants = {
         "role",
         "lead_source",
         "taxonomy",
+        "api_key",
       ],
       case_status: [
         "onboarding",

@@ -153,8 +153,16 @@ export type ApiScope = (typeof API_SCOPES)[number]
 // create returns the raw key ONCE (never stored) so the UI can show it.
 export type ApiKeyResult = { ok: true; rawKey: string } | { error: string }
 
-// NOTE: key create/revoke are not written to audit_log — its `entity` is a fixed enum that doesn't
-// include 'api_key' (extending it is a separate migration). Deferred; the RLS gate still applies.
+async function auditApiKey(supabase: DbClient, byUserId: string, keyId: string, label: string, action: string) {
+  try {
+    await supabase
+      .from("audit_log")
+      .insert({ entity: "api_key", entity_id: keyId, label, action, by_user_id: byUserId })
+  } catch {
+    // best-effort
+  }
+}
+
 export async function createApiKey(formData: FormData): Promise<ApiKeyResult> {
   const gate = await requireAdmin()
   if (!gate.ok) return { error: gate.error }
@@ -174,6 +182,7 @@ export async function createApiKey(formData: FormData): Promise<ApiKeyResult> {
     .single()
   if (error || !data) return { error: "Couldn't create the API key." }
 
+  await auditApiKey(supabase, gate.user.id, data.id, name, "created")
   revalidatePath(PATH)
   return { ok: true, rawKey: raw }
 }
@@ -183,9 +192,10 @@ export async function setApiKeyEnabled(keyId: string, enabled: boolean): Promise
   if (!gate.ok) return { error: gate.error }
 
   const supabase = await createClient()
-  const { data, error } = await supabase.from("api_keys").update({ enabled }).eq("id", keyId).select("id")
+  const { data, error } = await supabase.from("api_keys").update({ enabled }).eq("id", keyId).select("id, name")
   if (error || !data || data.length === 0) return { error: "Couldn't update the API key." }
 
+  await auditApiKey(supabase, gate.user.id, keyId, data[0]!.name, enabled ? "enabled" : "disabled")
   revalidatePath(PATH)
   return { ok: true }
 }
@@ -199,6 +209,7 @@ export async function deleteApiKey(keyId: string): Promise<ActionResult> {
   if (error) return { error: "Couldn't delete the API key." }
   if (!data || data.length === 0) return { error: "That API key couldn't be deleted." }
 
+  await auditApiKey(supabase, gate.user.id, keyId, "", "deleted")
   revalidatePath(PATH)
   return { ok: true }
 }

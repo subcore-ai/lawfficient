@@ -18,7 +18,13 @@ import {
 import { Input } from "@workspace/ui/components/input"
 import { toast } from "@workspace/ui/components/sonner"
 
-import { API_SCOPES, createApiKey, deleteApiKey, setApiKeyEnabled } from "@/app/(app)/settings/integrations/actions"
+import {
+  API_SCOPES,
+  createApiKey,
+  deleteApiKey,
+  setApiKeyEnabled,
+  type ApiScope,
+} from "@/app/(app)/settings/integrations/actions"
 import { Field } from "@/components/form-field"
 import { StatusPill } from "@/components/status-pill"
 import { formatDateTime } from "@/lib/format"
@@ -34,7 +40,9 @@ export type ApiKeyRow = {
 }
 
 // Human label for a scope (the raw value is what the API checks).
-const SCOPE_LABEL: Record<string, string> = { "leads:read": "Read leads", "leads:write": "Write leads" }
+const SCOPE_LABEL: Record<ApiScope, string> = { "leads:read": "Read leads", "leads:write": "Write leads" }
+// Least-privilege default for a new key (read only).
+const DEFAULT_SCOPES: Record<ApiScope, boolean> = { "leads:read": true, "leads:write": false }
 
 function CopyButton({ value, label = "Copy" }: { value: string; label?: string }) {
   return (
@@ -43,6 +51,11 @@ function CopyButton({ value, label = "Copy" }: { value: string; label?: string }
       variant="outline"
       size="sm"
       onClick={() => {
+        // navigator.clipboard is undefined in non-secure contexts / older browsers — guard it.
+        if (!navigator.clipboard) {
+          toast.error("Copying isn't available here — select the text and copy manually.")
+          return
+        }
         navigator.clipboard.writeText(value).then(
           () => toast.success("Copied"),
           () => toast.error("Couldn't copy"),
@@ -84,7 +97,7 @@ function KeyRevealDialog({
           <div className="text-muted-foreground rounded-lg border p-3 text-xs leading-relaxed">
             <p className="text-foreground mb-1 font-medium">Example</p>
             <code className="block break-all">
-              curl {endpointUrl} -H &quot;Authorization: Bearer {rawKey ? "<your key>" : ""}&quot;
+              curl {endpointUrl} -H &quot;Authorization: Bearer {rawKey}&quot;
             </code>
           </div>
         </div>
@@ -98,8 +111,14 @@ function KeyRevealDialog({
 
 function NewApiKeyDialog({ onCreated }: { onCreated: (rawKey: string) => void }) {
   const [open, setOpen] = React.useState(false)
-  const [scopes, setScopes] = React.useState<Record<string, boolean>>({ "leads:read": true, "leads:write": false })
+  const [scopes, setScopes] = React.useState<Record<ApiScope, boolean>>(DEFAULT_SCOPES)
   const [pending, startTransition] = React.useTransition()
+
+  // Reset scope selections whenever the dialog closes, so reopening never inherits broader perms.
+  function onOpenChange(next: boolean) {
+    setOpen(next)
+    if (!next) setScopes(DEFAULT_SCOPES)
+  }
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -111,14 +130,13 @@ function NewApiKeyDialog({ onCreated }: { onCreated: (rawKey: string) => void })
         toast.error(res.error)
         return
       }
-      setOpen(false)
-      setScopes({ "leads:read": true, "leads:write": false })
+      onOpenChange(false)
       onCreated(res.rawKey)
     })
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogTrigger render={<Button size="sm" />}>
         <Plus className="size-4" /> New API key
       </DialogTrigger>
