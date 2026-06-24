@@ -1,0 +1,73 @@
+---
+title: Update a lead
+description: PATCH /api/leads/{id} — partially update a lead.
+---
+
+```http
+PATCH /api/leads/{id}
+```
+
+Partially updates a lead. Only the fields you send change; omitted fields are left untouched.
+Requires `leads:write`. Returns the updated lead and fires the matching [webhooks](/docs/webhooks).
+A lead from another firm returns `404`.
+
+## Path parameters
+
+| Param | Type | Description |
+| --- | --- | --- |
+| `id` | string | The lead's UUID. |
+
+## Request body
+
+JSON. Every field is optional — send only what you want to change.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `first_name` | string | Can't be blanked. |
+| `last_name` | string | Can't be blanked. |
+| `email` | string | |
+| `phone` | string | |
+| `source` | string | Can't be blanked. |
+| `assignee_id` | string \| null | A UUID to assign, or `null` to unassign. |
+| `status` | string | The firm-defined status **key** to move the lead to. |
+| `data` | object | Firm-defined fields; merged over the stored `data` (omitted keys are kept). |
+
+You can't remove a lead's last contact method — leaving both `email` and `phone` empty is a `422`.
+
+## Events
+
+The response is the updated lead, and the change maps to webhooks:
+
+| Changed | Event |
+| --- | --- |
+| status | `lead.status_changed` |
+| assignee | `lead.assigned` |
+| any other field | `lead.updated` |
+
+A no-op PATCH (every value already current) returns the lead and emits nothing.
+
+## Example
+
+```bash
+curl -X PATCH https://app.lawfficient.com/api/leads/3f8c1e2a-1b2c-4d5e-8f90-abcdef012345 \
+  -H "Authorization: Bearer $LAWFFICIENT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "status": "qualified", "assignee_id": "a1b2c3d4-0000-4000-8000-000000000000" }'
+```
+
+```json title="200 OK"
+{
+  "id": "3f8c1e2a-1b2c-4d5e-8f90-abcdef012345",
+  "first_name": "Ada",
+  "last_name": "Lovelace",
+  "email": "ada@example.com",
+  "phone": "+15551234567",
+  "source": "partner_referral",
+  "status": { "key": "qualified", "name": "Qualified" },
+  "assignee_id": "a1b2c3d4-0000-4000-8000-000000000000",
+  "archived": false,
+  "created_at": "2026-06-24T10:00:00.000Z",
+  "last_activity_at": "2026-06-24T10:05:00.000Z",
+  "data": { "caseType": "Family" }
+}
+```
