@@ -13,6 +13,9 @@
 //      gets `pending` (the route → 409, a request with that key is in flight).
 //   4. releaseIdempotencyKey clears a pending reservation if the create itself failed, so the client
 //      can retry the same key with a corrected request rather than being wedged on 409.
+//   5. A reservation still pending past a staleness window — its holder crashed or its completion
+//      update failed, so it never completed OR released — is treated as abandoned and reclaimed by
+//      the next request, so a failed completion can't wedge the key on 409 forever.
 import type { createAdminClient } from "@/lib/supabase/admin"
 import type { Json } from "@/lib/supabase/database.types"
 
@@ -23,9 +26,12 @@ type Admin = ReturnType<typeof createAdminClient>
 // 0036 backstops it).
 export const MAX_IDEMPOTENCY_KEY_LENGTH = 255
 
-// A create + complete runs within one request (seconds). A reservation still PENDING after this long
-// means the holder died before completing (e.g. its completion update failed) — a later request
-// reclaims the slot so the key isn't wedged on 409 forever.
+// A create + complete runs within one request (well under a second of DB work). A reservation still
+// PENDING after this long means the holder died before completing (e.g. its completion update failed)
+// — a later request reclaims the slot so the key isn't wedged on 409 forever. This MUST stay safely
+// above the platform's max request/function duration: reclaiming a still-RUNNING request would let
+// both create a duplicate. 60s is ~many× a normal create yet within any sane function timeout; raise
+// it if function budgets ever approach it (the only cost is a longer wedge after the rare death).
 const STALE_RESERVATION_MS = 60_000
 
 function requireFirmId(firmId: string): void {
@@ -73,13 +79,14 @@ export async function reserveIdempotencyKey(
   // Still pending. If it predates what a create+complete could take, the holder died before
   // completing — reclaim the slot so the key isn't wedged on 409 forever.
   if (Date.now() - new Date(data.created_at).getTime() <= STALE_RESERVATION_MS) return { kind: "pending" }
-  await admin
+  const { error: delErr } = await admin
     .from("api_idempotency_keys")
     .delete()
     .eq("firm_id", firmId)
     .eq("api_key_id", apiKeyId)
     .eq("idempotency_key", idempotencyKey)
     .is("response_status", null)
+  if (delErr) throw new Error("idempotency_reclaim_failed") // route → 503; don't mask a real failure
   const retry = await admin.from("api_idempotency_keys").insert({
     firm_id: firmId,
     api_key_id: apiKeyId,
@@ -87,8 +94,9 @@ export async function reserveIdempotencyKey(
     response_status: null,
     response_body: null,
   })
-  // Won the reclaim → we own it; another reclaimer beat us → still pending.
-  return retry.error ? { kind: "pending" } : { kind: "reserved" }
+  if (!retry.error) return { kind: "reserved" } // won the reclaim
+  if (retry.error.code === "23505") return { kind: "pending" } // another reclaimer beat us — back off
+  throw new Error("idempotency_reserve_failed") // a real DB error, not a lost race → 503
 }
 
 // Fill a reservation in with the produced result so a later repeat replays it. Best-effort: a store

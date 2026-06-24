@@ -18,6 +18,7 @@ type Admin = ReturnType<typeof createAdminClient>
 function fakeAdmin(opts: {
   insertError?: { code?: string; message?: string } | null
   retryInsertError?: { code?: string; message?: string } | null
+  deleteError?: { code?: string; message?: string } | null
   existing?: { response_status: number | null; response_body: unknown; created_at?: string } | null
   selectError?: boolean
 }) {
@@ -38,7 +39,9 @@ function fakeAdmin(opts: {
       }
       builder.delete = () => {
         ops.push({ kind: "delete" })
-        return { eq: () => ({ eq: () => ({ eq: () => ({ is: () => Promise.resolve({ error: null }) }) }) }) }
+        return {
+          eq: () => ({ eq: () => ({ eq: () => ({ is: () => Promise.resolve({ error: opts.deleteError ?? null }) }) }) }),
+        }
       }
       builder.select = () => builder
       builder.eq = () => builder
@@ -102,6 +105,28 @@ describe("reserveIdempotencyKey", () => {
       existing: { response_status: null, response_body: null, created_at: staleIso() },
     })
     expect(await reserveIdempotencyKey(admin, K.firmId, K.apiKeyId, K.idempotencyKey)).toEqual({ kind: "pending" })
+  })
+
+  test("23505 + STALE but the reclaim delete fails → throws (503, never a silent pending)", async () => {
+    const admin = fakeAdmin({
+      insertError: { code: "23505" },
+      deleteError: { code: "55000" },
+      existing: { response_status: null, response_body: null, created_at: staleIso() },
+    })
+    await expect(reserveIdempotencyKey(admin, K.firmId, K.apiKeyId, K.idempotencyKey)).rejects.toThrow(
+      "idempotency_reclaim_failed",
+    )
+  })
+
+  test("23505 + STALE but the re-insert hits a real (non-conflict) error → throws (503)", async () => {
+    const admin = fakeAdmin({
+      insertError: { code: "23505" },
+      retryInsertError: { code: "55000" },
+      existing: { response_status: null, response_body: null, created_at: staleIso() },
+    })
+    await expect(reserveIdempotencyKey(admin, K.firmId, K.apiKeyId, K.idempotencyKey)).rejects.toThrow(
+      "idempotency_reserve_failed",
+    )
   })
 
   test("23505 but the holder row vanished (released mid-race) → pending", async () => {

@@ -179,6 +179,12 @@ export async function createLeadViaApi(
   if (stageErr) return { ok: false, status: 503, code: "unavailable", message: "Temporarily unavailable." }
   if (!stage) return { ok: false, status: 409, code: "no_open_stage", message: "No open pipeline stage is configured." }
 
+  // Load the status map BEFORE the insert: serializing the result needs it, and a failure here must
+  // not 503 AFTER the row commits (which would also skip the webhook and release the idempotency
+  // reservation → a retry could create a second lead).
+  const statusesById = await loadStatusMap(admin, firmId)
+  if (!statusesById) return { ok: false, status: 503, code: "unavailable", message: "Temporarily unavailable." }
+
   const { data: inserted, error } = await admin
     .from("leads")
     .insert({
@@ -201,8 +207,6 @@ export async function createLeadViaApi(
   }
   if (error || !inserted) return { ok: false, status: 500, code: "internal_error", message: "Couldn't create the lead." }
 
-  const statusesById = await loadStatusMap(admin, firmId)
-  if (!statusesById) return { ok: false, status: 503, code: "unavailable", message: "Temporarily unavailable." }
   const lead = serializeRow(inserted, statusesById, firmId)
   return { ok: true, lead, events: ["lead.created"] }
 }
@@ -227,6 +231,11 @@ export async function updateLeadViaApi(
     .maybeSingle()
   if (readErr) return { ok: false, status: 503, code: "unavailable", message: "Temporarily unavailable." }
   if (!existing) return { ok: false, status: 404, code: "not_found", message: "Lead not found." }
+
+  // Status map up front (needed to resolve a status key AND to serialize the result): a failure is a
+  // clean 503 BEFORE any write, never after the row commits.
+  const statusesById = await loadStatusMap(admin, firmId)
+  if (!statusesById) return { ok: false, status: 503, code: "unavailable", message: "Temporarily unavailable." }
 
   const core = parseLeadPatch(body, { phone: existing.phone, email: existing.email })
   if (!core.ok) return { ok: false, status: 422, code: "invalid_request", message: core.error }
@@ -259,8 +268,6 @@ export async function updateLeadViaApi(
   if (Object.prototype.hasOwnProperty.call(body, "status")) {
     const statusKey = typeof body.status === "string" ? body.status.trim() : ""
     if (!statusKey) return { ok: false, status: 422, code: "invalid_request", message: "status can't be empty." }
-    const statusesById = await loadStatusMap(admin, firmId)
-    if (!statusesById) return { ok: false, status: 503, code: "unavailable", message: "Temporarily unavailable." }
     const match = [...statusesById.values()].find((s) => s.key === statusKey)
     if (!match) return { ok: false, status: 422, code: "invalid_request", message: "Unknown status." }
     if (match.id !== existing.status_id) {
@@ -302,7 +309,9 @@ export async function updateLeadViaApi(
       existing.data && typeof existing.data === "object" && !Array.isArray(existing.data)
         ? (existing.data as Record<string, Json>)
         : {}
-    if (Object.keys(built.value).length > 0) {
+    // Only write when a provided value actually differs from what's stored — a same-value `data`
+    // resend is a no-op (no write, no last_activity bump, no event).
+    if (Object.entries(built.value).some(([k, v]) => existingData[k] !== v)) {
       update.data = { ...existingData, ...built.value }
       dataChanged = true
     }
@@ -337,8 +346,6 @@ export async function updateLeadViaApi(
   }
   if (error || !updated) return { ok: false, status: 500, code: "internal_error", message: "Couldn't update the lead." }
 
-  const statusesById = await loadStatusMap(admin, firmId)
-  if (!statusesById) return { ok: false, status: 503, code: "unavailable", message: "Temporarily unavailable." }
   const lead = serializeRow(updated, statusesById, firmId)
   const events = decideUpdateEvents({
     status: statusChanged,
@@ -376,6 +383,10 @@ export async function setLeadArchivedViaApi(
     return { ok: true, lead, events: [] }
   }
 
+  // Status map before the write (needed to serialize; a failure must not 503 after the row commits).
+  const statusesById = await loadStatusMap(admin, firmId)
+  if (!statusesById) return { ok: false, status: 503, code: "unavailable", message: "Temporarily unavailable." }
+
   const { data: updated, error } = await admin
     .from("leads")
     .update({ archived })
@@ -391,8 +402,6 @@ export async function setLeadArchivedViaApi(
       message: archived ? "Couldn't archive the lead." : "Couldn't restore the lead.",
     }
 
-  const statusesById = await loadStatusMap(admin, firmId)
-  if (!statusesById) return { ok: false, status: 503, code: "unavailable", message: "Temporarily unavailable." }
   const lead = serializeRow(updated, statusesById, firmId)
   return { ok: true, lead, events: [archived ? "lead.archived" : "lead.updated"] }
 }
