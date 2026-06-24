@@ -351,7 +351,10 @@ export async function updateLeadViaApi(
     .eq("firm_id", firmId)
     .select(SELECT_COLS)
     .single()
-  if (error?.code === "23503") {
+  // Map the composite assignee FK (23503) to a clean 422 — but ONLY when this PATCH actually changed
+  // the assignee. A 23503 without an assignee change is a different FK (e.g. a status_id whose stage
+  // was removed after validation) → a 500, not a misleading assignee error.
+  if (error?.code === "23503" && update.assigned_to_id !== undefined) {
     return { ok: false, status: 422, code: "invalid_request", message: "assignee_id is not a member of this firm." }
   }
   if (error || !updated) return { ok: false, status: 500, code: "internal_error", message: "Couldn't update the lead." }
