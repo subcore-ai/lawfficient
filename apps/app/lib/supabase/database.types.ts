@@ -1217,6 +1217,140 @@ export type Database = {
           },
         ]
       }
+      webhook_deliveries: {
+        Row: {
+          attempts: number
+          created_at: string
+          delivered_at: string | null
+          endpoint_id: string
+          error: string | null
+          event_type: string
+          firm_id: string
+          id: string
+          payload: Json
+          response_status: number | null
+          status: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          delivered_at?: string | null
+          endpoint_id: string
+          error?: string | null
+          event_type: string
+          firm_id: string
+          id?: string
+          payload?: Json
+          response_status?: number | null
+          status?: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          delivered_at?: string | null
+          endpoint_id?: string
+          error?: string | null
+          event_type?: string
+          firm_id?: string
+          id?: string
+          payload?: Json
+          response_status?: number | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_deliveries_endpoint_id_fkey"
+            columns: ["endpoint_id"]
+            isOneToOne: false
+            referencedRelation: "webhook_endpoints"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "webhook_deliveries_firm_id_fkey"
+            columns: ["firm_id"]
+            isOneToOne: false
+            referencedRelation: "firms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      webhook_endpoint_secrets: {
+        Row: {
+          created_at: string
+          endpoint_id: string
+          firm_id: string
+          secret: string
+        }
+        Insert: {
+          created_at?: string
+          endpoint_id: string
+          firm_id: string
+          secret: string
+        }
+        Update: {
+          created_at?: string
+          endpoint_id?: string
+          firm_id?: string
+          secret?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_endpoint_secrets_endpoint_id_fkey"
+            columns: ["endpoint_id"]
+            isOneToOne: true
+            referencedRelation: "webhook_endpoints"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "webhook_endpoint_secrets_firm_id_fkey"
+            columns: ["firm_id"]
+            isOneToOne: false
+            referencedRelation: "firms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      webhook_endpoints: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          event_types: string[]
+          firm_id: string
+          id: string
+          secret_hash: string
+          secret_last4: string
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          event_types?: string[]
+          firm_id?: string
+          id?: string
+          secret_hash: string
+          secret_last4: string
+          url: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          event_types?: string[]
+          firm_id?: string
+          id?: string
+          secret_hash?: string
+          secret_last4?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_endpoints_firm_id_fkey"
+            columns: ["firm_id"]
+            isOneToOne: false
+            referencedRelation: "firms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       webhook_events: {
         Row: {
           error: string | null
