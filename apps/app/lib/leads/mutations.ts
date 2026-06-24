@@ -21,14 +21,13 @@ import { serializeLead, type ApiLead } from "@/lib/api/leads"
 import { tenantScoped } from "@/lib/api/tenant-db"
 import { isUuid } from "@/lib/api/validation"
 import { createAdminClient } from "@/lib/supabase/admin"
-import type { Database } from "@/lib/supabase/database.types"
+import type { Database, Json } from "@/lib/supabase/database.types"
 import { groupTaxonomies, toLeadVocabAll } from "@/lib/taxonomies/queries"
 import { emitEvent } from "@/lib/webhooks/emit"
 import type { WebhookEventType } from "@/lib/webhooks/events"
 import { mapLeadRow, mapLeadStatus, type LeadStatusView } from "./queries"
 import {
   buildLeadData,
-  mergeLeadData,
   parseLeadData,
   type LeadDataInput,
   type LeadVocab,
@@ -296,8 +295,17 @@ export async function updateLeadViaApi(
     }
     const built = buildLeadData(rawData as LeadDataInput, widened)
     if (!built.ok) return { ok: false, status: 422, code: "invalid_request", message: built.error }
-    update.data = mergeLeadData(existing.data, built.value)
-    dataChanged = true
+    // PARTIAL merge: overlay only the provided + valid keys onto the EXISTING data, preserving both
+    // unmentioned managed fields and any ingestion-set extras. (mergeLeadData drops ALL managed keys
+    // first — right for the full-form Server Action, but it would wipe fields a partial PATCH omits.)
+    const existingData =
+      existing.data && typeof existing.data === "object" && !Array.isArray(existing.data)
+        ? (existing.data as Record<string, Json>)
+        : {}
+    if (Object.keys(built.value).length > 0) {
+      update.data = { ...existingData, ...built.value }
+      dataChanged = true
+    }
   }
 
   // A core field counts as changed only if the conditional sets above actually wrote it (re-sending

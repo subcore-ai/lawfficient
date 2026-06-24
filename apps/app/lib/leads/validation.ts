@@ -41,6 +41,10 @@ export function parseLeadInput(raw: {
   source?: unknown
   assignedToId?: unknown
 }): { ok: true; value: LeadCoreInput } | { ok: false; error: string } {
+  // Contact fields: a non-string (e.g. a numeric phone from an integration) would str()→"" and be
+  // silently dropped, so reject it explicitly rather than lose the value.
+  if (raw.phone != null && typeof raw.phone !== "string") return { ok: false, error: "phone must be a string." }
+  if (raw.email != null && typeof raw.email !== "string") return { ok: false, error: "email must be a string." }
   const firstName = str(raw.firstName)
   const lastName = str(raw.lastName)
   const phone = str(raw.phone)
@@ -99,11 +103,19 @@ export function parseLeadPatch(
     patch.source = v
   }
   if (has("email")) {
+    if (raw.email !== null && typeof raw.email !== "string") {
+      return { ok: false, error: "email must be a string." }
+    }
     const v = str(raw.email).toLowerCase()
     if (v && !isValidEmail(v)) return { ok: false, error: "Enter a valid email address." }
     patch.email = v
   }
   if (has("phone")) {
+    // Reject a non-string phone (e.g. a JSON number) — str() would blank it, silently clearing a
+    // stored phone on PATCH.
+    if (raw.phone !== null && typeof raw.phone !== "string") {
+      return { ok: false, error: "phone must be a string." }
+    }
     patch.phone = str(raw.phone)
   }
   // assignee_id: an explicit null (or "") unassigns; a non-empty string assigns. Its uuid shape is

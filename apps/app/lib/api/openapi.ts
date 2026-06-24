@@ -326,7 +326,9 @@ export const openapiDocument = {
         description:
           "Lead data fields. The constrained fields (case_type / hierarchy / qualification, written " +
           "here as caseType / hierarchy / qualification) are validated against the firm's taxonomy; " +
-          "the rest are free text. Unknown keys are preserved verbatim.",
+          "the rest are free text. On WRITE only the fields below are stored — other keys you send are " +
+          "ignored, not persisted; keys already on the record (e.g. from ingestion) are preserved on " +
+          "update and returned on read.",
         properties: {
           caseType: { type: "string" },
           hierarchy: { type: "string" },

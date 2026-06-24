@@ -23,6 +23,11 @@ type Admin = ReturnType<typeof createAdminClient>
 // 0036 backstops it).
 export const MAX_IDEMPOTENCY_KEY_LENGTH = 255
 
+// A create + complete runs within one request (seconds). A reservation still PENDING after this long
+// means the holder died before completing (e.g. its completion update failed) — a later request
+// reclaims the slot so the key isn't wedged on 409 forever.
+const STALE_RESERVATION_MS = 60_000
+
 function requireFirmId(firmId: string): void {
   if (!firmId) throw new Error("firmId is required")
 }
@@ -55,15 +60,35 @@ export async function reserveIdempotencyKey(
   // Lost the race (or a later repeat): read the holder's row.
   const { data, error: readErr } = await admin
     .from("api_idempotency_keys")
-    .select("response_status, response_body")
+    .select("response_status, response_body, created_at")
     .eq("firm_id", firmId)
     .eq("api_key_id", apiKeyId)
     .eq("idempotency_key", idempotencyKey)
     .maybeSingle()
   if (readErr) throw new Error("idempotency_lookup_failed")
-  // Row vanished (its reservation was released) or still pending → treat as in-flight; the client retries.
-  if (!data || data.response_status === null || data.response_body === null) return { kind: "pending" }
-  return { kind: "replay", status: data.response_status, body: data.response_body }
+  if (!data) return { kind: "pending" } // released mid-race → the client retries
+  if (data.response_status !== null && data.response_body !== null) {
+    return { kind: "replay", status: data.response_status, body: data.response_body }
+  }
+  // Still pending. If it predates what a create+complete could take, the holder died before
+  // completing — reclaim the slot so the key isn't wedged on 409 forever.
+  if (Date.now() - new Date(data.created_at).getTime() <= STALE_RESERVATION_MS) return { kind: "pending" }
+  await admin
+    .from("api_idempotency_keys")
+    .delete()
+    .eq("firm_id", firmId)
+    .eq("api_key_id", apiKeyId)
+    .eq("idempotency_key", idempotencyKey)
+    .is("response_status", null)
+  const retry = await admin.from("api_idempotency_keys").insert({
+    firm_id: firmId,
+    api_key_id: apiKeyId,
+    idempotency_key: idempotencyKey,
+    response_status: null,
+    response_body: null,
+  })
+  // Won the reclaim → we own it; another reclaimer beat us → still pending.
+  return retry.error ? { kind: "pending" } : { kind: "reserved" }
 }
 
 // Fill a reservation in with the produced result so a later repeat replays it. Best-effort: a store
