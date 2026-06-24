@@ -1,4 +1,4 @@
 {
   "title": "Leads",
-  "pages": ["index", "list", "get", "push"]
+  "pages": ["index", "list", "get", "push", "update", "archive"]
 }

@@ -1,68 +1,81 @@
 ---
-title: Push a lead
-description: POST /api/leads — create or update a lead from any source.
+title: Create a lead
+description: POST /api/leads — create a lead with a per-firm API key.
 ---
 
 ```http
 POST /api/leads
 ```
 
-Pushes a single lead into the firm. This is the **one** endpoint every source targets — a web
-form, a Zapier/Make automation, a CRM, or your own backend. It's the inbound side of
-[lead ingestion](https://github.com/subcore-ai/lawfficient/blob/main/specs/23-lead-ingestion.md):
-the firm is resolved from the key, the payload is normalized, and the upsert is **idempotent**.
-
-## Authentication
-
-Send a per-source ingestion key as a Bearer token. As with the rest of the API the firm is
-resolved server-side from the key — never from the body.
+Creates a lead. With a per-firm API key (scope `leads:write`) the payload is validated, the lead
+lands in the firm's **first open pipeline stage**, and the created lead is returned in full. A
+[`lead.created`](/docs/webhooks) webhook fires.
 
 ## Request body
 
-JSON. The core fields:
+JSON. `first_name`, `last_name`, and `source` are required, plus **at least one** of `email` /
+`phone` — a lead has to be reachable.
 
 | Field | Type | Notes |
 | --- | --- | --- |
-| `firstName` | string | |
-| `lastName` | string | |
-| `email` | string | Lowercased on ingest. |
-| `phone` | string | Normalized to E.164 where possible. |
-| `externalId` | string | **Optional but recommended.** The lead's id in your system; makes the push idempotent. |
-
-Any other fields you send are retained on the lead's custom `data` — nothing is dropped.
+| `first_name` | string | Required. |
+| `last_name` | string | Required. |
+| `source` | string | Required. Where the lead came from. |
+| `email` | string | Required if no `phone`. |
+| `phone` | string | Required if no `email`. |
+| `assignee_id` | string \| null | Optional firm member (UUID) to assign. |
+| `data` | object | Optional firm-defined fields (case type, etc.). Only the fields your firm defines are stored. |
 
 ## Idempotency
 
-Re-delivering the same `(source, externalId)` **updates** the existing lead instead of creating a
-duplicate. Without an `externalId`, every call creates a new lead — so always send one when the
-source has a stable id (Zapier retries, CRM webhooks, etc.).
+Send an `Idempotency-Key` header to make a create safe to retry — a repeat with the **same** key
+returns the original lead instead of creating a second. Use a fresh unique value (e.g. a UUID) per
+logical create.
+
+```http
+Idempotency-Key: 9d2b7c1e-5a4b-4c3d-8e2f-1a2b3c4d5e6f
+```
 
 ## Example
 
 ```bash
 curl https://app.lawfficient.com/api/leads \
-  -H "Authorization: Bearer $LAWFFICIENT_SOURCE_KEY" \
+  -H "Authorization: Bearer $LAWFFICIENT_API_KEY" \
   -H "Content-Type: application/json" \
+  -H "Idempotency-Key: 9d2b7c1e-5a4b-4c3d-8e2f-1a2b3c4d5e6f" \
   -d '{
-    "firstName": "Ada",
-    "lastName": "Lovelace",
+    "first_name": "Ada",
+    "last_name": "Lovelace",
     "email": "ada@example.com",
-    "phone": "+1 (555) 123-4567",
-    "externalId": "crm-9912",
-    "city": "London"
+    "source": "partner_referral",
+    "data": { "caseType": "Family" }
   }'
 ```
 
 ```json title="201 Created"
-{ "externalId": "crm-9912", "status": "created", "leadId": "3f8c1e2a-1b2c-4d5e-8f90-abcdef012345" }
+{
+  "id": "3f8c1e2a-1b2c-4d5e-8f90-abcdef012345",
+  "first_name": "Ada",
+  "last_name": "Lovelace",
+  "email": "ada@example.com",
+  "phone": "",
+  "source": "partner_referral",
+  "status": { "key": "new", "name": "New" },
+  "assignee_id": null,
+  "archived": false,
+  "created_at": "2026-06-24T10:00:00.000Z",
+  "last_activity_at": "2026-06-24T10:00:00.000Z",
+  "data": { "caseType": "Family" }
+}
 ```
 
-A subsequent push with the same `externalId` returns `200` with `"status": "updated"` and the
-same `leadId`.
+Errors use the [error envelope](/docs/errors): `422 invalid_request` (e.g. no contact method, or an
+unknown `data` value), `403 insufficient_scope` (the key lacks `leads:write`), `409 no_open_stage`
+(the firm has no open pipeline stage configured).
 
 <Callout type="info">
-  This endpoint is the lead-ingestion webhook today: on success it returns `{ status, leadId }`,
-  and on failure `{ "error": "<message>" }`. It is being unified with the rest of the API to also
-  accept per-firm API keys (scope `leads:write`) and the standard [error envelope](/docs/errors) —
-  the path (`POST /api/leads`) stays the same.
+  **Inbound ingestion shares this path.** Authenticate with a per-*source* ingestion key instead of
+  an API key and `POST /api/leads` is the inbound webhook: it takes the source's mapped fields,
+  dedupes on `externalId`, and returns `{ status, leadId }`. See the
+  [lead-ingestion spec](https://github.com/subcore-ai/lawfficient/blob/main/specs/23-lead-ingestion.md).
 </Callout>

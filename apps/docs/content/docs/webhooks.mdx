@@ -1,0 +1,86 @@
+---
+title: Webhooks
+description: Receive signed, real-time events when your firm's data changes.
+---
+
+Webhooks are the **outbound** mirror of the read API: instead of polling, you give us a URL and we
+`POST` a signed event to it whenever something changes in your firm. Add and manage endpoints in
+**Settings → Integrations → Developer access**.
+
+## Events
+
+Event types are named `resource.action`. Today the lead lifecycle is covered:
+
+| Event | Fires when |
+| --- | --- |
+| `lead.created` | A lead is created (via the API or the app). |
+| `lead.updated` | A lead's core or `data` fields change (a restore counts as this). |
+| `lead.status_changed` | A lead moves to a different pipeline status. |
+| `lead.assigned` | A lead's assignee changes. |
+| `lead.archived` | A lead is archived. |
+
+Each endpoint subscribes to specific events, or to `*` for all of them. The catalog grows as more
+of the app is exposed.
+
+## Payload
+
+A `POST` with a JSON envelope. `data` is the resource in the **same shape the API returns** — a
+`lead.*` event carries the [lead object](/docs/leads/get) verbatim.
+
+```json
+{
+  "id": "f1e2d3c4-...unique-per-event...",
+  "type": "lead.created",
+  "created_at": "2026-06-24T10:00:00.000Z",
+  "data": {
+    "id": "3f8c1e2a-1b2c-4d5e-8f90-abcdef012345",
+    "first_name": "Ada",
+    "status": { "key": "new", "name": "New" }
+  }
+}
+```
+
+Deliveries can, rarely, repeat — **dedupe on the event `id`**.
+
+## Verifying the signature
+
+Every delivery carries a `Lawfficient-Signature` header:
+
+```http
+Lawfficient-Signature: t=1750766400,v1=3a4b5c...
+```
+
+`v1` is `HMAC-SHA256(secret, "{t}.{rawBody}")` — the unix-second timestamp `t` joined to the raw
+request body with a dot, so the timestamp is covered by the signature. The signing **secret**
+(prefix `whsec_`) is shown once when you create the endpoint.
+
+To verify a delivery: recompute the HMAC with your stored secret over `"{t}.{body}"`, compare it to
+`v1` in constant time, and reject if `t` is too old (a 5-minute tolerance bounds replay).
+
+```js
+import crypto from "node:crypto"
+
+// `body` MUST be the raw request bytes — verify before any JSON parse/re-serialize.
+function verify(secret, body, header, toleranceSec = 300) {
+  const parts = Object.fromEntries(header.split(",").map((kv) => kv.split("=")))
+  const t = Number(parts.t)
+  if (!Number.isFinite(t) || Math.abs(Date.now() / 1000 - t) > toleranceSec) return false
+  const expected = crypto.createHmac("sha256", secret).update(t + "." + body).digest("hex")
+  const a = Buffer.from(expected)
+  const b = Buffer.from(parts.v1 ?? "")
+  return a.length === b.length && crypto.timingSafeEqual(a, b)
+}
+```
+
+## Delivery
+
+- A `2xx` response is success. Anything else — including a `3xx` (redirects are **not** followed) —
+  is a failure and is logged.
+- Each attempt has a short (~5s) timeout, so one slow endpoint can't hold up others.
+- Acknowledge fast: return `200` as soon as you've accepted the event, then do your work
+  asynchronously.
+
+<Callout type="info">
+  Delivery is best-effort today — a single attempt per event, with every attempt logged for you to
+  see. Durable retry with backoff is a planned follow-up.
+</Callout>

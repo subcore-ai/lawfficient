@@ -1,0 +1,41 @@
+---
+title: Archive & restore a lead
+description: POST /api/leads/{id}/archive and /unarchive — archive or restore a lead.
+---
+
+Archive a lead (remove it from the active pipeline) or restore it. Both require `leads:write` and
+return the lead in the [standard shape](/docs/leads/get) with `archived` reflecting the new state.
+
+Both are **idempotent**: acting on a lead that's already in the target state is a no-op that returns
+the lead and emits nothing. A lead from another firm returns `404`.
+
+## Archive
+
+```http
+POST /api/leads/{id}/archive
+```
+
+An actual state change emits [`lead.archived`](/docs/webhooks).
+
+```bash
+curl -X POST https://app.lawfficient.com/api/leads/3f8c1e2a-1b2c-4d5e-8f90-abcdef012345/archive \
+  -H "Authorization: Bearer $LAWFFICIENT_API_KEY"
+```
+
+## Restore
+
+```http
+POST /api/leads/{id}/unarchive
+```
+
+An actual state change emits [`lead.updated`](/docs/webhooks).
+
+```bash
+curl -X POST https://app.lawfficient.com/api/leads/3f8c1e2a-1b2c-4d5e-8f90-abcdef012345/unarchive \
+  -H "Authorization: Bearer $LAWFFICIENT_API_KEY"
+```
+
+<Callout type="info">
+  Archiving doesn't delete anything — the lead and its history are kept, just hidden from the active
+  pipeline. Restore brings it back unchanged.
+</Callout>

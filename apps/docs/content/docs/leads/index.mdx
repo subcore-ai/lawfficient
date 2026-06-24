@@ -12,7 +12,10 @@ imported list, or the [push endpoint](/docs/leads/push).
 | --- | --- | --- | --- |
 | `GET` | [`/api/leads`](/docs/leads/list) | `leads:read` | List leads (filtered, paginated) |
 | `GET` | [`/api/leads/{id}`](/docs/leads/get) | `leads:read` | Fetch a single lead |
-| `POST` | [`/api/leads`](/docs/leads/push) | `leads:write` | Push (create or update) a lead |
+| `POST` | [`/api/leads`](/docs/leads/push) | `leads:write` | Create a lead |
+| `PATCH` | [`/api/leads/{id}`](/docs/leads/update) | `leads:write` | Update a lead (partial) |
+| `POST` | [`/api/leads/{id}/archive`](/docs/leads/archive) | `leads:write` | Archive a lead |
+| `POST` | [`/api/leads/{id}/unarchive`](/docs/leads/archive) | `leads:write` | Restore a lead |
 
 ## The lead object
 
