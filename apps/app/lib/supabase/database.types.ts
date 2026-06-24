@@ -14,6 +14,61 @@ export type Database = {
   }
   public: {
     Tables: {
+      api_idempotency_keys: {
+        Row: {
+          api_key_id: string
+          created_at: string
+          firm_id: string
+          id: string
+          idempotency_key: string
+          lead_id: string | null
+          response_body: Json
+          response_status: number
+        }
+        Insert: {
+          api_key_id: string
+          created_at?: string
+          firm_id: string
+          id?: string
+          idempotency_key: string
+          lead_id?: string | null
+          response_body: Json
+          response_status: number
+        }
+        Update: {
+          api_key_id?: string
+          created_at?: string
+          firm_id?: string
+          id?: string
+          idempotency_key?: string
+          lead_id?: string | null
+          response_body?: Json
+          response_status?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_idempotency_keys_api_key_id_fkey"
+            columns: ["api_key_id"]
+            isOneToOne: false
+            referencedRelation: "api_keys"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "api_idempotency_keys_firm_id_fkey"
+            columns: ["firm_id"]
+            isOneToOne: false
+            referencedRelation: "firms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "api_idempotency_keys_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       api_keys: {
         Row: {
           created_at: string
