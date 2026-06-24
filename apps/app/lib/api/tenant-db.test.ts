@@ -68,4 +68,10 @@ describe("tenantScoped", () => {
     const { admin } = fakeAdmin()
     expect(Object.keys(tenantScoped(admin, "firm-123"))).toEqual(["from"])
   })
+
+  test("throws on a missing firmId (the fail-open backstop)", () => {
+    const { admin } = fakeAdmin()
+    expect(() => tenantScoped(admin, "")).toThrow()
+    expect(() => tenantScoped(admin, undefined as unknown as string)).toThrow()
+  })
 })

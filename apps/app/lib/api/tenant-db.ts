@@ -4,10 +4,11 @@
 // the firm predicate already applied, so an unscoped read can't be written. The query layer only
 // ever receives this scoped handle (never the raw admin client), so firm scoping is structural, not
 // a convention each query has to remember. Read-only by design — writes go through the ingest path.
-import type { createAdminClient } from "@/lib/supabase/admin"
+import type { SupabaseClient } from "@supabase/supabase-js"
+
 import type { Database } from "@/lib/supabase/database.types"
 
-type Admin = ReturnType<typeof createAdminClient>
+type Admin = SupabaseClient<Database>
 type Tables = Database["public"]["Tables"]
 
 // Only tables that actually carry a firm_id column can be scoped — pointing the wrapper at a
@@ -21,6 +22,11 @@ export type TenantDb = ReturnType<typeof tenantScoped>
 // Build the firm-scoped data-access boundary the public API reads through. Callers get ONLY `from`
 // (no escape hatch to the unscoped admin client), so every query is firm-scoped by construction.
 export function tenantScoped(admin: Admin, firmId: string) {
+  // Hard-fail on a missing firmId: an empty/undefined value would make `.match({ firm_id })` drop the
+  // predicate (PostgREST ignores undefined) and read ACROSS firms — the exact fail-open this wrapper
+  // exists to prevent. Callers pass a key/session-derived id, so this never fires in practice; it's
+  // the backstop that keeps the scoping unconditional.
+  if (!firmId) throw new Error("tenantScoped requires a non-empty firmId")
   return {
     // `select("*")` over `table`, pinned to this firm. Returns the normal PostgrestFilterBuilder, so
     // callers keep the full chain (.eq/.order/.limit/.or/.maybeSingle/await) — they just can't drop
