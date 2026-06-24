@@ -26,4 +26,11 @@ describe("generateKey", () => {
   test("is unique per call", () => {
     expect(generateKey().raw).not.toBe(generateKey().raw)
   })
+
+  test("honors a custom prefix (e.g. lak_ for public-API keys)", () => {
+    const k = generateKey("lak_")
+    expect(k.raw.startsWith("lak_")).toBe(true)
+    expect(k.hash).toBe(hashKey(k.raw))
+    expect(k.last4).toBe(k.raw.slice(-4))
+  })
 })
