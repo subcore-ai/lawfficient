@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      api_keys: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          firm_id: string
+          id: string
+          key_hash: string
+          key_last4: string
+          last_used_at: string | null
+          name: string
+          scopes: string[]
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          firm_id?: string
+          id?: string
+          key_hash: string
+          key_last4: string
+          last_used_at?: string | null
+          name: string
+          scopes?: string[]
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          firm_id?: string
+          id?: string
+          key_hash?: string
+          key_last4?: string
+          last_used_at?: string | null
+          name?: string
+          scopes?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_keys_firm_id_fkey"
+            columns: ["firm_id"]
+            isOneToOne: false
+            referencedRelation: "firms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_log: {
         Row: {
           action: string
@@ -1565,3 +1609,4 @@ export const Constants = {
     },
   },
 } as const
+
