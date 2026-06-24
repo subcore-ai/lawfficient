@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 
+import { API_SCOPES } from "@/lib/api/scopes"
 import { getCurrentUser, type CurrentUser } from "@/lib/auth/session"
 import { generateKey } from "@/lib/ingest/keys"
 import { createClient } from "@/lib/supabase/server"
@@ -146,9 +147,8 @@ export async function deleteSource(sourceId: string): Promise<ActionResult> {
 // ── Public API keys (Settings → Integrations, "Developer access") ────────────────────────────────
 // Per-firm Bearer keys for the REST API at /api/** (0034). Same opaque-key + show-once model as lead
 // sources, gated by the api_keys_rw RLS policy (settings.manage, firm-scoped). The `lak_` prefix marks
-// them apart from ingestion keys (`lfk_`).
-export const API_SCOPES = ["leads:read", "leads:write"] as const
-export type ApiScope = (typeof API_SCOPES)[number]
+// them apart from ingestion keys (`lfk_`). API_SCOPES / ApiScope live in lib/api/scopes — a "use
+// server" module can only export async functions, so a const there wouldn't reach the client editor.
 
 // create returns the raw key ONCE (never stored) so the UI can show it.
 export type ApiKeyResult = { ok: true; rawKey: string } | { error: string }
