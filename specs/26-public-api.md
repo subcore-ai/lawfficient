@@ -45,9 +45,18 @@ A PR that adds a capability without its endpoint + events is incomplete.
 - **Idempotency (writes):** an `Idempotency-Key` header on POST returns the original result for a repeat
   (mirrors ingestion's `externalId` idempotency).
 - **Rate limiting:** per firm/key, reusing the ingestion rate-limit approach; 429 + `Retry-After`.
+- **Body limits (writes):** reject oversized payloads in two steps — the `Content-Length` header up
+  front, then the actual `Buffer.byteLength` after reading (Content-Length can be absent or lie) — so a
+  413 is returned **before** buffering an attacker-sized body. (Ingestion's `POST /api/leads` already
+  does this; the rest of the write surface inherits the same guard.)
 - **Timestamps:** ISO-8601 UTC. **IDs:** resource UUIDs.
-- **No RLS at the API layer.** Like ingestion, the API authenticates a key (no user session), uses the
-  **admin client**, and **scopes every query by the resolved `firm_id` explicitly**.
+- **No RLS at the API layer — so firm-scoping is fail-safe, not per-handler discipline.** Like
+  ingestion, the API authenticates a key (no user session) and uses the **admin client**, which
+  **bypasses RLS**. A forgotten `firm_id` filter is therefore fail-**open** (cross-tenant leak). Every
+  API read/write goes through a **tenant-scoped data-access layer** — `lib/api/*-query` helpers that
+  take `firmId` and always apply it, ideally a thin wrapper that injects the `firm_id` predicate so an
+  unscoped query can't be written. "Admin client used without a `firm_id` predicate" is a
+  review-blocking defect.
 
 ## Versioning (header, not path)
 
@@ -56,6 +65,11 @@ A PR that adds a capability without its endpoint + events is incomplete.
   stable** version. Breaking changes mint a new dated version and handlers branch on it. Responses echo
   the resolved version. v1 today is the implicit default — the header exists so future versions never
   require a URL change or break existing callers.
+- **Header-less default — pin to the key (fast-follow).** Defaulting an absent header to *latest* is
+  fine while there is one version, but becomes a footgun once a breaking version ships: a header-less
+  client silently moves to the new behavior. Stripe avoids this by pinning a default version **to the
+  API key** at creation. Add a `default_version` column to `api_keys` when the second dated version
+  lands and fall back to *that*, not to *latest*; until then, absent → latest is safe.
 
 ## Auth & key management
 
