@@ -6,6 +6,7 @@ import { revalidatePath, revalidateTag } from "next/cache"
 
 import { getCurrentUser } from "@/lib/auth/session"
 import { staffTag } from "@/lib/reference"
+import { AVATAR_BUCKET } from "@/lib/supabase/avatars"
 import { createClient } from "@/lib/supabase/server"
 
 export type ActionResult = { ok: true } | { error: string }
@@ -14,7 +15,6 @@ type NameResult = { ok: true; changed: boolean } | { error: string }
 const PROFILE_PATH = "/profile"
 const NAME_MAX = 100
 
-const AVATAR_BUCKET = "avatars"
 const AVATAR_MAX_BYTES = 4 * 1024 * 1024
 // Allowed upload types → file extension. Mirrors the bucket's allowed_mime_types (migration 0032).
 const AVATAR_EXT: Record<string, string> = {
