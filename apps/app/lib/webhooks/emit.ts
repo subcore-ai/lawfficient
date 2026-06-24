@@ -10,10 +10,13 @@
 //
 // Delivery uses the service-role admin client (no user session), so every read/write is scoped to
 // `firmId` EXPLICITLY (RLS does not apply here).
+import { lookup } from "node:dns/promises"
+
 import type { createAdminClient } from "@/lib/supabase/admin"
 import type { Json } from "@/lib/supabase/database.types"
 import { buildEvent, endpointWantsEvent, type WebhookEventType } from "./events"
 import { signPayload, SIGNATURE_HEADER } from "./secret"
+import { isBlockedIp } from "./url"
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -38,6 +41,25 @@ type DeliveryOutcome = {
 // POST the signed event to one endpoint, returning the outcome (never throws). Exported for the
 // follow-up worker + tests; the body is signed exactly as a consumer must verify it.
 export async function deliverOnce(target: DeliveryTarget, body: string): Promise<DeliveryOutcome> {
+  // SSRF defense at delivery: resolve the host and refuse if any resolved address is internal — a
+  // public hostname can point at private space, and IP literals have encodings the registration-time
+  // check can't normalize. `redirect: "error"` below stops a 30x from escaping this to an internal IP.
+  let host: string
+  try {
+    host = new URL(target.url).hostname
+    if (host.startsWith("[") && host.endsWith("]")) host = host.slice(1, -1)
+  } catch {
+    return { status: "failed", responseStatus: null, error: "invalid_url" }
+  }
+  try {
+    const addresses = await lookup(host, { all: true })
+    if (addresses.length === 0 || addresses.some((a) => isBlockedIp(a.address))) {
+      return { status: "failed", responseStatus: null, error: "blocked_destination" }
+    }
+  } catch {
+    return { status: "failed", responseStatus: null, error: "dns_resolution_failed" }
+  }
+
   const timestamp = Math.floor(Date.now() / 1000)
   const signature = signPayload(target.secret, body, timestamp)
   const controller = new AbortController()
@@ -47,6 +69,7 @@ export async function deliverOnce(target: DeliveryTarget, body: string): Promise
       method: "POST",
       headers: { "content-type": "application/json", [SIGNATURE_HEADER]: signature },
       body,
+      redirect: "error",
       signal: controller.signal,
     })
     // 2xx = delivered; any other status is a failed attempt (the consumer rejected / errored).
