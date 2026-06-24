@@ -1,90 +1,120 @@
 import { describe, expect, test } from "bun:test"
 
-import { findIdempotentResponse, storeIdempotentResponse, MAX_IDEMPOTENCY_KEY_LENGTH } from "./idempotency"
+import {
+  reserveIdempotencyKey,
+  completeIdempotencyKey,
+  releaseIdempotencyKey,
+  MAX_IDEMPOTENCY_KEY_LENGTH,
+} from "./idempotency"
 import type { createAdminClient } from "@/lib/supabase/admin"
 
 type Admin = ReturnType<typeof createAdminClient>
 
-// A chainable stub of the admin client's PostgREST surface, just enough for these helpers:
-//   - .from(t).insert(row)                            → resolves { error }
-//   - .from(t).select(c).eq().eq().eq().maybeSingle() → resolves { data, error }
-// Records the inserted rows so a test can assert what would persist.
+// Chainable stub of the admin PostgREST surface the idempotency helpers use:
+//   insert(row)                          → { error }
+//   select().eq()×3.maybeSingle()        → { data, error }
+//   update(row).eq()×3                   → { error }
+//   delete().eq()×3.is()                 → { error }
+// Records the ops so a test can assert what would persist.
 function fakeAdmin(opts: {
   insertError?: { code?: string; message?: string } | null
-  existing?: { response_status: number; response_body: unknown } | null
+  existing?: { response_status: number | null; response_body: unknown } | null
   selectError?: boolean
 }) {
-  const inserts: unknown[] = []
+  const ops: { kind: string; arg?: unknown }[] = []
   const admin = {
     from() {
-      const builder = {
-        insert(row: unknown) {
-          inserts.push(row)
-          return Promise.resolve({ error: opts.insertError ?? null })
-        },
-        select() {
-          return builder
-        },
-        eq() {
-          return builder
-        },
-        maybeSingle() {
-          if (opts.selectError) return Promise.resolve({ data: null, error: { message: "boom" } })
-          return Promise.resolve({ data: opts.existing ?? null, error: null })
-        },
+      const builder: Record<string, (...a: unknown[]) => unknown> = {}
+      builder.insert = (row: unknown) => {
+        ops.push({ kind: "insert", arg: row })
+        return Promise.resolve({ error: opts.insertError ?? null })
+      }
+      builder.update = (row: unknown) => {
+        ops.push({ kind: "update", arg: row })
+        return { eq: () => ({ eq: () => ({ eq: () => Promise.resolve({ error: null }) }) }) }
+      }
+      builder.delete = () => {
+        ops.push({ kind: "delete" })
+        return { eq: () => ({ eq: () => ({ eq: () => ({ is: () => Promise.resolve({ error: null }) }) }) }) }
+      }
+      builder.select = () => builder
+      builder.eq = () => builder
+      builder.maybeSingle = () => {
+        if (opts.selectError) return Promise.resolve({ data: null, error: { message: "boom" } })
+        return Promise.resolve({ data: opts.existing ?? null, error: null })
       }
       return builder
     },
-    _inserts: inserts,
+    _ops: ops,
   }
-  return admin as unknown as Admin & { _inserts: unknown[] }
+  return admin as unknown as Admin & { _ops: { kind: string; arg?: unknown }[] }
 }
 
-const KEY = { firmId: "firm-1", apiKeyId: "key-1", idempotencyKey: "idem-abc" }
+const K = { firmId: "firm-1", apiKeyId: "key-1", idempotencyKey: "idem-abc" }
 
-describe("findIdempotentResponse", () => {
-  test("returns the stored {status, body} on a hit", async () => {
-    const admin = fakeAdmin({ existing: { response_status: 201, response_body: { id: "lead-1" } } })
-    const r = await findIdempotentResponse(admin, KEY.firmId, KEY.apiKeyId, KEY.idempotencyKey)
-    expect(r).toEqual({ status: 201, body: { id: "lead-1" } })
+describe("reserveIdempotencyKey", () => {
+  test("clean insert → reserved (we own the key)", async () => {
+    const admin = fakeAdmin({ insertError: null })
+    expect(await reserveIdempotencyKey(admin, K.firmId, K.apiKeyId, K.idempotencyKey)).toEqual({ kind: "reserved" })
+    expect(admin._ops[0]?.kind).toBe("insert")
   })
 
-  test("returns null on a miss", async () => {
-    const admin = fakeAdmin({ existing: null })
-    expect(await findIdempotentResponse(admin, KEY.firmId, KEY.apiKeyId, KEY.idempotencyKey)).toBeNull()
+  test("23505 + a completed holder → replay the holder's response", async () => {
+    const admin = fakeAdmin({
+      insertError: { code: "23505" },
+      existing: { response_status: 201, response_body: { id: "winner" } },
+    })
+    expect(await reserveIdempotencyKey(admin, K.firmId, K.apiKeyId, K.idempotencyKey)).toEqual({
+      kind: "replay",
+      status: 201,
+      body: { id: "winner" },
+    })
   })
 
-  test("throws on a real lookup error (route maps to 503)", async () => {
-    const admin = fakeAdmin({ selectError: true })
-    await expect(findIdempotentResponse(admin, KEY.firmId, KEY.apiKeyId, KEY.idempotencyKey)).rejects.toThrow(
+  test("23505 + a still-pending holder (null response) → pending", async () => {
+    const admin = fakeAdmin({
+      insertError: { code: "23505" },
+      existing: { response_status: null, response_body: null },
+    })
+    expect(await reserveIdempotencyKey(admin, K.firmId, K.apiKeyId, K.idempotencyKey)).toEqual({ kind: "pending" })
+  })
+
+  test("23505 but the holder row vanished (released mid-race) → pending", async () => {
+    const admin = fakeAdmin({ insertError: { code: "23505" }, existing: null })
+    expect(await reserveIdempotencyKey(admin, K.firmId, K.apiKeyId, K.idempotencyKey)).toEqual({ kind: "pending" })
+  })
+
+  test("a non-conflict insert error → throws (route maps to 503)", async () => {
+    const admin = fakeAdmin({ insertError: { code: "55000" } })
+    await expect(reserveIdempotencyKey(admin, K.firmId, K.apiKeyId, K.idempotencyKey)).rejects.toThrow(
+      "idempotency_reserve_failed",
+    )
+  })
+
+  test("a conflict then a lookup error → throws (route maps to 503)", async () => {
+    const admin = fakeAdmin({ insertError: { code: "23505" }, selectError: true })
+    await expect(reserveIdempotencyKey(admin, K.firmId, K.apiKeyId, K.idempotencyKey)).rejects.toThrow(
       "idempotency_lookup_failed",
     )
   })
+
+  test("throws on a missing firmId (fail-open backstop)", async () => {
+    const admin = fakeAdmin({ insertError: null })
+    await expect(reserveIdempotencyKey(admin, "", K.apiKeyId, K.idempotencyKey)).rejects.toThrow()
+  })
 })
 
-describe("storeIdempotentResponse", () => {
-  const body = { id: "lead-1" }
-
-  test("clean insert → returns the original response + persists a row", async () => {
+describe("completeIdempotencyKey / releaseIdempotencyKey", () => {
+  test("complete fills in the row, never throws", async () => {
     const admin = fakeAdmin({ insertError: null })
-    const r = await storeIdempotentResponse(admin, { ...KEY, leadId: "lead-1", status: 201, body })
-    expect(r).toEqual({ status: 201, body })
-    expect(admin._inserts).toHaveLength(1)
+    await completeIdempotencyKey(admin, { ...K, leadId: "lead-1", status: 201, body: { id: "lead-1" } })
+    expect(admin._ops.some((o) => o.kind === "update")).toBe(true)
   })
 
-  test("unique-violation race → replays the WINNER's stored response", async () => {
-    const admin = fakeAdmin({
-      insertError: { code: "23505", message: "duplicate key" },
-      existing: { response_status: 201, response_body: { id: "winner-lead" } },
-    })
-    const r = await storeIdempotentResponse(admin, { ...KEY, leadId: "lead-1", status: 201, body })
-    expect(r).toEqual({ status: 201, body: { id: "winner-lead" } })
-  })
-
-  test("a non-conflict insert error is swallowed → returns the original (never throws)", async () => {
-    const admin = fakeAdmin({ insertError: { code: "55000", message: "transient" } })
-    const r = await storeIdempotentResponse(admin, { ...KEY, leadId: "lead-1", status: 201, body })
-    expect(r).toEqual({ status: 201, body })
+  test("release deletes the pending reservation, never throws", async () => {
+    const admin = fakeAdmin({ insertError: null })
+    await releaseIdempotencyKey(admin, K.firmId, K.apiKeyId, K.idempotencyKey)
+    expect(admin._ops.some((o) => o.kind === "delete")).toBe(true)
   })
 })
 

@@ -4,7 +4,12 @@ import { bearerKey } from "@/lib/api/auth"
 import { readJsonObject } from "@/lib/api/body"
 import { apiError, apiJson } from "@/lib/api/errors"
 import { withApi } from "@/lib/api/handler"
-import { findIdempotentResponse, storeIdempotentResponse, MAX_IDEMPOTENCY_KEY_LENGTH } from "@/lib/api/idempotency"
+import {
+  reserveIdempotencyKey,
+  completeIdempotencyKey,
+  releaseIdempotencyKey,
+  MAX_IDEMPOTENCY_KEY_LENGTH,
+} from "@/lib/api/idempotency"
 import { resolveApiKey, touchApiKey } from "@/lib/api/keys"
 import { getApiLeadsPage, type LeadFilters } from "@/lib/api/leads-query"
 import { decodeCursor, parseLimit } from "@/lib/api/pagination"
@@ -225,29 +230,46 @@ async function createLeadFromApiKey(
     return echo(res)
   }
 
-  // Optional Idempotency-Key: a repeat with the same key (per firm + key) replays the original
-  // result instead of creating a second lead. Bound the header length defensively.
+  // Optional Idempotency-Key (reserve-first): reserving the key is the dedup gate — exactly one of N
+  // concurrent repeats wins the unique-constraint reservation and creates the lead; the rest replay
+  // its result (or 409 while it's still in flight). Bound the header length defensively.
   const idempotencyKey = request.headers.get("idempotency-key")?.trim() || null
   if (idempotencyKey && idempotencyKey.length > MAX_IDEMPOTENCY_KEY_LENGTH) {
     return echo(apiError("invalid_request", "Idempotency-Key is too long.", 400))
   }
   if (idempotencyKey) {
-    let prior: Awaited<ReturnType<typeof findIdempotentResponse>>
+    let reservation: Awaited<ReturnType<typeof reserveIdempotencyKey>>
     try {
-      prior = await findIdempotentResponse(admin, apiKey.firmId, apiKey.keyId, idempotencyKey)
+      reservation = await reserveIdempotencyKey(admin, apiKey.firmId, apiKey.keyId, idempotencyKey)
     } catch {
       return echo(apiError("unavailable", "Temporarily unavailable.", 503))
     }
-    if (prior) return echo(apiJson(prior.body, prior.status))
+    if (reservation.kind === "replay") return echo(apiJson(reservation.body, reservation.status))
+    if (reservation.kind === "pending") {
+      return echo(apiError("conflict", "A request with this Idempotency-Key is already in progress.", 409))
+    }
+    // kind === "reserved": we own the key. Release it on any failure below so it can be retried.
+  }
+
+  // Free a held reservation before any error return (otherwise the pending row wedges retries on 409).
+  const releaseReservation = async () => {
+    if (idempotencyKey) await releaseIdempotencyKey(admin, apiKey.firmId, apiKey.keyId, idempotencyKey)
   }
 
   const body = await readJsonObject(request)
-  if (!body.ok) return echo(apiError(body.code, body.message, body.status))
+  if (!body.ok) {
+    await releaseReservation()
+    return echo(apiError(body.code, body.message, body.status))
+  }
 
-  // Pull the typed `data` sub-object through; createLeadViaApi validates it against the firm's vocab.
+  // `data`, if present, must be a JSON object — reject a primitive / array / null rather than
+  // silently dropping it and creating the lead without the supplied fields.
   const rawData = body.value.data
-  const dataInput: LeadDataInput | undefined =
-    rawData && typeof rawData === "object" && !Array.isArray(rawData) ? (rawData as LeadDataInput) : undefined
+  if (rawData !== undefined && (typeof rawData !== "object" || rawData === null || Array.isArray(rawData))) {
+    await releaseReservation()
+    return echo(apiError("invalid_request", "data must be an object.", 422))
+  }
+  const dataInput = rawData as LeadDataInput | undefined
 
   const result = await createLeadViaApi(admin, apiKey.firmId, {
     firstName: body.value.first_name,
@@ -258,16 +280,18 @@ async function createLeadFromApiKey(
     assignedToId: body.value.assignee_id,
     data: dataInput,
   })
-  if (!result.ok) return echo(apiError(result.code, result.message, result.status))
+  if (!result.ok) {
+    await releaseReservation()
+    return echo(apiError(result.code, result.message, result.status))
+  }
 
   emitLeadEvents(apiKey.firmId, result.lead.id, result.events)
 
   const status = 201
   const responseBody = result.lead as unknown as Json
-  // Persist the result for replay if an Idempotency-Key was supplied. On a concurrent-create race the
-  // store replays the winner, so two repeats converge on ONE lead.
+  // Fill in the reservation so a later repeat replays this exact result.
   if (idempotencyKey) {
-    const stored = await storeIdempotentResponse(admin, {
+    await completeIdempotencyKey(admin, {
       firmId: apiKey.firmId,
       apiKeyId: apiKey.keyId,
       idempotencyKey,
@@ -275,7 +299,6 @@ async function createLeadFromApiKey(
       status,
       body: responseBody,
     })
-    return echo(apiJson(stored.body, stored.status))
   }
   return echo(apiJson(responseBody, status))
 }

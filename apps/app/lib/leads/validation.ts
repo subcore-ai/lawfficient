@@ -110,6 +110,11 @@ export function parseLeadPatch(
   // checked at the mutation boundary (it's the assigned_to_id column), like the read API's filter.
   if (has("assignee_id")) {
     const v = raw.assignee_id
+    // Only a string (assign) or null (unassign) is valid — reject other types instead of silently
+    // coercing e.g. a number into an unassign.
+    if (v !== null && typeof v !== "string") {
+      return { ok: false, error: "assignee_id must be a string or null." }
+    }
     patch.assignedToId = typeof v === "string" && v.trim() !== "" ? v.trim() : null
   }
 

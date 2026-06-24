@@ -14,13 +14,16 @@ create table public.api_idempotency_keys (
   firm_id uuid not null references public.firms(id) on delete cascade,
   -- the key that performed the write; if the key is deleted, its idempotency records go with it.
   api_key_id uuid not null references public.api_keys(id) on delete cascade,
-  -- the client-supplied Idempotency-Key header value (opaque).
-  idempotency_key text not null,
+  -- the client-supplied Idempotency-Key header value (opaque). Bounded so a hostile caller can't store
+  -- megabytes keyed off one create (the route also rejects oversize keys with a 400).
+  idempotency_key text not null check (char_length(idempotency_key) <= 255),
   -- the stored original outcome, replayed verbatim on a repeat: the HTTP status + the JSON response
-  -- body (the created lead in its public shape). lead_id is kept for observability / cascade cleanup.
+  -- body (the created lead in its public shape). NULL while the reservation is PENDING — reserve-first
+  -- inserts the row BEFORE the create (the unique constraint is the concurrency gate), then fills it in
+  -- on success. lead_id is kept for observability / cascade cleanup.
   lead_id uuid references public.leads(id) on delete set null,
-  response_status integer not null,
-  response_body jsonb not null,
+  response_status integer,
+  response_body jsonb,
   created_at timestamptz not null default now(),
   -- Scope is per (firm, key): the same Idempotency-Key reused by a DIFFERENT key (or firm) is a
   -- distinct request, never a cross-tenant replay. firm_id leads for tenant-scoped lookups.

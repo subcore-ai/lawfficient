@@ -38,6 +38,14 @@ import { parseLeadInput, parseLeadPatch } from "./validation"
 type Admin = ReturnType<typeof createAdminClient>
 type LeadUpdate = Database["public"]["Tables"]["leads"]["Update"]
 
+// The admin client bypasses RLS, so every write below scopes firm_id EXPLICITLY. Guard it: an
+// empty/undefined firmId would make `.eq("firm_id", …)` drop the predicate (PostgREST ignores
+// undefined) and touch other firms' rows — fail-open. Callers pass a key-derived id, so this never
+// fires in practice; it's the unconditional backstop.
+function requireFirmId(firmId: string): void {
+  if (!firmId) throw new Error("firmId is required")
+}
+
 // ── Shared event mapping ──────────────────────────────────────────────────────────────────────
 // What changed in a (possibly combined) update → which lead.* events to emit. Mirrors the
 // per-action mapping (setLeadStatus → status_changed, assignLead → assigned, updateLead → updated):
@@ -91,13 +99,15 @@ async function loadVocab(admin: Admin, firmId: string): Promise<LeadVocab> {
   return toLeadVocabAll(groupTaxonomies(data ?? []))
 }
 
-async function loadStatusMap(admin: Admin, firmId: string): Promise<Map<string, LeadStatusView>> {
+// Returns null on a lookup failure (rather than throwing) so a blip AFTER a successful write becomes
+// a controlled 503 envelope, not an uncaught throw past the MutationResult contract.
+async function loadStatusMap(admin: Admin, firmId: string): Promise<Map<string, LeadStatusView> | null> {
   const { data, error } = await admin
     .from("lead_statuses")
     .select("*")
     .eq("firm_id", firmId)
     .order("position")
-  if (error) throw new Error("status_lookup_failed")
+  if (error) return null
   return new Map((data ?? []).map((row) => [row.id, mapLeadStatus(row)]))
 }
 
@@ -138,6 +148,7 @@ export async function createLeadViaApi(
   firmId: string,
   input: CreateLeadApiInput,
 ): Promise<MutationResult> {
+  requireFirmId(firmId)
   const core = parseLeadInput(input)
   if (!core.ok) return { ok: false, status: 422, code: "invalid_request", message: core.error }
 
@@ -192,6 +203,7 @@ export async function createLeadViaApi(
   if (error || !inserted) return { ok: false, status: 500, code: "internal_error", message: "Couldn't create the lead." }
 
   const statusesById = await loadStatusMap(admin, firmId)
+  if (!statusesById) return { ok: false, status: 503, code: "unavailable", message: "Temporarily unavailable." }
   const lead = serializeRow(inserted, statusesById, firmId)
   return { ok: true, lead, events: ["lead.created"] }
 }
@@ -205,11 +217,12 @@ export async function updateLeadViaApi(
   id: string,
   body: Record<string, unknown>,
 ): Promise<MutationResult> {
+  requireFirmId(firmId)
   if (!isUuid(id)) return { ok: false, status: 404, code: "not_found", message: "Lead not found." }
 
   const { data: existing, error: readErr } = await admin
     .from("leads")
-    .select("phone, email, status_id, assigned_to_id, data")
+    .select("first_name, last_name, phone, email, source, status_id, assigned_to_id, data")
     .eq("id", id)
     .eq("firm_id", firmId)
     .maybeSingle()
@@ -221,11 +234,13 @@ export async function updateLeadViaApi(
 
   const patch = core.value
   const update: LeadUpdate = {}
-  if (patch.firstName !== undefined) update.first_name = patch.firstName
-  if (patch.lastName !== undefined) update.last_name = patch.lastName
-  if (patch.phone !== undefined) update.phone = patch.phone
-  if (patch.email !== undefined) update.email = patch.email
-  if (patch.source !== undefined) update.source = patch.source
+  // Only write a core field when it's PRESENT and actually different — re-sending the same value is
+  // an idempotent no-op (no write, no last_activity bump, no event).
+  if (patch.firstName !== undefined && patch.firstName !== existing.first_name) update.first_name = patch.firstName
+  if (patch.lastName !== undefined && patch.lastName !== existing.last_name) update.last_name = patch.lastName
+  if (patch.phone !== undefined && patch.phone !== existing.phone) update.phone = patch.phone
+  if (patch.email !== undefined && patch.email !== existing.email) update.email = patch.email
+  if (patch.source !== undefined && patch.source !== existing.source) update.source = patch.source
 
   // assignee: only when provided, and only when it actually changes (mirrors assignLead's no-op skip).
   let assigneeChanged = false
@@ -246,6 +261,7 @@ export async function updateLeadViaApi(
     const statusKey = typeof body.status === "string" ? body.status.trim() : ""
     if (!statusKey) return { ok: false, status: 422, code: "invalid_request", message: "status can't be empty." }
     const statusesById = await loadStatusMap(admin, firmId)
+    if (!statusesById) return { ok: false, status: 503, code: "unavailable", message: "Temporarily unavailable." }
     const match = [...statusesById.values()].find((s) => s.key === statusKey)
     if (!match) return { ok: false, status: 422, code: "invalid_request", message: "Unknown status." }
     if (match.id !== existing.status_id) {
@@ -284,12 +300,14 @@ export async function updateLeadViaApi(
     dataChanged = true
   }
 
+  // A core field counts as changed only if the conditional sets above actually wrote it (re-sending
+  // an identical value leaves `update` untouched → emits nothing).
   const coreChanged =
-    patch.firstName !== undefined ||
-    patch.lastName !== undefined ||
-    patch.phone !== undefined ||
-    patch.email !== undefined ||
-    patch.source !== undefined
+    update.first_name !== undefined ||
+    update.last_name !== undefined ||
+    update.phone !== undefined ||
+    update.email !== undefined ||
+    update.source !== undefined
 
   // Nothing actually changed → return the lead unchanged, emit nothing (idempotent no-op PATCH).
   if (Object.keys(update).length === 0) {
@@ -312,6 +330,7 @@ export async function updateLeadViaApi(
   if (error || !updated) return { ok: false, status: 500, code: "internal_error", message: "Couldn't update the lead." }
 
   const statusesById = await loadStatusMap(admin, firmId)
+  if (!statusesById) return { ok: false, status: 503, code: "unavailable", message: "Temporarily unavailable." }
   const lead = serializeRow(updated, statusesById, firmId)
   const events = decideUpdateEvents({
     status: statusChanged,
@@ -330,6 +349,7 @@ export async function setLeadArchivedViaApi(
   id: string,
   archived: boolean,
 ): Promise<MutationResult> {
+  requireFirmId(firmId)
   if (!isUuid(id)) return { ok: false, status: 404, code: "not_found", message: "Lead not found." }
 
   const { data: current, error: readErr } = await admin
@@ -355,9 +375,16 @@ export async function setLeadArchivedViaApi(
     .eq("firm_id", firmId)
     .select(SELECT_COLS)
     .single()
-  if (error || !updated) return { ok: false, status: 500, code: "internal_error", message: "Couldn't archive the lead." }
+  if (error || !updated)
+    return {
+      ok: false,
+      status: 500,
+      code: "internal_error",
+      message: archived ? "Couldn't archive the lead." : "Couldn't restore the lead.",
+    }
 
   const statusesById = await loadStatusMap(admin, firmId)
+  if (!statusesById) return { ok: false, status: 503, code: "unavailable", message: "Temporarily unavailable." }
   const lead = serializeRow(updated, statusesById, firmId)
   return { ok: true, lead, events: [archived ? "lead.archived" : "lead.updated"] }
 }

@@ -113,6 +113,7 @@ export const openapiDocument = {
           "413": { $ref: "#/components/responses/Error" },
           "422": { $ref: "#/components/responses/Error" },
           "429": { $ref: "#/components/responses/Error" },
+          "503": { $ref: "#/components/responses/Error" },
         },
       },
     },
@@ -174,8 +175,9 @@ export const openapiDocument = {
         operationId: "archiveLead",
         summary: "Archive a lead",
         description:
-          "Archives a lead. Idempotent — archiving an already-archived lead is a no-op. Returns the " +
-          "lead and emits `lead.archived`. A lead from another firm returns 404.",
+          "Archives a lead. Idempotent — archiving an already-archived lead is a no-op that returns the " +
+          "lead and emits NOTHING. Only an actual state change returns the lead and emits `lead.archived`. " +
+          "A lead from another firm returns 404.",
         security: [{ apiKey: ["leads:write"] }],
         parameters: [
           { $ref: "#/components/parameters/VersionHeader" },
@@ -198,8 +200,9 @@ export const openapiDocument = {
         operationId: "unarchiveLead",
         summary: "Unarchive a lead",
         description:
-          "Restores an archived lead. Idempotent — restoring an already-active lead is a no-op. " +
-          "Returns the lead and emits `lead.updated`. A lead from another firm returns 404.",
+          "Restores an archived lead. Idempotent — restoring an already-active lead is a no-op that " +
+          "returns the lead and emits NOTHING. Only an actual state change returns the lead and emits " +
+          "`lead.updated`. A lead from another firm returns 404.",
         security: [{ apiKey: ["leads:write"] }],
         parameters: [
           { $ref: "#/components/parameters/VersionHeader" },
@@ -342,10 +345,11 @@ export const openapiDocument = {
         type: "object",
         description: "Create payload (API-key path). The lead lands in the firm's first open stage.",
         required: ["first_name", "last_name", "source"],
+        // At least one of email/phone must be present — a lead has to be reachable.
+        anyOf: [{ required: ["email"] }, { required: ["phone"] }],
         properties: {
           first_name: { type: "string" },
           last_name: { type: "string" },
-          // At least one of email/phone is required (enforced by the API, not expressible cleanly here).
           email: { type: "string", description: "Email; required if no phone is given." },
           phone: { type: "string", description: "Phone; required if no email is given." },
           source: { type: "string" },

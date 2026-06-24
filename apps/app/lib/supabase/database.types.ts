@@ -22,8 +22,8 @@ export type Database = {
           id: string
           idempotency_key: string
           lead_id: string | null
-          response_body: Json
-          response_status: number
+          response_body: Json | null
+          response_status: number | null
         }
         Insert: {
           api_key_id: string
@@ -32,8 +32,8 @@ export type Database = {
           id?: string
           idempotency_key: string
           lead_id?: string | null
-          response_body: Json
-          response_status: number
+          response_body?: Json | null
+          response_status?: number | null
         }
         Update: {
           api_key_id?: string
@@ -42,8 +42,8 @@ export type Database = {
           id?: string
           idempotency_key?: string
           lead_id?: string | null
-          response_body?: Json
-          response_status?: number
+          response_body?: Json | null
+          response_status?: number | null
         }
         Relationships: [
           {
