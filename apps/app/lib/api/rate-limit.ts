@@ -46,6 +46,24 @@ export function checkRateLimit(
 // Process-wide store for the route handlers (one bucket per key id).
 const globalStore: RateLimitStore = new Map()
 
+// Drop buckets whose newest hit has already aged out of the window. Without this the process-wide
+// store would retain a bucket per key id forever (a slow leak); sweeping reclaims them with no
+// background timer. Pure + exported so the eviction is unit-tested deterministically.
+export function sweepExpired(
+  store: RateLimitStore,
+  now: number,
+  windowSeconds: number = RATE_WINDOW_SECONDS,
+): void {
+  const cutoff = now - windowSeconds * 1000
+  for (const [key, bucket] of store) {
+    const newest = bucket[bucket.length - 1]
+    if (newest === undefined || newest <= cutoff) store.delete(key)
+  }
+}
+
 export function rateLimitByKey(keyId: string): RateLimitResult {
-  return checkRateLimit(globalStore, keyId, Date.now())
+  const now = Date.now()
+  // ~1% of calls sweep expired buckets — amortized cleanup, no timer, negligible per-request cost.
+  if (Math.random() < 0.01) sweepExpired(globalStore, now)
+  return checkRateLimit(globalStore, keyId, now)
 }

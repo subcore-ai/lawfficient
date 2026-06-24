@@ -28,12 +28,12 @@ describe("parseLimit", () => {
 
 describe("cursor encode/decode round-trips", () => {
   test("round-trips createdAt + id", () => {
-    const c: Cursor = { createdAt: "2026-06-23T10:00:00.000Z", id: "abc-123" }
+    const c: Cursor = { createdAt: "2026-06-23T10:00:00.000Z", id: "3f8c1e2a-1b2c-4d5e-8f90-abcdef012345" }
     expect(decodeCursor(encodeCursor(c))).toEqual(c)
   })
 
   test("is opaque (base64url, no raw separator leaked)", () => {
-    const token = encodeCursor({ createdAt: "2026-06-23T10:00:00.000Z", id: "abc-123" })
+    const token = encodeCursor({ createdAt: "2026-06-23T10:00:00.000Z", id: "3f8c1e2a-1b2c-4d5e-8f90-abcdef012345" })
     expect(token).toMatch(/^[A-Za-z0-9_-]+$/)
     expect(token).not.toContain("|")
   })
@@ -46,6 +46,19 @@ describe("cursor encode/decode round-trips", () => {
   test("returns null when either half is empty", () => {
     expect(decodeCursor(Buffer.from("|abc", "utf8").toString("base64url"))).toBeNull()
     expect(decodeCursor(Buffer.from("2026|", "utf8").toString("base64url"))).toBeNull()
+  })
+
+  test("rejects a cursor whose id is not a UUID or createdAt is not ISO-8601", () => {
+    // both halves interpolate into the raw keyset `.or(...)`, so each is validated on decode
+    expect(decodeCursor(encodeCursor({ createdAt: "2026-06-23T10:00:00.000Z", id: "2" }))).toBeNull()
+    expect(
+      decodeCursor(encodeCursor({ createdAt: "not-a-date", id: "3f8c1e2a-1b2c-4d5e-8f90-abcdef012345" })),
+    ).toBeNull()
+    const injected = Buffer.from(
+      "2026-06-23T10:00:00Z,phone.ilike.*|3f8c1e2a-1b2c-4d5e-8f90-abcdef012345",
+      "utf8",
+    ).toString("base64url")
+    expect(decodeCursor(injected)).toBeNull()
   })
 })
 
@@ -63,15 +76,18 @@ describe("buildPage", () => {
   })
 
   test("limit+1 rows → drops the extra and emits a cursor from the last KEPT row", () => {
+    const u1 = "11111111-1111-4111-8111-111111111111"
+    const u2 = "22222222-2222-4222-8222-222222222222"
+    const u3 = "33333333-3333-4333-8333-333333333333"
     const rows = [
-      { id: "1", created_at: "2026-06-23T10:00:00.000Z" },
-      { id: "2", created_at: "2026-06-23T09:00:00.000Z" },
-      { id: "3", created_at: "2026-06-23T08:00:00.000Z" }, // the +1 sentinel
+      { id: u1, created_at: "2026-06-23T10:00:00.000Z" },
+      { id: u2, created_at: "2026-06-23T09:00:00.000Z" },
+      { id: u3, created_at: "2026-06-23T08:00:00.000Z" }, // the +1 sentinel
     ]
     const page = buildPage(rows, 2, toCursor)
-    expect(page.data.map((r) => r.id)).toEqual(["1", "2"])
+    expect(page.data.map((r) => r.id)).toEqual([u1, u2])
     expect(page.next_cursor).not.toBeNull()
-    expect(decodeCursor(page.next_cursor)).toEqual({ createdAt: "2026-06-23T09:00:00.000Z", id: "2" })
+    expect(decodeCursor(page.next_cursor)).toEqual({ createdAt: "2026-06-23T09:00:00.000Z", id: u2 })
   })
 
   test("empty result → empty page, null cursor", () => {

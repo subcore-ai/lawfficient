@@ -3,6 +3,8 @@
 // `created_at` + `id` — so the ordering key stays an implementation detail and ties never
 // straddle a page boundary (the keyset filter compares the pair, not just the timestamp).
 // Responses are `{ "data": [...], "next_cursor": string | null }`.
+import { isIsoTimestamp, isUuid } from "./validation"
+
 export const DEFAULT_LIMIT = 50
 export const MAX_LIMIT = 200
 
@@ -34,7 +36,10 @@ export function decodeCursor(raw: string | null): Cursor | null {
   if (sep === -1) return null
   const createdAt = decoded.slice(0, sep)
   const id = decoded.slice(sep + 1)
-  if (!createdAt || !id) return null
+  // Validate before these reach the raw PostgREST keyset filter: createdAt must be a real ISO-8601
+  // instant and id a UUID. A crafted cursor that smuggles filter syntax — or a bad uuid that would
+  // 500 on cast — decodes to null → a clean 400 at the call site.
+  if (!isIsoTimestamp(createdAt) || !isUuid(id)) return null
   return { createdAt, id }
 }
 

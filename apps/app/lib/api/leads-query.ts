@@ -7,6 +7,7 @@ import { mapLeadRow, mapLeadStatus, type LeadStatusView } from "@/lib/leads/quer
 import type { createAdminClient } from "@/lib/supabase/admin"
 import { buildPage, type Cursor, type Page } from "./pagination"
 import { serializeLead, type ApiLead } from "./leads"
+import { isUuid } from "./validation"
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -57,7 +58,12 @@ export async function getApiLeadsPage(
 
   if (statusId) query = query.eq("status_id", statusId)
   if (filters.source) query = query.eq("source", filters.source)
-  if (filters.assignee) query = query.eq("assigned_to_id", filters.assignee)
+  // A non-UUID assignee can't match the uuid column — and `.eq` would 500 on the cast — so an
+  // invalid value is an empty page, not an error.
+  if (filters.assignee) {
+    if (!isUuid(filters.assignee)) return { data: [], next_cursor: null }
+    query = query.eq("assigned_to_id", filters.assignee)
+  }
 
   if (filters.q) {
     const term = sanitizeLike(filters.q)
@@ -90,6 +96,8 @@ export async function getApiLeadsPage(
 
 // A single firm-scoped lead, or null if it doesn't exist / belongs to another firm.
 export async function getApiLeadById(admin: Admin, firmId: string, id: string): Promise<ApiLead | null> {
+  // A non-UUID id can't be a real lead (and `.eq("id", …)` would 500 on the uuid cast) → 404.
+  if (!isUuid(id)) return null
   const { data, error } = await admin
     .from("leads")
     .select("*")

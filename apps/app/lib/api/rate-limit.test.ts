@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { checkRateLimit, type RateLimitStore } from "./rate-limit"
+import { checkRateLimit, sweepExpired, type RateLimitStore } from "./rate-limit"
 
 describe("checkRateLimit", () => {
   test("allows up to the limit, then 429s with a Retry-After", () => {
@@ -36,5 +36,16 @@ describe("checkRateLimit", () => {
     expect(checkRateLimit(store, "a", 0, 1, 60).ok).toBe(true)
     expect(checkRateLimit(store, "a", 0, 1, 60).ok).toBe(false)
     expect(checkRateLimit(store, "b", 0, 1, 60).ok).toBe(true)
+  })
+})
+
+describe("sweepExpired", () => {
+  test("drops buckets whose newest hit has aged out, keeps live ones", () => {
+    const store: RateLimitStore = new Map()
+    checkRateLimit(store, "old", 0, 5, 60) // last hit at t=0
+    checkRateLimit(store, "live", 50_000, 5, 60) // last hit at t=50s
+    sweepExpired(store, 61_000, 60) // window now spans (1s, 61s]
+    expect(store.has("old")).toBe(false)
+    expect(store.has("live")).toBe(true)
   })
 })
