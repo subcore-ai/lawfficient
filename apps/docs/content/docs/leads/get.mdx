@@ -1,0 +1,45 @@
+---
+title: Fetch a lead
+description: GET /api/leads/{id} — fetch a single lead by id.
+---
+
+```http
+GET /api/leads/{id}
+```
+
+Fetches one lead by its UUID. Requires the `leads:read` scope.
+
+## Path parameters
+
+| Param | Type | Description |
+| --- | --- | --- |
+| `id` | string | The lead's UUID. |
+
+## Example
+
+```bash
+curl https://app.lawfficient.com/api/leads/3f8c1e2a-1b2c-4d5e-8f90-abcdef012345 \
+  -H "Authorization: Bearer $LAWFFICIENT_API_KEY"
+```
+
+```json title="200 OK"
+{
+  "id": "3f8c1e2a-1b2c-4d5e-8f90-abcdef012345",
+  "first_name": "Ada",
+  "last_name": "Lovelace",
+  "email": "ada@example.com",
+  "phone": "+15551234567",
+  "source": "web_form",
+  "status": { "key": "new", "name": "New" },
+  "assignee_id": null,
+  "archived": false,
+  "created_at": "2026-06-23T10:00:00.000Z",
+  "last_activity_at": "2026-06-23T10:00:00.000Z",
+  "data": {}
+}
+```
+
+<Callout type="info">
+  An id that doesn't exist — or belongs to another firm — returns `404 not_found`. A malformed
+  (non-UUID) id also returns `404`, never a `500`.
+</Callout>

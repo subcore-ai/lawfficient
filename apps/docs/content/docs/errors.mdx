@@ -1,0 +1,54 @@
+---
+title: Errors
+description: A single error envelope and the HTTP status codes the API uses.
+---
+
+Successful responses return the resource (or a `{ "data", "next_cursor" }` page) verbatim.
+Errors use a single envelope:
+
+```json
+{
+  "error": {
+    "code": "insufficient_scope",
+    "message": "The API key does not grant leads:read.",
+    "details": null
+  }
+}
+```
+
+- **`code`** — a stable, machine-readable `snake_case` string. Branch on this, not the message.
+- **`message`** — a human-readable description; may change.
+- **`details`** — optional structured context, present only for some errors.
+
+## Status codes
+
+| Status | Meaning |
+| --- | --- |
+| `200` | OK |
+| `201` | Created (a new lead from [push](/docs/leads/push)) |
+| `400` | Malformed request (bad JSON, invalid body) |
+| `401` | Missing or invalid API key |
+| `403` | Key disabled, or missing the required scope |
+| `404` | No such resource (or it belongs to another firm) |
+| `413` | Request body too large |
+| `429` | [Rate limit](/docs/rate-limits) exceeded |
+| `500` | Unexpected server error |
+| `503` | The API is temporarily unavailable / not configured |
+
+## Common codes
+
+| `code` | Status | When |
+| --- | --- | --- |
+| `missing_key` | 401 | No `Authorization` header |
+| `invalid_key` | 401 | Key doesn't match an active key |
+| `key_disabled` | 403 | Key has been disabled |
+| `insufficient_scope` | 403 | Key lacks the required scope |
+| `not_found` | 404 | Resource doesn't exist for this firm |
+| `rate_limited` | 429 | Too many requests for this key |
+| `internal_error` | 500 | Unexpected failure |
+| `unavailable` | 503 | API not configured / temporarily down |
+
+<Callout type="info">
+  A cross-firm id reads as `404 not_found`, never `403` — the API doesn't reveal whether a
+  resource exists in another firm.
+</Callout>

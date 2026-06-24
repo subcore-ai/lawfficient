@@ -1,0 +1,42 @@
+---
+title: Authentication
+description: Authenticate requests with a per-firm API key sent as a Bearer token.
+---
+
+Every request authenticates with a **per-firm API key**, sent as a Bearer token:
+
+```bash
+curl https://app.lawfficient.com/api/leads \
+  -H "Authorization: Bearer $LAWFFICIENT_API_KEY"
+```
+
+The key resolves your firm **server-side** — a firm id is never read from the request body or
+query, so a key can only ever touch its own firm's data.
+
+## Keys and scopes
+
+A key carries one or more **scopes** that gate what it can do:
+
+| Scope | Grants |
+| --- | --- |
+| `leads:read` | List and fetch leads |
+| `leads:write` | Create / update leads (the [push endpoint](/docs/leads/push)) |
+
+Keys are stored **hashed** — only a SHA-256 hash and the last four characters are kept, so the
+raw key is shown once at creation and can't be recovered. Treat it like a password: keep it on
+the server, never ship it in client-side code.
+
+<Callout type="warn">
+  A `NEXT_PUBLIC_`-style or browser-embedded key is a leaked key. Call the API from your backend.
+</Callout>
+
+## Failure modes
+
+| Status | `code` | Meaning |
+| --- | --- | --- |
+| `401` | `missing_key` | No `Authorization: Bearer` header |
+| `401` | `invalid_key` | The key doesn't match any active key |
+| `403` | `key_disabled` | The key exists but has been disabled |
+| `403` | `insufficient_scope` | The key lacks the scope this endpoint requires |
+
+All errors follow the [error envelope](/docs/errors).

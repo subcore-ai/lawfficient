@@ -1,0 +1,62 @@
+---
+title: Introduction
+description: The Lawfficient public REST API — push and read your firm's data programmatically.
+---
+
+The Lawfficient API is a REST API for integrating with your firm's data. Everything the app
+does is being made available programmatically — starting with **leads**.
+
+## Conventions
+
+- **Base URL** — every endpoint lives under `/api` on your Lawfficient app domain, e.g.
+  `https://app.lawfficient.com/api/leads`.
+- **HTTPS only** — requests over plain HTTP are rejected.
+- **JSON** — request and response bodies are JSON; successful responses return the resource
+  verbatim, errors use a [single envelope](/docs/errors).
+- **Per-firm API keys** — every request authenticates with a [Bearer key](/docs/authentication)
+  that resolves your firm server-side. The firm is never taken from the request body.
+- **Header versioning** — the path stays stable; a dated [`Lawfficient-Version`](/docs/versioning)
+  header selects the API version.
+
+## A first request
+
+```bash
+curl https://app.lawfficient.com/api/leads \
+  -H "Authorization: Bearer $LAWFFICIENT_API_KEY"
+```
+
+```json title="Response"
+{
+  "data": [
+    {
+      "id": "3f8c1e2a-1b2c-4d5e-8f90-abcdef012345",
+      "first_name": "Ada",
+      "last_name": "Lovelace",
+      "email": "ada@example.com",
+      "phone": "+15551234567",
+      "source": "web_form",
+      "status": { "key": "new", "name": "New" },
+      "assignee_id": null,
+      "archived": false,
+      "created_at": "2026-06-23T10:00:00.000Z",
+      "last_activity_at": "2026-06-23T10:00:00.000Z",
+      "data": {}
+    }
+  ],
+  "next_cursor": null
+}
+```
+
+## What's here
+
+- **[Authentication](/docs/authentication)** — API keys and scopes.
+- **[Versioning](/docs/versioning)** — the `Lawfficient-Version` header.
+- **[Pagination](/docs/pagination)** — cursor-based list pagination.
+- **[Errors](/docs/errors)** — the error envelope and status codes.
+- **[Rate limits](/docs/rate-limits)** — per-key limits.
+- **[Leads](/docs/leads)** — list, fetch, and push leads.
+
+<Callout type="info">
+  More resources (and outbound **webhooks**) are on the way. Every capability we ship in the app
+  gets a matching documented endpoint here.
+</Callout>
