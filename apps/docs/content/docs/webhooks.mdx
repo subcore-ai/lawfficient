@@ -62,12 +62,14 @@ import crypto from "node:crypto"
 
 // `body` MUST be the raw request bytes — verify before any JSON parse/re-serialize.
 function verify(secret, body, header, toleranceSec = 300) {
-  const parts = Object.fromEntries(header.split(",").map((kv) => kv.split("=")))
+  if (typeof header !== "string") return false
+  const parts = Object.fromEntries(header.split(",").map((kv) => kv.split("=").map((s) => s.trim())))
   const t = Number(parts.t)
   if (!Number.isFinite(t) || Math.abs(Date.now() / 1000 - t) > toleranceSec) return false
+  if (!parts.v1) return false
   const expected = crypto.createHmac("sha256", secret).update(t + "." + body).digest("hex")
   const a = Buffer.from(expected)
-  const b = Buffer.from(parts.v1 ?? "")
+  const b = Buffer.from(parts.v1)
   return a.length === b.length && crypto.timingSafeEqual(a, b)
 }
 ```
