@@ -1,4 +1,5 @@
 import { headers } from "next/headers"
+import { ChevronDown, Code2 } from "lucide-react"
 
 import {
   Card,
@@ -10,6 +11,7 @@ import {
 
 import { MockTag } from "@/components/dev/mock-tag"
 import { ConfigureIntegrationDialog } from "@/components/settings/settings-dialogs"
+import { ApiKeysSection, type ApiKeyRow } from "@/components/settings/api-keys-editor"
 import { LeadSourcesSection, type LeadSourceRow } from "@/components/settings/lead-sources-editor"
 import { WebhooksSection, type WebhookEndpointRow } from "@/components/settings/webhooks-editor"
 import { StatusPill } from "@/components/status-pill"
@@ -33,6 +35,7 @@ type Loaded = {
   sources: LeadSourceRow[]
   assignees: AssigneeOption[]
   endpoints: WebhookEndpointRow[]
+  apiKeys: ApiKeyRow[]
   canManage: boolean
   webhookUrl: string
 }
@@ -45,7 +48,7 @@ async function load(): Promise<Loaded> {
   const webhookUrl = origin ? `${origin}/api/leads` : "/api/leads"
 
   if (!isSupabaseConfigured()) {
-    return { sources: [], assignees: [], endpoints: [], canManage: false, webhookUrl }
+    return { sources: [], assignees: [], endpoints: [], apiKeys: [], canManage: false, webhookUrl }
   }
 
   const me = await getCurrentUser()
@@ -139,17 +142,34 @@ async function load(): Promise<Loaded> {
     }
   })
 
+  // Per-firm public-API keys (the api_keys_rw RLS policy scopes to the firm + settings.manage, so a
+  // non-admin sees an empty list).
+  const { data: apiKeyRows } = await supabase
+    .from("api_keys")
+    .select("id, name, key_last4, scopes, enabled, created_at, last_used_at")
+    .order("created_at")
+  const apiKeys: ApiKeyRow[] = (apiKeyRows ?? []).map((k) => ({
+    id: k.id,
+    name: k.name,
+    keyLast4: k.key_last4,
+    scopes: k.scopes,
+    enabled: k.enabled,
+    createdAt: k.created_at,
+    lastUsedAt: k.last_used_at,
+  }))
+
   return {
     sources,
     assignees: (assigneesRes.data ?? []).map((p) => ({ id: p.id, name: p.name })),
     endpoints,
+    apiKeys,
     canManage: me?.permissions?.includes("settings.manage") ?? false,
     webhookUrl,
   }
 }
 
 export default async function SettingsIntegrationsPage() {
-  const { sources, assignees, endpoints, canManage, webhookUrl } = await load()
+  const { sources, assignees, endpoints, apiKeys, canManage, webhookUrl } = await load()
 
   return (
     <div className="flex flex-col gap-6">
@@ -161,12 +181,6 @@ export default async function SettingsIntegrationsPage() {
             canManage={canManage}
             webhookUrl={webhookUrl}
           />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="pt-6">
-          <WebhooksSection endpoints={endpoints} canManage={canManage} />
         </CardContent>
       </Card>
 
@@ -195,6 +209,25 @@ export default async function SettingsIntegrationsPage() {
           ))}
         </CardContent>
       </Card>
+
+      {/* Developer access — programmatic REST API + outbound webhooks. Collapsed by default: most
+          firms never touch this, so it stays out of the way. */}
+      <details className="bg-card group rounded-xl border">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-4 [&::-webkit-details-marker]:hidden">
+          <span className="flex items-center gap-2 text-sm font-medium">
+            <Code2 className="text-muted-foreground size-4" />
+            Developer access
+            <span className="text-muted-foreground hidden font-normal sm:inline">
+              — API keys &amp; webhooks; most firms won&apos;t need this
+            </span>
+          </span>
+          <ChevronDown className="text-muted-foreground size-4 transition-transform group-open:rotate-180" />
+        </summary>
+        <div className="flex flex-col gap-8 border-t p-4 pt-6">
+          <ApiKeysSection keys={apiKeys} canManage={canManage} endpointUrl={webhookUrl} />
+          <WebhooksSection endpoints={endpoints} canManage={canManage} />
+        </div>
+      </details>
     </div>
   )
 }
