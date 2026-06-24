@@ -3,6 +3,7 @@
 import { cache } from "react"
 
 import { createClient } from "@/lib/supabase/server"
+import { avatarPublicUrl } from "@/lib/supabase/avatars"
 import { isSupabaseConfigured } from "@/lib/supabase/env"
 import type { AppPermission } from "@/lib/rbac/permissions"
 import type { Role } from "@/data/types"
@@ -63,11 +64,7 @@ async function loadCurrentUser(): Promise<CurrentUser | null> {
     ?.permissions
   const permissions = Array.isArray(perms) ? (perms as AppPermission[]) : null
 
-  // Public bucket → a stable URL we can build without a network call (getPublicUrl is a pure
-  // string builder). null when no avatar is set, so the UI falls back to initials.
-  const avatarUrl = profile.avatar_path
-    ? supabase.storage.from("avatars").getPublicUrl(profile.avatar_path).data.publicUrl
-    : null
+  const avatarUrl = avatarPublicUrl(supabase, profile.avatar_path)
 
   return {
     id: profile.id,

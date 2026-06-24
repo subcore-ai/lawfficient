@@ -14,6 +14,7 @@ import {
 } from "@/components/settings/settings-dialogs"
 import { UsersTable } from "@/components/settings/users-table"
 import { getCurrentUser } from "@/lib/auth/session"
+import { avatarPublicUrl } from "@/lib/supabase/avatars"
 import { createClient } from "@/lib/supabase/server"
 import type { StaffUser } from "@/data/types"
 
@@ -66,10 +67,7 @@ async function load(): Promise<Loaded> {
     status: p.status as StaffUser["status"],
     podId: p.pod_id ?? undefined,
     roleIds: roleIdsByUser.get(p.id) ?? [],
-    // Public bucket → derive the URL with no network call (getPublicUrl is a string builder).
-    avatarUrl: p.avatar_path
-      ? supabase.storage.from("avatars").getPublicUrl(p.avatar_path).data.publicUrl
-      : null,
+    avatarUrl: avatarPublicUrl(supabase, p.avatar_path),
   }))
   const roles: RoleOption[] = (rolesRes.data ?? []).map((r) => ({
     id: r.id,
