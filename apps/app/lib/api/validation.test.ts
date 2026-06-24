@@ -24,6 +24,8 @@ describe("isIsoTimestamp", () => {
     expect(isIsoTimestamp("2026-06-23T10:00:00Z")).toBe(true)
     expect(isIsoTimestamp("2026-06-23T10:00:00.123456+00:00")).toBe(true)
     expect(isIsoTimestamp("2026-06-23T10:00:00-05:00")).toBe(true)
+    expect(isIsoTimestamp("2026-06-23T10:00:00+14:00")).toBe(true) // max real offset
+    expect(isIsoTimestamp("2026-06-23T05:30:00+05:30")).toBe(true)
     expect(isIsoTimestamp("2024-02-29T00:00:00Z")).toBe(true) // real leap day
   })
 
@@ -39,5 +41,8 @@ describe("isIsoTimestamp", () => {
     expect(isIsoTimestamp("2026-02-30T10:00:00Z")).toBe(false)
     expect(isIsoTimestamp("2026-06-31T10:00:00Z")).toBe(false)
     expect(isIsoTimestamp("2025-02-29T00:00:00Z")).toBe(false) // 2025 is not a leap year
+    expect(isIsoTimestamp("2026-06-23T10:00:00+25:00")).toBe(false) // offset hour out of range
+    expect(isIsoTimestamp("2026-06-23T10:00:00+14:30")).toBe(false) // beyond ±14:00
+    expect(isIsoTimestamp("2026-06-23T10:00:00+12:99")).toBe(false) // offset minute out of range
   })
 })
