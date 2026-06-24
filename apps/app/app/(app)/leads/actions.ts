@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 import { after } from "next/server"
 
 import { getApiLeadById } from "@/lib/api/leads-query"
+import { tenantScoped } from "@/lib/api/tenant-db"
 import { getCurrentUser, type CurrentUser } from "@/lib/auth/session"
 import {
   buildLeadData,
@@ -101,7 +102,7 @@ function emitLeadEvent(firmId: string, leadId: string, type: WebhookEventType) {
   after(async () => {
     try {
       const admin = createAdminClient()
-      const lead = await getApiLeadById(admin, firmId, leadId)
+      const lead = await getApiLeadById(tenantScoped(admin, firmId), leadId)
       if (!lead) return // deleted out from under us, or not this firm's — nothing to emit
       await emitEvent(admin, firmId, type, lead)
     } catch (err) {

@@ -1,15 +1,14 @@
-// DB reads for the public leads API (spec 26), via the service-role admin client (no user
-// session → RLS does not apply, so EVERY query filters by the resolved firmId explicitly).
-// Ordering is keyset on the IMMUTABLE pair (created_at desc, id desc) — not last_activity, which
-// mutates and would corrupt cursor paging. Results are mapped through the shared LeadView mapper
-// and the shared serializer, so the public shape never diverges from the board's.
+// DB reads for the public leads API (spec 26), via the fail-safe tenant-scoped wrapper (tenant-db).
+// The admin client bypasses RLS, so every read goes through `db.from(...)`, which pins the firm
+// predicate by construction — an unscoped cross-firm read can't be written here. Ordering is keyset
+// on the IMMUTABLE pair (created_at desc, id desc) — not last_activity, which mutates and would
+// corrupt cursor paging. Results are mapped through the shared LeadView mapper and the shared
+// serializer, so the public shape never diverges from the board's.
 import { mapLeadRow, mapLeadStatus, type LeadStatusView } from "@/lib/leads/queries"
-import type { createAdminClient } from "@/lib/supabase/admin"
 import { buildPage, type Cursor, type Page } from "./pagination"
 import { serializeLead, type ApiLead } from "./leads"
+import type { TenantDb } from "./tenant-db"
 import { isUuid } from "./validation"
-
-type Admin = ReturnType<typeof createAdminClient>
 
 export type LeadFilters = {
   status?: string // firm-defined status key
@@ -24,21 +23,20 @@ function sanitizeLike(term: string): string {
   return term.replace(/[,()*\\]/g, " ").trim()
 }
 
-async function loadStatusMap(admin: Admin, firmId: string): Promise<Map<string, LeadStatusView>> {
-  const { data, error } = await admin.from("lead_statuses").select("*").eq("firm_id", firmId).order("position")
+async function loadStatusMap(db: TenantDb): Promise<Map<string, LeadStatusView>> {
+  const { data, error } = await db.from("lead_statuses").order("position")
   if (error) throw error
   return new Map((data ?? []).map((row) => [row.id, mapLeadStatus(row)]))
 }
 
 // One page of the firm's leads, newest-first, filtered, with an opaque next cursor.
 export async function getApiLeadsPage(
-  admin: Admin,
-  firmId: string,
+  db: TenantDb,
   limit: number,
   cursor: Cursor | null,
   filters: LeadFilters,
 ): Promise<Page<ApiLead>> {
-  const statusesById = await loadStatusMap(admin, firmId)
+  const statusesById = await loadStatusMap(db)
 
   // status filter resolves the firm's status KEY → its id; an unknown key matches nothing.
   let statusId: string | null = null
@@ -48,10 +46,8 @@ export async function getApiLeadsPage(
     statusId = match.id
   }
 
-  let query = admin
+  let query = db
     .from("leads")
-    .select("*")
-    .eq("firm_id", firmId)
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
     .limit(limit + 1) // +1 sentinel → buildPage detects a further page
@@ -95,19 +91,14 @@ export async function getApiLeadsPage(
 }
 
 // A single firm-scoped lead, or null if it doesn't exist / belongs to another firm.
-export async function getApiLeadById(admin: Admin, firmId: string, id: string): Promise<ApiLead | null> {
+export async function getApiLeadById(db: TenantDb, id: string): Promise<ApiLead | null> {
   // A non-UUID id can't be a real lead (and `.eq("id", …)` would 500 on the uuid cast) → 404.
   if (!isUuid(id)) return null
-  const { data, error } = await admin
-    .from("leads")
-    .select("*")
-    .eq("firm_id", firmId)
-    .eq("id", id)
-    .maybeSingle()
+  const { data, error } = await db.from("leads").eq("id", id).maybeSingle()
   if (error) throw error
   if (!data) return null
 
-  const statusesById = await loadStatusMap(admin, firmId)
+  const statusesById = await loadStatusMap(db)
   const lead = mapLeadRow(data, statusesById)
   return lead ? serializeLead(lead) : null
 }

@@ -4,6 +4,7 @@ import { apiError, apiJson } from "@/lib/api/errors"
 import { withApi } from "@/lib/api/handler"
 import { getApiLeadsPage, type LeadFilters } from "@/lib/api/leads-query"
 import { decodeCursor, parseLimit } from "@/lib/api/pagination"
+import { tenantScoped } from "@/lib/api/tenant-db"
 import { parseCanonicalPayload } from "@/lib/ingest/contract"
 import { hashKey } from "@/lib/ingest/keys"
 import { checkRateLimit, recordEvent, resolveSourceByKey, upsertLead, type ResolvedSource } from "@/lib/ingest/store"
@@ -190,7 +191,7 @@ export async function GET(request: NextRequest) {
       q: params.get("q") ?? undefined,
     }
 
-    const page = await getApiLeadsPage(admin, context.firmId, limit, cursor, filters)
+    const page = await getApiLeadsPage(tenantScoped(admin, context.firmId), limit, cursor, filters)
     return apiJson(page)
   })
 }
