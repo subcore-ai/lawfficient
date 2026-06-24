@@ -39,13 +39,18 @@ same public shape the API returns> }`. The catalog is the union of every capabil
 
 ## Data model
 
-- **`webhook_endpoints`** (per firm): `id`, `firm_id`, `url`, `secret_encrypted` (the HMAC signing
-  secret stored **encrypted at rest** — Supabase Vault, or app-level AEAD with a server-held key —
-  **not hashed**: the delivery worker must recover the *raw* secret to compute the `Lawfficient-Signature`
-  HMAC on every send and replay. This is the opposite of the *inbound* api_keys / ingestion keys
-  ([23], [26]), which are one-way hashed because the server only ever *verifies* an incoming key, never
-  reproduces it), `secret_last4` (display only), `event_types text[]` (or `*` = all), `enabled`,
-  `disabled_reason`, `created_at`.
+- **`webhook_endpoints`** (per firm, admin-readable): `id`, `firm_id`, `url`, `secret_hash` (sha256 of
+  the signing secret — leak-safe like the api_keys / ingestion keys; useless for signing),
+  `secret_last4` (display only), `event_types text[]` (or `*` = all), `enabled`, `disabled_reason`,
+  `created_at`.
+- **`webhook_endpoint_secrets`** (the raw signing secret, isolated): `endpoint_id`, `firm_id`, `secret`.
+  RLS **enabled with no policies** → `authenticated` / `anon` are denied entirely; only the service-role
+  admin client (server-only, bypasses RLS) reads it to compute the `Lawfficient-Signature` HMAC. Outbound
+  signing needs the *raw* secret on every send, so it can't be a one-way hash; isolating it here (per
+  [21]/[23]'s "raw secret → service-role-only table, not a readable column") keeps the admin-readable
+  `webhook_endpoints` leak-safe. A composite FK `(endpoint_id, firm_id)` ties it to its endpoint's firm.
+  Plaintext-at-rest matches `lead_sources.key` for Phase 1; encrypting it (Vault / app AEAD) is the
+  hardening follow-up.
 - **`webhook_deliveries`** (the log): `id`, `firm_id`, `endpoint_id`, `event_type`, `payload jsonb`,
   `status` (pending | delivered | failed), `attempts`, `response_code`, `last_error`, `next_attempt_at`,
   `created_at`. Reuses the disposition/observability pattern of the inbound `webhook_events` ([23]).
