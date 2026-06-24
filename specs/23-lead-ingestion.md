@@ -17,7 +17,7 @@ tool) becomes a thin adapter — usually just configuration.
 ```
 sources (Sheets · Meta · web form · CSV · CRM · the AI voice agent)
    └─ thin mappers (source format → canonical LeadInbound)
-        └─ POST /api/ingest/leads   (idempotent upsert, firm-scoped key)
+        └─ POST /api/leads          (idempotent upsert, firm-scoped key)
              └─ leads core (12) — source-agnostic
 ```
 
@@ -104,12 +104,17 @@ Reference [02-roles-and-permissions](02-roles-and-permissions.md).
 
 ## API (the contract producers code against)
 
-- `POST /api/ingest/leads` — single or batch; normalizes → dedupe-checks → idempotent upsert;
-  returns per-item `{externalId, status, leadId?}`. The **one** endpoint every Tier-0/1/2 source targets.
+Part of the unified public API ([26-public-api](26-public-api.md)) — `/api/**`, header-versioned. There
+is **one** endpoint to push a lead, shared by ingestion sources and direct API clients:
+
+- `POST /api/leads` — single or batch; normalizes → dedupe-checks → idempotent upsert; returns per-item
+  `{externalId, status, leadId?}`. Every Tier-0/1/2 source targets it; a per-firm API key targets the
+  same endpoint (see [26], "One way to push a lead"). **No separate `/api/ingest/*` path.**
 - `GET  /api/leads/resolve?phone=|email=` — caller resolution → `{match, callerType, leadId?}`.
 - `POST /api/leads/{id}/interactions` — disposition / note (maps to the `Interaction` entity in [12]).
 
-All three use the same per-firm key; the voice agent (a separate service) is just another caller.
+Producers authenticate with a per-source key; the voice agent (a separate service) is just another
+caller. Lead changes also emit outbound webhook events ([27-webhooks](27-webhooks.md)).
 
 ## Screens
 
