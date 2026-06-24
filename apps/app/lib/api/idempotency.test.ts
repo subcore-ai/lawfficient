@@ -1,170 +1,40 @@
 import { describe, expect, test } from "bun:test"
 
-import {
-  reserveIdempotencyKey,
-  completeIdempotencyKey,
-  releaseIdempotencyKey,
-  MAX_IDEMPOTENCY_KEY_LENGTH,
-} from "./idempotency"
-import type { createAdminClient } from "@/lib/supabase/admin"
+import { parseIdempotencyKey, MAX_IDEMPOTENCY_KEY_LENGTH } from "./idempotency"
 
-type Admin = ReturnType<typeof createAdminClient>
-
-// Chainable stub of the admin PostgREST surface the idempotency helpers use:
-//   insert(row)                          → { error }  (1st call vs retry can differ)
-//   select().eq()×3.maybeSingle()        → { data, error }
-//   update(row).eq()×3                   → { error }
-//   delete().eq()×3.is()                 → { error }
-function fakeAdmin(opts: {
-  insertError?: { code?: string; message?: string } | null
-  retryInsertError?: { code?: string; message?: string } | null
-  deleteError?: { code?: string; message?: string } | null
-  existing?: { response_status: number | null; response_body: unknown; created_at?: string } | null
-  selectError?: boolean
-}) {
-  const ops: { kind: string; arg?: unknown }[] = []
-  let insertCalls = 0
-  const admin = {
-    from() {
-      const builder: Record<string, (...a: unknown[]) => unknown> = {}
-      builder.insert = (row: unknown) => {
-        ops.push({ kind: "insert", arg: row })
-        insertCalls += 1
-        const err = insertCalls === 1 ? (opts.insertError ?? null) : (opts.retryInsertError ?? null)
-        return Promise.resolve({ error: err })
-      }
-      builder.update = (row: unknown) => {
-        ops.push({ kind: "update", arg: row })
-        return { eq: () => ({ eq: () => ({ eq: () => Promise.resolve({ error: null }) }) }) }
-      }
-      builder.delete = () => {
-        ops.push({ kind: "delete" })
-        return {
-          eq: () => ({ eq: () => ({ eq: () => ({ is: () => Promise.resolve({ error: opts.deleteError ?? null }) }) }) }),
-        }
-      }
-      builder.select = () => builder
-      builder.eq = () => builder
-      builder.maybeSingle = () => {
-        if (opts.selectError) return Promise.resolve({ data: null, error: { message: "boom" } })
-        return Promise.resolve({ data: opts.existing ?? null, error: null })
-      }
-      return builder
-    },
-    _ops: ops,
-  }
-  return admin as unknown as Admin & { _ops: { kind: string; arg?: unknown }[] }
-}
-
-const K = { firmId: "firm-1", apiKeyId: "key-1", idempotencyKey: "idem-abc" }
-const recentIso = () => new Date(Date.now() - 1_000).toISOString()
-const staleIso = () => new Date(Date.now() - 10 * 60_000).toISOString()
-
-describe("reserveIdempotencyKey", () => {
-  test("clean insert → reserved (we own the key)", async () => {
-    const admin = fakeAdmin({ insertError: null })
-    expect(await reserveIdempotencyKey(admin, K.firmId, K.apiKeyId, K.idempotencyKey)).toEqual({ kind: "reserved" })
-    expect(admin._ops[0]?.kind).toBe("insert")
+// The dedup itself is enforced atomically in the DB (api_create_lead, migration 0036) and exercised
+// there; the only logic left in TS is parsing + bounding the optional header.
+describe("parseIdempotencyKey", () => {
+  test("no header → ok with key null (a normal, non-idempotent create)", () => {
+    expect(parseIdempotencyKey(null)).toEqual({ ok: true, key: null })
+    expect(parseIdempotencyKey(undefined)).toEqual({ ok: true, key: null })
   })
 
-  test("23505 + a completed holder → replay the holder's response", async () => {
-    const admin = fakeAdmin({
-      insertError: { code: "23505" },
-      existing: { response_status: 201, response_body: { id: "winner" }, created_at: recentIso() },
-    })
-    expect(await reserveIdempotencyKey(admin, K.firmId, K.apiKeyId, K.idempotencyKey)).toEqual({
-      kind: "replay",
-      status: 201,
-      body: { id: "winner" },
-    })
+  test("empty / whitespace-only → treated as absent", () => {
+    expect(parseIdempotencyKey("")).toEqual({ ok: true, key: null })
+    expect(parseIdempotencyKey("   ")).toEqual({ ok: true, key: null })
   })
 
-  test("23505 + a RECENT pending holder → pending", async () => {
-    const admin = fakeAdmin({
-      insertError: { code: "23505" },
-      existing: { response_status: null, response_body: null, created_at: recentIso() },
-    })
-    expect(await reserveIdempotencyKey(admin, K.firmId, K.apiKeyId, K.idempotencyKey)).toEqual({ kind: "pending" })
-    expect(admin._ops.some((o) => o.kind === "delete")).toBe(false) // not reclaimed — still in flight
+  test("trims surrounding whitespace", () => {
+    expect(parseIdempotencyKey("  abc-123  ")).toEqual({ ok: true, key: "abc-123" })
   })
 
-  test("23505 + a STALE pending holder → reclaim and reserve", async () => {
-    const admin = fakeAdmin({
-      insertError: { code: "23505" },
-      retryInsertError: null, // we win the reclaim's re-insert
-      existing: { response_status: null, response_body: null, created_at: staleIso() },
-    })
-    expect(await reserveIdempotencyKey(admin, K.firmId, K.apiKeyId, K.idempotencyKey)).toEqual({ kind: "reserved" })
-    expect(admin._ops.some((o) => o.kind === "delete")).toBe(true) // reclaimed the dead reservation
+  test("a normal opaque token passes through", () => {
+    expect(parseIdempotencyKey("01J0X9F4Z8KQ")).toEqual({ ok: true, key: "01J0X9F4Z8KQ" })
   })
 
-  test("23505 + STALE but another reclaimer wins the re-insert → pending", async () => {
-    const admin = fakeAdmin({
-      insertError: { code: "23505" },
-      retryInsertError: { code: "23505" },
-      existing: { response_status: null, response_body: null, created_at: staleIso() },
-    })
-    expect(await reserveIdempotencyKey(admin, K.firmId, K.apiKeyId, K.idempotencyKey)).toEqual({ kind: "pending" })
+  test("at the max length → still ok", () => {
+    const key = "k".repeat(MAX_IDEMPOTENCY_KEY_LENGTH)
+    expect(parseIdempotencyKey(key)).toEqual({ ok: true, key })
   })
 
-  test("23505 + STALE but the reclaim delete fails → throws (503, never a silent pending)", async () => {
-    const admin = fakeAdmin({
-      insertError: { code: "23505" },
-      deleteError: { code: "55000" },
-      existing: { response_status: null, response_body: null, created_at: staleIso() },
-    })
-    await expect(reserveIdempotencyKey(admin, K.firmId, K.apiKeyId, K.idempotencyKey)).rejects.toThrow(
-      "idempotency_reclaim_failed",
-    )
+  test("over the max length → invalid (route returns 400)", () => {
+    expect(parseIdempotencyKey("k".repeat(MAX_IDEMPOTENCY_KEY_LENGTH + 1))).toEqual({ ok: false })
   })
 
-  test("23505 + STALE but the re-insert hits a real (non-conflict) error → throws (503)", async () => {
-    const admin = fakeAdmin({
-      insertError: { code: "23505" },
-      retryInsertError: { code: "55000" },
-      existing: { response_status: null, response_body: null, created_at: staleIso() },
-    })
-    await expect(reserveIdempotencyKey(admin, K.firmId, K.apiKeyId, K.idempotencyKey)).rejects.toThrow(
-      "idempotency_reserve_failed",
-    )
-  })
-
-  test("23505 but the holder row vanished (released mid-race) → pending", async () => {
-    const admin = fakeAdmin({ insertError: { code: "23505" }, existing: null })
-    expect(await reserveIdempotencyKey(admin, K.firmId, K.apiKeyId, K.idempotencyKey)).toEqual({ kind: "pending" })
-  })
-
-  test("a non-conflict insert error → throws (route maps to 503)", async () => {
-    const admin = fakeAdmin({ insertError: { code: "55000" } })
-    await expect(reserveIdempotencyKey(admin, K.firmId, K.apiKeyId, K.idempotencyKey)).rejects.toThrow(
-      "idempotency_reserve_failed",
-    )
-  })
-
-  test("a conflict then a lookup error → throws (route maps to 503)", async () => {
-    const admin = fakeAdmin({ insertError: { code: "23505" }, selectError: true })
-    await expect(reserveIdempotencyKey(admin, K.firmId, K.apiKeyId, K.idempotencyKey)).rejects.toThrow(
-      "idempotency_lookup_failed",
-    )
-  })
-
-  test("throws on a missing firmId (fail-open backstop)", async () => {
-    const admin = fakeAdmin({ insertError: null })
-    await expect(reserveIdempotencyKey(admin, "", K.apiKeyId, K.idempotencyKey)).rejects.toThrow()
-  })
-})
-
-describe("completeIdempotencyKey / releaseIdempotencyKey", () => {
-  test("complete fills in the row, never throws", async () => {
-    const admin = fakeAdmin({ insertError: null })
-    await completeIdempotencyKey(admin, { ...K, leadId: "lead-1", status: 201, body: { id: "lead-1" } })
-    expect(admin._ops.some((o) => o.kind === "update")).toBe(true)
-  })
-
-  test("release deletes the pending reservation, never throws", async () => {
-    const admin = fakeAdmin({ insertError: null })
-    await releaseIdempotencyKey(admin, K.firmId, K.apiKeyId, K.idempotencyKey)
-    expect(admin._ops.some((o) => o.kind === "delete")).toBe(true)
+  test("length is measured AFTER trimming (trailing spaces don't count)", () => {
+    const key = "k".repeat(MAX_IDEMPOTENCY_KEY_LENGTH)
+    expect(parseIdempotencyKey(`  ${key}  `)).toEqual({ ok: true, key })
   })
 })
 

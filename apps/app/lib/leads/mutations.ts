@@ -142,18 +142,24 @@ export type CreateLeadApiInput = {
 // Direct create from a per-firm API key (spec 26, "one way to push a lead"). Validates the core +
 // data against the firm's vocab, lands the lead in the firm's first open stage, and returns the
 // serialized lead + the lead.created event. firm_id is set EXPLICITLY (admin client bypasses RLS).
+//
+// When `idempotency` is given (the client sent an Idempotency-Key), the insert + the key record are
+// written ATOMICALLY by the api_create_lead DB function: a repeat with the same key returns the
+// ORIGINAL lead (replayed=true → emit no second lead.created), and a failed create rolls back leaving
+// no reservation behind. See lib/api/idempotency.ts.
 export async function createLeadViaApi(
   admin: Admin,
   firmId: string,
   input: CreateLeadApiInput,
+  idempotency?: { apiKeyId: string; key: string },
 ): Promise<MutationResult> {
   requireFirmId(firmId)
   const core = parseLeadInput(input)
   if (!core.ok) return { ok: false, status: 422, code: "invalid_request", message: core.error }
 
   // An assignee, if given, must be a uuid (it's the assigned_to_id column; a bad value would 500 on
-  // the cast). We don't verify membership here — a wrong-firm id can't satisfy the FK and the insert
-  // fails closed below.
+  // the cast). We don't verify membership here — a wrong-firm id can't satisfy the FK and the create
+  // fails closed below (23503 → 422).
   if (core.value.assignedToId && !isUuid(core.value.assignedToId)) {
     return { ok: false, status: 422, code: "invalid_request", message: "assignee_id must be a UUID." }
   }
@@ -179,36 +185,38 @@ export async function createLeadViaApi(
   if (stageErr) return { ok: false, status: 503, code: "unavailable", message: "Temporarily unavailable." }
   if (!stage) return { ok: false, status: 409, code: "no_open_stage", message: "No open pipeline stage is configured." }
 
-  // Load the status map BEFORE the insert: serializing the result needs it, and a failure here must
-  // not 503 AFTER the row commits (which would also skip the webhook and release the idempotency
-  // reservation → a retry could create a second lead).
+  // Status map for serializing the result. Loaded BEFORE the write so a blip here is a clean 503, not
+  // a failure after the row commits.
   const statusesById = await loadStatusMap(admin, firmId)
   if (!statusesById) return { ok: false, status: 503, code: "unavailable", message: "Temporarily unavailable." }
 
-  const { data: inserted, error } = await admin
-    .from("leads")
-    .insert({
-      firm_id: firmId,
-      first_name: core.value.firstName,
-      last_name: core.value.lastName,
-      phone: core.value.phone,
-      email: core.value.email,
-      source: core.value.source,
-      assigned_to_id: core.value.assignedToId,
-      status_id: stage.id,
-      data: built.value,
-    })
-    .select(SELECT_COLS)
-    .single()
-  // A bad assignee (wrong firm / unknown) trips the composite FK (23503); surface it as a clean 422
-  // rather than a generic 500.
+  // Atomic create (+ idempotency record, when a key is supplied) via the api_create_lead function.
+  // Optional args (assignee + idempotency pair) carry DEFAULT NULL in the function, so omit them
+  // (undefined) rather than passing null — an absent assignee/key becomes NULL in the row.
+  const { data: rows, error } = await admin.rpc("api_create_lead", {
+    p_firm_id: firmId,
+    p_first_name: core.value.firstName,
+    p_last_name: core.value.lastName,
+    p_phone: core.value.phone,
+    p_email: core.value.email,
+    p_source: core.value.source,
+    p_status_id: stage.id,
+    p_data: built.value as Json,
+    p_assigned_to_id: core.value.assignedToId ?? undefined,
+    p_api_key_id: idempotency?.apiKeyId,
+    p_idempotency_key: idempotency?.key,
+  })
+  // A bad assignee (wrong firm / unknown) trips the composite FK (23503) inside the function; surface
+  // it as a clean 422 rather than a generic 500.
   if (error?.code === "23503") {
     return { ok: false, status: 422, code: "invalid_request", message: "assignee_id is not a member of this firm." }
   }
-  if (error || !inserted) return { ok: false, status: 500, code: "internal_error", message: "Couldn't create the lead." }
+  const row = rows?.[0]
+  if (error || !row) return { ok: false, status: 500, code: "internal_error", message: "Couldn't create the lead." }
 
-  const lead = serializeRow(inserted, statusesById, firmId)
-  return { ok: true, lead, events: ["lead.created"] }
+  const lead = serializeRow(row, statusesById, firmId)
+  // A replay returns the original lead — don't re-emit lead.created for it.
+  return { ok: true, lead, events: row.replayed ? [] : ["lead.created"] }
 }
 
 // Partial update from a per-firm API key. Loads the lead (firm-scoped), validates only the PROVIDED

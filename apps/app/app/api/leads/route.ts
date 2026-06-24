@@ -4,12 +4,7 @@ import { bearerKey } from "@/lib/api/auth"
 import { readJsonObject } from "@/lib/api/body"
 import { apiError, apiJson } from "@/lib/api/errors"
 import { withApi } from "@/lib/api/handler"
-import {
-  reserveIdempotencyKey,
-  completeIdempotencyKey,
-  releaseIdempotencyKey,
-  MAX_IDEMPOTENCY_KEY_LENGTH,
-} from "@/lib/api/idempotency"
+import { parseIdempotencyKey } from "@/lib/api/idempotency"
 import { resolveApiKey, touchApiKey } from "@/lib/api/keys"
 import { getApiLeadsPage, type LeadFilters } from "@/lib/api/leads-query"
 import { decodeCursor, parseLimit } from "@/lib/api/pagination"
@@ -230,77 +225,42 @@ async function createLeadFromApiKey(
     return echo(res)
   }
 
-  // Optional Idempotency-Key (reserve-first): reserving the key is the dedup gate — exactly one of N
-  // concurrent repeats wins the unique-constraint reservation and creates the lead; the rest replay
-  // its result (or 409 while it's still in flight). Bound the header length defensively.
-  const idempotencyKey = request.headers.get("idempotency-key")?.trim() || null
-  if (idempotencyKey && idempotencyKey.length > MAX_IDEMPOTENCY_KEY_LENGTH) {
-    return echo(apiError("invalid_request", "Idempotency-Key is too long.", 400))
-  }
-  if (idempotencyKey) {
-    let reservation: Awaited<ReturnType<typeof reserveIdempotencyKey>>
-    try {
-      reservation = await reserveIdempotencyKey(admin, apiKey.firmId, apiKey.keyId, idempotencyKey)
-    } catch {
-      return echo(apiError("unavailable", "Temporarily unavailable.", 503))
-    }
-    if (reservation.kind === "replay") return echo(apiJson(reservation.body, reservation.status))
-    if (reservation.kind === "pending") {
-      return echo(apiError("conflict", "A request with this Idempotency-Key is already in progress.", 409))
-    }
-    // kind === "reserved": we own the key. Release it on any failure below so it can be retried.
-  }
-
-  // Free a held reservation before any error return (otherwise the pending row wedges retries on 409).
-  const releaseReservation = async () => {
-    if (idempotencyKey) await releaseIdempotencyKey(admin, apiKey.firmId, apiKey.keyId, idempotencyKey)
-  }
+  // Optional Idempotency-Key: the dedup is enforced ATOMICALLY by the DB (api_create_lead) — a repeat
+  // with the same key returns the original lead, and a failed create leaves no reservation behind, so
+  // there's no reserve/complete/release dance here. We only validate the header's length.
+  const idem = parseIdempotencyKey(request.headers.get("idempotency-key"))
+  if (!idem.ok) return echo(apiError("invalid_request", "Idempotency-Key is too long.", 400))
 
   const body = await readJsonObject(request)
-  if (!body.ok) {
-    await releaseReservation()
-    return echo(apiError(body.code, body.message, body.status))
-  }
+  if (!body.ok) return echo(apiError(body.code, body.message, body.status))
 
   // `data`, if present, must be a JSON object — reject a primitive / array / null rather than
   // silently dropping it and creating the lead without the supplied fields.
   const rawData = body.value.data
   if (rawData !== undefined && (typeof rawData !== "object" || rawData === null || Array.isArray(rawData))) {
-    await releaseReservation()
     return echo(apiError("invalid_request", "data must be an object.", 422))
   }
   const dataInput = rawData as LeadDataInput | undefined
 
-  const result = await createLeadViaApi(admin, apiKey.firmId, {
-    firstName: body.value.first_name,
-    lastName: body.value.last_name,
-    phone: body.value.phone,
-    email: body.value.email,
-    source: body.value.source,
-    assignedToId: body.value.assignee_id,
-    data: dataInput,
-  })
-  if (!result.ok) {
-    await releaseReservation()
-    return echo(apiError(result.code, result.message, result.status))
-  }
+  const result = await createLeadViaApi(
+    admin,
+    apiKey.firmId,
+    {
+      firstName: body.value.first_name,
+      lastName: body.value.last_name,
+      phone: body.value.phone,
+      email: body.value.email,
+      source: body.value.source,
+      assignedToId: body.value.assignee_id,
+      data: dataInput,
+    },
+    idem.key ? { apiKeyId: apiKey.keyId, key: idem.key } : undefined,
+  )
+  if (!result.ok) return echo(apiError(result.code, result.message, result.status))
 
+  // `events` is empty on an idempotent replay, so a repeat emits nothing (no duplicate lead.created).
   emitLeadEvents(apiKey.firmId, result.lead.id, result.events)
-
-  const status = 201
-  const responseBody = result.lead as unknown as Json
-  // Fill in the reservation so a later repeat replays this exact result.
-  if (idempotencyKey) {
-    await completeIdempotencyKey(admin, {
-      firmId: apiKey.firmId,
-      apiKeyId: apiKey.keyId,
-      idempotencyKey,
-      leadId: result.lead.id,
-      status,
-      body: responseBody,
-    })
-  }
-  return echo(apiJson(responseBody, status))
+  return echo(apiJson(result.lead as unknown as Json, 201))
 }
 
 // Public REST list (spec 26, Phase 1). Key-authed (scope `leads:read`); firm-scoped; newest-first;

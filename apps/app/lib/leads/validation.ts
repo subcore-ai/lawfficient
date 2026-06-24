@@ -45,6 +45,11 @@ export function parseLeadInput(raw: {
   // silently dropped, so reject it explicitly rather than lose the value.
   if (raw.phone != null && typeof raw.phone !== "string") return { ok: false, error: "phone must be a string." }
   if (raw.email != null && typeof raw.email !== "string") return { ok: false, error: "email must be a string." }
+  // Same for the assignee: a non-string (e.g. a JSON number) would str()→""→null and silently create
+  // an unassigned lead, dropping the intended assignee. Reject it (mirrors parseLeadPatch).
+  if (raw.assignedToId != null && typeof raw.assignedToId !== "string") {
+    return { ok: false, error: "assignee_id must be a string or null." }
+  }
   const firstName = str(raw.firstName)
   const lastName = str(raw.lastName)
   const phone = str(raw.phone)
