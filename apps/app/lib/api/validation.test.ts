@@ -23,15 +23,21 @@ describe("isIsoTimestamp", () => {
     expect(isIsoTimestamp("2026-06-23T10:00:00.000Z")).toBe(true)
     expect(isIsoTimestamp("2026-06-23T10:00:00Z")).toBe(true)
     expect(isIsoTimestamp("2026-06-23T10:00:00.123456+00:00")).toBe(true)
-    expect(isIsoTimestamp("2026-06-23T10:00:00+00")).toBe(true)
     expect(isIsoTimestamp("2026-06-23T10:00:00-05:00")).toBe(true)
+    expect(isIsoTimestamp("2024-02-29T00:00:00Z")).toBe(true) // real leap day
   })
 
-  test("rejects malformed values and filter-injection payloads", () => {
+  test("rejects malformed, out-of-range, and filter-injection payloads", () => {
     expect(isIsoTimestamp("")).toBe(false)
     expect(isIsoTimestamp("2026-06-23")).toBe(false)
     expect(isIsoTimestamp("not-a-date")).toBe(false)
+    expect(isIsoTimestamp("2026-06-23T10:00:00+00")).toBe(false) // bare 2-digit offset (not emitted)
     expect(isIsoTimestamp("2026-06-23T10:00:00Z,phone.ilike.*")).toBe(false)
     expect(isIsoTimestamp("2026-06-23T10:00:00Z)")).toBe(false)
+    // matches the regex shape but is not a real instant → rejected (Postgres would 500 on the cast)
+    expect(isIsoTimestamp("2026-13-45T99:99:99Z")).toBe(false)
+    expect(isIsoTimestamp("2026-02-30T10:00:00Z")).toBe(false)
+    expect(isIsoTimestamp("2026-06-31T10:00:00Z")).toBe(false)
+    expect(isIsoTimestamp("2025-02-29T00:00:00Z")).toBe(false) // 2025 is not a leap year
   })
 })

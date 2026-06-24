@@ -9,13 +9,25 @@ export function isUuid(value: string): boolean {
   return UUID_REGEX.test(value)
 }
 
-// Strict-ish ISO-8601 instant — the shape Postgres `timestamptz` serializes to in JSON
-// (`YYYY-MM-DDThh:mm:ss[.ffffff][Z|±hh[:mm]]`). Tolerant on the fractional seconds and the offset
-// form (so it never rejects a real `created_at`), but it still requires the date+time skeleton and
-// admits ONLY `[0-9 T : . + - Z]`, so the cursor's createdAt can't smuggle `,` `(` `)` `*` or other
-// PostgREST filter syntax.
-const ISO_TIMESTAMP_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}(:?\d{2})?)$/
+// ISO-8601 instant in the shape Postgres `timestamptz` serializes to in JSON:
+// `YYYY-MM-DDThh:mm:ss[.ffffff](Z|±hh:mm)`. The regex fixes the structure and admits ONLY
+// `[0-9 T : . + - Z]`, so the cursor's createdAt can't smuggle `,` `(` `)` `*` filter syntax.
+const ISO_TIMESTAMP_REGEX = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/
 
+// True only for a REAL instant. The range + days-in-month checks reject values that match the
+// shape but aren't valid dates (month 13, Feb 30, hour 99) — exactly what Postgres rejects — so a
+// crafted cursor 4xx's at decode instead of 500-ing later on the timestamptz cast. (`Date.parse`
+// is unfit here: it rolls Feb 30 over to Mar 2, which Postgres would still reject.)
 export function isIsoTimestamp(value: string): boolean {
-  return ISO_TIMESTAMP_REGEX.test(value)
+  const m = ISO_TIMESTAMP_REGEX.exec(value)
+  if (!m) return false
+  const month = Number(m[2])
+  const day = Number(m[3])
+  const hour = Number(m[4])
+  const minute = Number(m[5])
+  const second = Number(m[6])
+  if (month < 1 || month > 12 || hour > 23 || minute > 59 || second > 59) return false
+  // 0th day of the *next* month (1-based here) = the last day of this month, leap years included.
+  const daysInMonth = new Date(Date.UTC(Number(m[1]), month, 0)).getUTCDate()
+  return day >= 1 && day <= daysInMonth
 }
