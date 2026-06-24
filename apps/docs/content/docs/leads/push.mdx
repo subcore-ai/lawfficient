@@ -54,7 +54,7 @@ curl https://app.lawfficient.com/api/leads \
 ```
 
 ```json title="201 Created"
-{ "status": "created", "leadId": "3f8c1e2a-1b2c-4d5e-8f90-abcdef012345" }
+{ "externalId": "crm-9912", "status": "created", "leadId": "3f8c1e2a-1b2c-4d5e-8f90-abcdef012345" }
 ```
 
 A subsequent push with the same `externalId` returns `200` with `"status": "updated"` and the
