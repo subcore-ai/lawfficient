@@ -18,15 +18,10 @@ import {
 import { Input } from "@workspace/ui/components/input"
 import { toast } from "@workspace/ui/components/sonner"
 
-import {
-  API_SCOPES,
-  createApiKey,
-  deleteApiKey,
-  setApiKeyEnabled,
-  type ApiScope,
-} from "@/app/(app)/settings/integrations/actions"
+import { createApiKey, deleteApiKey, setApiKeyEnabled } from "@/app/(app)/settings/integrations/actions"
 import { Field } from "@/components/form-field"
 import { StatusPill } from "@/components/status-pill"
+import { API_SCOPES, type ApiScope } from "@/lib/api/scopes"
 import { formatDateTime } from "@/lib/format"
 
 export type ApiKeyRow = {
