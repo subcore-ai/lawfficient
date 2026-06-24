@@ -1,5 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server"
 
+import { apiError, apiJson } from "@/lib/api/errors"
+import { withApi } from "@/lib/api/handler"
+import { getApiLeadsPage, type LeadFilters } from "@/lib/api/leads-query"
+import { decodeCursor, parseLimit } from "@/lib/api/pagination"
 import { parseCanonicalPayload } from "@/lib/ingest/contract"
 import { hashKey } from "@/lib/ingest/keys"
 import { checkRateLimit, recordEvent, resolveSourceByKey, upsertLead, type ResolvedSource } from "@/lib/ingest/store"
@@ -163,4 +167,30 @@ export async function POST(request: NextRequest) {
     })
     return NextResponse.json({ error: "Could not ingest the lead." }, { status: 500 })
   }
+}
+
+// Public REST list (spec 26, Phase 1). Key-authed (scope `leads:read`); firm-scoped; newest-first;
+// paginated (?limit, ?cursor) and filterable (?status, ?source, ?assignee, ?q). The handler does
+// only parse + query + serialize — auth / version / rate-limit / errors live in withApi.
+export async function GET(request: NextRequest) {
+  return withApi(request, "leads:read", async ({ admin, context }) => {
+    const params = request.nextUrl.searchParams
+    const limit = parseLimit(params.get("limit"))
+
+    const rawCursor = params.get("cursor")
+    const cursor = decodeCursor(rawCursor)
+    if (rawCursor && !cursor) {
+      return apiError("invalid_cursor", "The cursor is invalid.", 400)
+    }
+
+    const filters: LeadFilters = {
+      status: params.get("status") ?? undefined,
+      source: params.get("source") ?? undefined,
+      assignee: params.get("assignee") ?? undefined,
+      q: params.get("q") ?? undefined,
+    }
+
+    const page = await getApiLeadsPage(admin, context.firmId, limit, cursor, filters)
+    return apiJson(page)
+  })
 }
