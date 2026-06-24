@@ -1,0 +1,23 @@
+---
+title: Versioning
+description: Select an API version with the dated Lawfficient-Version header.
+---
+
+The API is versioned by **header, not by path** — the URL stays `/api/leads` forever, and a
+dated `Lawfficient-Version` header selects the version (the same approach Stripe uses).
+
+```bash
+curl https://app.lawfficient.com/api/leads \
+  -H "Authorization: Bearer $LAWFFICIENT_API_KEY" \
+  -H "Lawfficient-Version: 2026-07-01"
+```
+
+- **Format** — an ISO date, `YYYY-MM-DD`. The current stable version is **`2026-07-01`**.
+- **Omitted** — requests with no version header resolve to the **latest stable** version.
+- **Echoed** — every response includes the resolved `Lawfficient-Version` header, so you can see
+  exactly which version served your request.
+
+<Callout type="info">
+  Pin a version in production. Breaking changes ship as a **new dated version**; existing
+  versions keep their behavior so your integration doesn't change under you.
+</Callout>

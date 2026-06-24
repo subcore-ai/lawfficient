@@ -1,0 +1,57 @@
+---
+title: List leads
+description: GET /api/leads — list your firm's leads, filtered and paginated.
+---
+
+```http
+GET /api/leads
+```
+
+Returns a [paginated](/docs/pagination) list of the firm's leads, newest-created first.
+Requires the `leads:read` scope.
+
+## Query parameters
+
+| Param | Type | Description |
+| --- | --- | --- |
+| `limit` | number | Page size, 1–200 (default 50). |
+| `cursor` | string | The `next_cursor` from a previous page. |
+| `status` | string | Filter by pipeline stage **key** (e.g. `new`). An unknown key returns an empty page. |
+| `source` | string | Filter by exact source label (e.g. `web_form`). |
+| `assignee` | string | Filter by assigned staff id (UUID). A non-UUID returns an empty page. |
+| `q` | string | Free-text search over first name, last name, email, and phone. |
+
+## Example
+
+```bash
+curl -G https://app.lawfficient.com/api/leads \
+  -H "Authorization: Bearer $LAWFFICIENT_API_KEY" \
+  --data-urlencode "status=new" \
+  --data-urlencode "q=ada" \
+  --data-urlencode "limit=50"
+```
+
+```json title="200 OK"
+{
+  "data": [
+    {
+      "id": "3f8c1e2a-1b2c-4d5e-8f90-abcdef012345",
+      "first_name": "Ada",
+      "last_name": "Lovelace",
+      "email": "ada@example.com",
+      "phone": "+15551234567",
+      "source": "web_form",
+      "status": { "key": "new", "name": "New" },
+      "assignee_id": null,
+      "archived": false,
+      "created_at": "2026-06-23T10:00:00.000Z",
+      "last_activity_at": "2026-06-23T10:00:00.000Z",
+      "data": {}
+    }
+  ],
+  "next_cursor": null
+}
+```
+
+See the [lead object](/docs/leads) for every field, and [Pagination](/docs/pagination) for
+walking multiple pages.

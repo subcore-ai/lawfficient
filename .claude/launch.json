@@ -8,6 +8,14 @@
       "cwd": "apps/app",
       "port": 3099,
       "autoPort": true
+    },
+    {
+      "name": "docs",
+      "runtimeExecutable": "bun",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "apps/docs",
+      "port": 3098,
+      "autoPort": true
     }
   ]
 }

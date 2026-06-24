@@ -1,0 +1,28 @@
+---
+title: Rate limits
+description: Requests are limited per API key.
+---
+
+Requests are limited **per API key** over a trailing window:
+
+- **120 requests / 60 seconds** per key.
+
+When you exceed it, the API responds `429` with a `Retry-After` header (seconds until you can
+retry):
+
+```http
+HTTP/1.1 429 Too Many Requests
+Retry-After: 42
+Lawfficient-Version: 2026-07-01
+```
+
+```json
+{ "error": { "code": "rate_limited", "message": "Rate limit exceeded." } }
+```
+
+Back off for `Retry-After` seconds, then retry. Spread bulk work over time rather than bursting.
+
+<Callout type="info">
+  The limit is a coarse abuse guard, not a billing quota. If your integration needs a higher
+  sustained throughput, get in touch and we'll size it with you.
+</Callout>

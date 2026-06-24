@@ -17,6 +17,9 @@ coverage
 .next/
 out/
 
+# fumadocs (generated content source)
+.source/
+
 # production
 build
 dist

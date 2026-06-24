@@ -1,0 +1,68 @@
+---
+title: Push a lead
+description: POST /api/leads — create or update a lead from any source.
+---
+
+```http
+POST /api/leads
+```
+
+Pushes a single lead into the firm. This is the **one** endpoint every source targets — a web
+form, a Zapier/Make automation, a CRM, or your own backend. It's the inbound side of
+[lead ingestion](https://github.com/subcore-ai/lawfficient/blob/main/specs/23-lead-ingestion.md):
+the firm is resolved from the key, the payload is normalized, and the upsert is **idempotent**.
+
+## Authentication
+
+Send a per-source ingestion key as a Bearer token. As with the rest of the API the firm is
+resolved server-side from the key — never from the body.
+
+## Request body
+
+JSON. The core fields:
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `firstName` | string | |
+| `lastName` | string | |
+| `email` | string | Lowercased on ingest. |
+| `phone` | string | Normalized to E.164 where possible. |
+| `externalId` | string | **Optional but recommended.** The lead's id in your system; makes the push idempotent. |
+
+Any other fields you send are retained on the lead's custom `data` — nothing is dropped.
+
+## Idempotency
+
+Re-delivering the same `(source, externalId)` **updates** the existing lead instead of creating a
+duplicate. Without an `externalId`, every call creates a new lead — so always send one when the
+source has a stable id (Zapier retries, CRM webhooks, etc.).
+
+## Example
+
+```bash
+curl https://app.lawfficient.com/api/leads \
+  -H "Authorization: Bearer $LAWFFICIENT_SOURCE_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "firstName": "Ada",
+    "lastName": "Lovelace",
+    "email": "ada@example.com",
+    "phone": "+1 (555) 123-4567",
+    "externalId": "crm-9912",
+    "city": "London"
+  }'
+```
+
+```json title="201 Created"
+{ "status": "created", "leadId": "3f8c1e2a-1b2c-4d5e-8f90-abcdef012345" }
+```
+
+A subsequent push with the same `externalId` returns `200` with `"status": "updated"` and the
+same `leadId`.
+
+<Callout type="info">
+  This endpoint is the lead-ingestion webhook today: on success it returns `{ status, leadId }`,
+  and on failure `{ "error": "<message>" }`. It is being unified with the rest of the API to also
+  accept per-firm API keys (scope `leads:write`) and the standard [error envelope](/docs/errors) —
+  the path (`POST /api/leads`) stays the same.
+</Callout>

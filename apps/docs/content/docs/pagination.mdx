@@ -1,0 +1,42 @@
+---
+title: Pagination
+description: List endpoints page with an opaque cursor.
+---
+
+List endpoints return a page of results plus an opaque cursor for the next page:
+
+```json
+{
+  "data": [ /* … */ ],
+  "next_cursor": "eyJjcmVhdGVkQXQiOiIyMDI2…"
+}
+```
+
+## Parameters
+
+| Query param | Default | Notes |
+| --- | --- | --- |
+| `limit` | `50` | Page size, clamped to **1–200**. Out-of-range or non-numeric values fall back to the default. |
+| `cursor` | — | The `next_cursor` from the previous page. Omit it for the first page. |
+
+## Walking the pages
+
+`next_cursor` is `null` on the **last** page. Keep requesting with the returned cursor until it
+comes back `null`:
+
+```bash
+cursor=""
+while :; do
+  res=$(curl -s "https://app.lawfficient.com/api/leads?limit=100&cursor=$cursor" \
+    -H "Authorization: Bearer $LAWFFICIENT_API_KEY")
+  echo "$res" | jq '.data[]'
+  cursor=$(echo "$res" | jq -r '.next_cursor // empty')
+  [ -z "$cursor" ] && break
+done
+```
+
+<Callout type="info">
+  The cursor is **opaque** — don't parse or construct it. It encodes a stable ordering key
+  (creation time + id), so new records arriving mid-pagination never shift a row across a page
+  boundary. Results are ordered newest-created first.
+</Callout>
