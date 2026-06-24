@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 
+import { getApiLeadById } from "@/lib/api/leads-query"
 import { getCurrentUser, type CurrentUser } from "@/lib/auth/session"
 import {
   buildLeadData,
@@ -16,6 +17,8 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import type { Json } from "@/lib/supabase/database.types"
 import { createClient } from "@/lib/supabase/server"
 import { groupTaxonomies, toLeadVocab } from "@/lib/taxonomies/queries"
+import { emitEvent } from "@/lib/webhooks/emit"
+import type { WebhookEventType } from "@/lib/webhooks/events"
 
 export type ActionResult = { ok: true } | { error: string }
 
@@ -81,6 +84,23 @@ async function recordEvent(
     if (error) console.error("note event insert failed:", error.message)
   } catch (err) {
     console.error("note event insert threw:", err)
+  }
+}
+
+// Emit a lead.* outbound webhook event (spec 27) after a successful mutation. The payload is the
+// lead in the SAME public shape the API returns (serializeLead, via getApiLeadById), so an
+// app-emitted event matches an API-emitted one byte-for-byte. Best-effort + non-blocking: it loads
+// the lead + delivers via the service-role admin client and NEVER throws — a webhook failure must
+// never fail the user's action. (Emitting from this shared path means the future API write
+// endpoints emit the same events.)
+async function emitLeadEvent(firmId: string, leadId: string, type: WebhookEventType) {
+  try {
+    const admin = createAdminClient()
+    const lead = await getApiLeadById(admin, firmId, leadId)
+    if (!lead) return // deleted out from under us, or not this firm's — nothing to emit
+    await emitEvent(admin, firmId, type, lead)
+  } catch (err) {
+    console.error("emitLeadEvent failed:", err)
   }
 }
 
@@ -201,6 +221,7 @@ export async function createLead(formData: FormData): Promise<ActionResult> {
     `${core.value.firstName} ${core.value.lastName}`,
     "created"
   )
+  await emitLeadEvent(gate.user.firmId, inserted.id, "lead.created")
   revalidateLeads()
   return { ok: true }
 }
@@ -271,6 +292,7 @@ export async function updateLead(
     `${core.value.firstName} ${core.value.lastName}`,
     "updated"
   )
+  await emitLeadEvent(gate.user.firmId, id, "lead.updated")
   revalidateLeads(id)
   return { ok: true }
 }
@@ -313,6 +335,7 @@ export async function setLeadStatus(
     `Moved to ${status?.name ?? "a new status"}`,
     gate.user.id
   )
+  await emitLeadEvent(gate.user.firmId, id, "lead.status_changed")
   revalidateLeads(id)
   return { ok: true }
 }
@@ -356,6 +379,7 @@ export async function assignLead(
     body = `Assigned to ${assignee?.name ?? "a teammate"}`
   }
   await recordEvent(gate.user.firmId, id, body, gate.user.id)
+  await emitLeadEvent(gate.user.firmId, id, "lead.assigned")
   revalidateLeads(id)
   return { ok: true }
 }
@@ -409,6 +433,8 @@ export async function setLeadQualification(
     next ? `Qualification → ${next}` : "Qualification cleared",
     gate.user.id
   )
+  // Qualification lives in the lead's data; there's no dedicated event, so it's a lead.updated.
+  await emitLeadEvent(gate.user.firmId, id, "lead.updated")
   revalidateLeads(id)
   return { ok: true }
 }
@@ -452,6 +478,8 @@ export async function setLeadArchived(
     archived ? "Archived the lead" : "Restored the lead",
     gate.user.id
   )
+  // lead.archived is the archive lifecycle event; a restore is a generic state change → lead.updated.
+  await emitLeadEvent(gate.user.firmId, id, archived ? "lead.archived" : "lead.updated")
   revalidateLeads(id)
   return { ok: true }
 }

@@ -11,6 +11,7 @@ import {
 import { MockTag } from "@/components/dev/mock-tag"
 import { ConfigureIntegrationDialog } from "@/components/settings/settings-dialogs"
 import { LeadSourcesSection, type LeadSourceRow } from "@/components/settings/lead-sources-editor"
+import { WebhooksSection, type WebhookEndpointRow } from "@/components/settings/webhooks-editor"
 import { StatusPill } from "@/components/status-pill"
 import { getCurrentUser } from "@/lib/auth/session"
 import type { AssigneeOption } from "@/lib/leads/queries"
@@ -31,6 +32,7 @@ const INTEGRATIONS: { name: string; desc: string; status: "connected" | "migrati
 type Loaded = {
   sources: LeadSourceRow[]
   assignees: AssigneeOption[]
+  endpoints: WebhookEndpointRow[]
   canManage: boolean
   webhookUrl: string
 }
@@ -43,7 +45,7 @@ async function load(): Promise<Loaded> {
   const webhookUrl = origin ? `${origin}/api/leads` : "/api/leads"
 
   if (!isSupabaseConfigured()) {
-    return { sources: [], assignees: [], canManage: false, webhookUrl }
+    return { sources: [], assignees: [], endpoints: [], canManage: false, webhookUrl }
   }
 
   const me = await getCurrentUser()
@@ -96,16 +98,58 @@ async function load(): Promise<Loaded> {
     }
   })
 
+  // Outbound webhook endpoints + their recent deliveries (RLS scopes both to the firm and
+  // settings.manage; a non-admin sees an empty list). One deliveries query per endpoint so a
+  // high-volume endpoint can't crowd out others.
+  const { data: endpointRows } = await supabase
+    .from("webhook_endpoints")
+    .select("id, url, secret_last4, event_types, enabled, created_at")
+    .order("created_at")
+  const endpointList = endpointRows ?? []
+  const deliveryResults = await Promise.all(
+    endpointList.map((e) =>
+      supabase
+        .from("webhook_deliveries")
+        .select("event_type, status, response_status, error, created_at")
+        .eq("endpoint_id", e.id)
+        .order("created_at", { ascending: false })
+        .limit(20)
+    )
+  )
+  const endpoints: WebhookEndpointRow[] = endpointList.map((e, i) => {
+    const res = deliveryResults[i]
+    const deliveries =
+      res && !res.error
+        ? (res.data ?? []).map((d) => ({
+            eventType: d.event_type,
+            status: d.status,
+            responseStatus: d.response_status,
+            error: d.error,
+            createdAt: d.created_at,
+          }))
+        : []
+    return {
+      id: e.id,
+      url: e.url,
+      secretLast4: e.secret_last4,
+      eventTypes: e.event_types,
+      enabled: e.enabled,
+      createdAt: e.created_at,
+      recentDeliveries: deliveries,
+    }
+  })
+
   return {
     sources,
     assignees: (assigneesRes.data ?? []).map((p) => ({ id: p.id, name: p.name })),
+    endpoints,
     canManage: me?.permissions?.includes("settings.manage") ?? false,
     webhookUrl,
   }
 }
 
 export default async function SettingsIntegrationsPage() {
-  const { sources, assignees, canManage, webhookUrl } = await load()
+  const { sources, assignees, endpoints, canManage, webhookUrl } = await load()
 
   return (
     <div className="flex flex-col gap-6">
@@ -117,6 +161,12 @@ export default async function SettingsIntegrationsPage() {
             canManage={canManage}
             webhookUrl={webhookUrl}
           />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="pt-6">
+          <WebhooksSection endpoints={endpoints} canManage={canManage} />
         </CardContent>
       </Card>
 
