@@ -1,14 +1,21 @@
 import { NextResponse, type NextRequest } from "next/server"
 
+import { bearerKey } from "@/lib/api/auth"
+import { readJsonObject } from "@/lib/api/body"
 import { apiError, apiJson } from "@/lib/api/errors"
 import { withApi } from "@/lib/api/handler"
+import { parseIdempotencyKey } from "@/lib/api/idempotency"
+import { resolveApiKey, touchApiKey } from "@/lib/api/keys"
 import { getApiLeadsPage, type LeadFilters } from "@/lib/api/leads-query"
 import { decodeCursor, parseLimit } from "@/lib/api/pagination"
+import { rateLimitByKey } from "@/lib/api/rate-limit"
 import { tenantScoped } from "@/lib/api/tenant-db"
+import { resolveVersion, withVersion } from "@/lib/api/version"
 import { parseCanonicalPayload } from "@/lib/ingest/contract"
 import { hashKey } from "@/lib/ingest/keys"
 import { checkRateLimit, recordEvent, resolveSourceByKey, upsertLead, type ResolvedSource } from "@/lib/ingest/store"
-import { buildLeadData } from "@/lib/leads/data-schema"
+import { buildLeadData, type LeadDataInput } from "@/lib/leads/data-schema"
+import { createLeadViaApi, emitLeadEvents } from "@/lib/leads/mutations"
 import { parseLeadInput } from "@/lib/leads/validation"
 import { createAdminClient } from "@/lib/supabase/admin"
 import type { Json } from "@/lib/supabase/database.types"
@@ -22,14 +29,12 @@ const MAX_BODY_BYTES = 64 * 1024
 const RATE_LIMIT = 120 // events
 const RATE_WINDOW_SECONDS = 60
 
-function bearerKey(request: NextRequest): string | null {
-  const header = request.headers.get("authorization") ?? ""
-  const match = header.match(/^Bearer\s+(.+)$/i)
-  return match?.[1]?.trim() || null
-}
-
-// Inbound lead webhook (spec 23, Tier 0). Auth via an opaque per-source key (Bearer); the firm
-// is resolved server-side from the key, NEVER the body. Idempotent on (firm, source, externalId).
+// One way to push a lead (spec 26): POST /api/leads resolves the firm from WHICHEVER Bearer key is
+// presented. We try the per-firm API key first (api_keys); if the key is one of those, it's a direct
+// API create (scope `leads:write`, standard error envelope, optional Idempotency-Key). Otherwise we
+// fall through to the existing per-source ingestion path (lead_sources) — UNCHANGED — so Zapier &
+// co. keep working exactly as before. The two key tables are disjoint, so "try one, then the other"
+// has no ambiguity: an api_keys hit is never a source, and vice-versa.
 export async function POST(request: NextRequest) {
   // Needs the publishable env AND the server-only secret (the admin client throws without it);
   // check both up front so a misconfig is a clear 503, not an uncaught 500 deeper in.
@@ -42,6 +47,28 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Missing API key." }, { status: 401 })
   }
 
+  const admin = createAdminClient()
+
+  // Try the per-firm API key first. A resolved (enabled) api_keys row → the direct-create path, which
+  // owns its own scope check + error envelope + idempotency. A lookup blip → 503 (don't fall through
+  // to ingestion and risk a duplicate create on a retry). Null → not an API key → ingestion below.
+  let apiKey: Awaited<ReturnType<typeof resolveApiKey>>
+  try {
+    apiKey = await resolveApiKey(admin, hashKey(rawKey))
+  } catch {
+    return NextResponse.json({ error: "Temporarily unavailable." }, { status: 503 })
+  }
+  if (apiKey) {
+    return createLeadFromApiKey(request, admin, apiKey)
+  }
+
+  return ingestFromSource(request, admin, rawKey)
+}
+
+// The per-source ingestion path (spec 23, Tier 0) — UNCHANGED behavior. Auth via an opaque per-source
+// key (Bearer); the firm is resolved server-side from the key, NEVER the body. Idempotent on
+// (firm, source, externalId). Reached only when the Bearer key is NOT a per-firm API key.
+async function ingestFromSource(request: NextRequest, admin: ReturnType<typeof createAdminClient>, rawKey: string) {
   // Reject oversized payloads by Content-Length BEFORE buffering the body (DoS guard)…
   const declaredLength = Number(request.headers.get("content-length") ?? "0")
   if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_BYTES) {
@@ -53,7 +80,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Payload too large." }, { status: 413 })
   }
 
-  const admin = createAdminClient()
   let source: ResolvedSource | null = null
   try {
     source = await resolveSourceByKey(admin, hashKey(rawKey))
@@ -168,6 +194,73 @@ export async function POST(request: NextRequest) {
     })
     return NextResponse.json({ error: "Could not ingest the lead." }, { status: 500 })
   }
+}
+
+// The per-firm API-key create path (spec 26, Phase 2): a direct create with the STANDARD error
+// envelope + version header (unlike ingestion's `{status, leadId}` shape). The key is already
+// resolved; here we enforce the `leads:write` scope, rate-limit per key, honor an optional
+// Idempotency-Key (store + replay), validate via the shared lib/leads core, and emit lead.created.
+async function createLeadFromApiKey(
+  request: NextRequest,
+  admin: ReturnType<typeof createAdminClient>,
+  apiKey: NonNullable<Awaited<ReturnType<typeof resolveApiKey>>>,
+) {
+  const version = resolveVersion(request.headers)
+  const echo = (res: NextResponse) => withVersion(res, version)
+
+  // Mirror the auth layer's status mapping for the cases withApi would otherwise handle.
+  if (!apiKey.enabled) {
+    return echo(apiError("key_disabled", "This API key is disabled.", 403))
+  }
+  if (!apiKey.scopes.includes("leads:write")) {
+    return echo(apiError("insufficient_scope", "This API key is missing the required scope: leads:write.", 403))
+  }
+  // Best-effort observability touch, once authorized (same as the read path).
+  void touchApiKey(admin, apiKey.keyId)
+
+  const limit = rateLimitByKey(apiKey.keyId)
+  if (!limit.ok) {
+    const res = apiError("rate_limited", "Rate limit exceeded.", 429)
+    res.headers.set("Retry-After", String(limit.retryAfterSeconds))
+    return echo(res)
+  }
+
+  // Optional Idempotency-Key: the dedup is enforced ATOMICALLY by the DB (api_create_lead) — a repeat
+  // with the same key returns the original lead, and a failed create leaves no reservation behind, so
+  // there's no reserve/complete/release dance here. We only validate the header's length.
+  const idem = parseIdempotencyKey(request.headers.get("idempotency-key"))
+  if (!idem.ok) return echo(apiError("invalid_request", "Idempotency-Key is too long.", 400))
+
+  const body = await readJsonObject(request)
+  if (!body.ok) return echo(apiError(body.code, body.message, body.status))
+
+  // `data`, if present, must be a JSON object — reject a primitive / array / null rather than
+  // silently dropping it and creating the lead without the supplied fields.
+  const rawData = body.value.data
+  if (rawData !== undefined && (typeof rawData !== "object" || rawData === null || Array.isArray(rawData))) {
+    return echo(apiError("invalid_request", "data must be an object.", 422))
+  }
+  const dataInput = rawData as LeadDataInput | undefined
+
+  const result = await createLeadViaApi(
+    admin,
+    apiKey.firmId,
+    {
+      firstName: body.value.first_name,
+      lastName: body.value.last_name,
+      phone: body.value.phone,
+      email: body.value.email,
+      source: body.value.source,
+      assignedToId: body.value.assignee_id,
+      data: dataInput,
+    },
+    idem.key ? { apiKeyId: apiKey.keyId, key: idem.key } : undefined,
+  )
+  if (!result.ok) return echo(apiError(result.code, result.message, result.status))
+
+  // `events` is empty on an idempotent replay, so a repeat emits nothing (no duplicate lead.created).
+  emitLeadEvents(apiKey.firmId, result.lead.id, result.events)
+  return echo(apiJson(result.lead as unknown as Json, 201))
 }
 
 // Public REST list (spec 26, Phase 1). Key-authed (scope `leads:read`); firm-scoped; newest-first;

@@ -1,10 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { after } from "next/server"
 
-import { getApiLeadById } from "@/lib/api/leads-query"
-import { tenantScoped } from "@/lib/api/tenant-db"
 import { getCurrentUser, type CurrentUser } from "@/lib/auth/session"
 import {
   buildLeadData,
@@ -14,12 +11,12 @@ import {
   type LeadDataInput,
   type LeadVocab,
 } from "@/lib/leads/data-schema"
+import { emitLeadEvents } from "@/lib/leads/mutations"
 import { parseLeadInput } from "@/lib/leads/validation"
 import { createAdminClient } from "@/lib/supabase/admin"
 import type { Json } from "@/lib/supabase/database.types"
 import { createClient } from "@/lib/supabase/server"
 import { groupTaxonomies, toLeadVocab } from "@/lib/taxonomies/queries"
-import { emitEvent } from "@/lib/webhooks/emit"
 import type { WebhookEventType } from "@/lib/webhooks/events"
 
 export type ActionResult = { ok: true } | { error: string }
@@ -89,26 +86,12 @@ async function recordEvent(
   }
 }
 
-// Emit a lead.* outbound webhook event (spec 27) after a successful mutation. The payload is the
-// lead in the SAME public shape the API returns (serializeLead, via getApiLeadById), so an
-// app-emitted event matches an API-emitted one byte-for-byte. Best-effort + non-blocking: it loads
-// the lead + delivers via the service-role admin client and NEVER throws — a webhook failure must
-// never fail the user's action. (Emitting from this shared path means the future API write
-// endpoints emit the same events.)
+// Emit a single lead.* outbound webhook event after a successful mutation. Thin wrapper over the
+// shared emitLeadEvents (lib/leads/mutations) — the ONE emission path both surfaces use, so an
+// app-emitted event is byte-identical to an API-emitted one (same serializeLead payload, same
+// best-effort `after` delivery).
 function emitLeadEvent(firmId: string, leadId: string, type: WebhookEventType) {
-  // Deliver AFTER the response is sent (next/server `after`) so a slow/hanging endpoint never adds
-  // latency to the user's action. Best-effort: loads the lead in the public API shape, delivers via
-  // the service-role admin client, and NEVER throws.
-  after(async () => {
-    try {
-      const admin = createAdminClient()
-      const lead = await getApiLeadById(tenantScoped(admin, firmId), leadId)
-      if (!lead) return // deleted out from under us, or not this firm's — nothing to emit
-      await emitEvent(admin, firmId, type, lead)
-    } catch (err) {
-      console.error("emitLeadEvent failed:", err)
-    }
-  })
+  emitLeadEvents(firmId, leadId, [type])
 }
 
 // Lead mutations also shift the dashboard's lead KPIs (/), so revalidate it alongside.

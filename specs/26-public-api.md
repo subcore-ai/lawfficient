@@ -139,7 +139,12 @@ keys (Phase 2) — nothing is relocated.
   segment (confirmed).
 - **Lead push:** one endpoint `POST /api/leads` for both ingestion keys and API keys — no
   `/api/ingest/leads`, no route relocation (confirmed).
+- **`Idempotency-Key` storage (Phase 2):** stored in a dedicated `api_idempotency_keys` table (0036),
+  keyed unique on `(firm_id, api_key_id, idempotency_key)` with the original `{status, body}` recorded
+  for replay. Server-side only (RLS enabled, no policies — reached via the admin client). Guarantees
+  idempotency for sequential retries (the real use case); a TTL sweep (Vercel Cron) prunes aged rows.
 
 ## Open questions
 
-- `Idempotency-Key` storage + TTL.
+- `Idempotency-Key` TTL sweep cadence + the durable rate-limiter (the in-memory limiter is per-instance
+  on serverless — see `lib/api/rate-limit.ts`).

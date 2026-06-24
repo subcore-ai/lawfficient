@@ -14,6 +14,55 @@ export type Database = {
   }
   public: {
     Tables: {
+      api_idempotency_keys: {
+        Row: {
+          api_key_id: string
+          created_at: string
+          firm_id: string
+          id: string
+          idempotency_key: string
+          lead_id: string
+        }
+        Insert: {
+          api_key_id: string
+          created_at?: string
+          firm_id: string
+          id?: string
+          idempotency_key: string
+          lead_id: string
+        }
+        Update: {
+          api_key_id?: string
+          created_at?: string
+          firm_id?: string
+          id?: string
+          idempotency_key?: string
+          lead_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_idempotency_keys_api_key_id_fkey"
+            columns: ["api_key_id"]
+            isOneToOne: false
+            referencedRelation: "api_keys"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "api_idempotency_keys_firm_id_fkey"
+            columns: ["firm_id"]
+            isOneToOne: false
+            referencedRelation: "firms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "api_idempotency_keys_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       api_keys: {
         Row: {
           created_at: string
@@ -1414,6 +1463,38 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      api_create_lead: {
+        Args: {
+          p_api_key_id?: string
+          p_assigned_to_id?: string
+          p_data: Json
+          p_email: string
+          p_firm_id: string
+          p_first_name: string
+          p_idempotency_key?: string
+          p_last_name: string
+          p_phone: string
+          p_source: string
+          p_status_id: string
+        }
+        Returns: {
+          archived: boolean
+          assigned_to_id: string | null
+          created_at: string
+          data: Json
+          email: string
+          external_id: string | null
+          firm_id: string
+          first_name: string
+          id: string
+          last_activity: string
+          last_name: string
+          phone: string
+          replayed: boolean
+          source: string
+          status_id: string
+        }[]
+      }
       authorize: {
         Args: {
           requested_permission: Database["public"]["Enums"]["app_permission"]

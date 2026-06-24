@@ -41,6 +41,15 @@ export function parseLeadInput(raw: {
   source?: unknown
   assignedToId?: unknown
 }): { ok: true; value: LeadCoreInput } | { ok: false; error: string } {
+  // Contact fields: a non-string (e.g. a numeric phone from an integration) would str()→"" and be
+  // silently dropped, so reject it explicitly rather than lose the value.
+  if (raw.phone != null && typeof raw.phone !== "string") return { ok: false, error: "phone must be a string." }
+  if (raw.email != null && typeof raw.email !== "string") return { ok: false, error: "email must be a string." }
+  // Same for the assignee: a non-string (e.g. a JSON number) would str()→""→null and silently create
+  // an unassigned lead, dropping the intended assignee. Reject it (mirrors parseLeadPatch).
+  if (raw.assignedToId != null && typeof raw.assignedToId !== "string") {
+    return { ok: false, error: "assignee_id must be a string or null." }
+  }
   const firstName = str(raw.firstName)
   const lastName = str(raw.lastName)
   const phone = str(raw.phone)
@@ -57,4 +66,79 @@ export function parseLeadInput(raw: {
     ok: true,
     value: { firstName, lastName, phone, email, source, assignedToId: assignedToId || null },
   }
+}
+
+// PARTIAL core for the API's PATCH /api/leads/{id}: only the keys PRESENT in the body are touched.
+// An absent key is left unchanged (undefined in the patch); a present key is validated + trimmed. It
+// guards the same invariants as parseLeadInput, but per-field: a provided name/source can't be
+// blanked; a provided email must be valid; and the post-merge lead must still be reachable
+// (phone OR email) — so a caller can't blank the last contact method. The post-merge reachability
+// check needs the EXISTING phone/email, passed in.
+export type LeadCorePatch = {
+  firstName?: string
+  lastName?: string
+  phone?: string
+  email?: string
+  source?: string
+  assignedToId?: string | null
+}
+
+type ExistingCore = { phone: string; email: string }
+
+export function parseLeadPatch(
+  raw: Record<string, unknown>,
+  existing: ExistingCore,
+): { ok: true; value: LeadCorePatch } | { ok: false; error: string } {
+  const has = (k: string) => Object.prototype.hasOwnProperty.call(raw, k)
+  const patch: LeadCorePatch = {}
+
+  if (has("first_name")) {
+    const v = str(raw.first_name)
+    if (!v) return { ok: false, error: "First name can't be empty." }
+    patch.firstName = v
+  }
+  if (has("last_name")) {
+    const v = str(raw.last_name)
+    if (!v) return { ok: false, error: "Last name can't be empty." }
+    patch.lastName = v
+  }
+  if (has("source")) {
+    const v = str(raw.source)
+    if (!v) return { ok: false, error: "Source can't be empty." }
+    patch.source = v
+  }
+  if (has("email")) {
+    if (raw.email !== null && typeof raw.email !== "string") {
+      return { ok: false, error: "email must be a string." }
+    }
+    const v = str(raw.email).toLowerCase()
+    if (v && !isValidEmail(v)) return { ok: false, error: "Enter a valid email address." }
+    patch.email = v
+  }
+  if (has("phone")) {
+    // Reject a non-string phone (e.g. a JSON number) — str() would blank it, silently clearing a
+    // stored phone on PATCH.
+    if (raw.phone !== null && typeof raw.phone !== "string") {
+      return { ok: false, error: "phone must be a string." }
+    }
+    patch.phone = str(raw.phone)
+  }
+  // assignee_id: an explicit null (or "") unassigns; a non-empty string assigns. Its uuid shape is
+  // checked at the mutation boundary (it's the assigned_to_id column), like the read API's filter.
+  if (has("assignee_id")) {
+    const v = raw.assignee_id
+    // Only a string (assign) or null (unassign) is valid — reject other types instead of silently
+    // coercing e.g. a number into an unassign.
+    if (v !== null && typeof v !== "string") {
+      return { ok: false, error: "assignee_id must be a string or null." }
+    }
+    patch.assignedToId = typeof v === "string" && v.trim() !== "" ? v.trim() : null
+  }
+
+  // The lead must still be reachable after the merge — a PATCH can't blank the LAST contact method.
+  const nextPhone = patch.phone !== undefined ? patch.phone : existing.phone
+  const nextEmail = patch.email !== undefined ? patch.email : existing.email
+  if (!nextPhone && !nextEmail) return { ok: false, error: "Add a phone number or an email." }
+
+  return { ok: true, value: patch }
 }

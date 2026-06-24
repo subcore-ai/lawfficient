@@ -81,6 +81,41 @@ export const openapiDocument = {
           "429": { $ref: "#/components/responses/Error" },
         },
       },
+      post: {
+        operationId: "createLead",
+        summary: "Create a lead",
+        description:
+          "Creates a lead. There is ONE endpoint to push a lead: POST /api/leads resolves the firm " +
+          "from whichever Bearer key is presented. With a per-firm API key (scope `leads:write`) this " +
+          "is a direct create — returns the created lead (201) and emits `lead.created`. With a " +
+          "per-source ingestion key it is the inbound webhook instead (idempotent on `externalId`, " +
+          "returns `{ status, leadId }`); see the lead-ingestion spec. An optional `Idempotency-Key` " +
+          "header makes an API-key create safe to retry: a repeat with the same key replays the " +
+          "original 201 instead of creating a second lead.",
+        security: [{ apiKey: ["leads:write"] }],
+        parameters: [
+          { $ref: "#/components/parameters/VersionHeader" },
+          { $ref: "#/components/parameters/IdempotencyKey" },
+        ],
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { $ref: "#/components/schemas/LeadCreate" } } },
+        },
+        responses: {
+          "201": {
+            description: "The created lead.",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/Lead" } } },
+          },
+          "400": { $ref: "#/components/responses/Error" },
+          "401": { $ref: "#/components/responses/Error" },
+          "403": { $ref: "#/components/responses/Error" },
+          "409": { $ref: "#/components/responses/Error" },
+          "413": { $ref: "#/components/responses/Error" },
+          "422": { $ref: "#/components/responses/Error" },
+          "429": { $ref: "#/components/responses/Error" },
+          "503": { $ref: "#/components/responses/Error" },
+        },
+      },
     },
     "/leads/{id}": {
       get: {
@@ -90,17 +125,92 @@ export const openapiDocument = {
         security: [{ apiKey: ["leads:read"] }],
         parameters: [
           { $ref: "#/components/parameters/VersionHeader" },
-          {
-            name: "id",
-            in: "path",
-            required: true,
-            description: "Lead id (UUID).",
-            schema: { type: "string", format: "uuid" },
-          },
+          { $ref: "#/components/parameters/LeadId" },
         ],
         responses: {
           "200": {
             description: "The lead.",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/Lead" } } },
+          },
+          "401": { $ref: "#/components/responses/Error" },
+          "403": { $ref: "#/components/responses/Error" },
+          "404": { $ref: "#/components/responses/Error" },
+          "429": { $ref: "#/components/responses/Error" },
+        },
+      },
+      patch: {
+        operationId: "updateLead",
+        summary: "Update a lead",
+        description:
+          "Partially updates a lead — only the fields present in the body are changed. `status` is " +
+          "set by its firm-defined key. Returns the updated lead and emits `lead.updated`, " +
+          "`lead.status_changed`, and/or `lead.assigned` to match what changed. A lead from another " +
+          "firm returns 404.",
+        security: [{ apiKey: ["leads:write"] }],
+        parameters: [
+          { $ref: "#/components/parameters/VersionHeader" },
+          { $ref: "#/components/parameters/LeadId" },
+        ],
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { $ref: "#/components/schemas/LeadPatch" } } },
+        },
+        responses: {
+          "200": {
+            description: "The updated lead.",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/Lead" } } },
+          },
+          "400": { $ref: "#/components/responses/Error" },
+          "401": { $ref: "#/components/responses/Error" },
+          "403": { $ref: "#/components/responses/Error" },
+          "404": { $ref: "#/components/responses/Error" },
+          "413": { $ref: "#/components/responses/Error" },
+          "422": { $ref: "#/components/responses/Error" },
+          "429": { $ref: "#/components/responses/Error" },
+        },
+      },
+    },
+    "/leads/{id}/archive": {
+      post: {
+        operationId: "archiveLead",
+        summary: "Archive a lead",
+        description:
+          "Archives a lead. Idempotent — archiving an already-archived lead is a no-op that returns the " +
+          "lead and emits NOTHING. Only an actual state change returns the lead and emits `lead.archived`. " +
+          "A lead from another firm returns 404.",
+        security: [{ apiKey: ["leads:write"] }],
+        parameters: [
+          { $ref: "#/components/parameters/VersionHeader" },
+          { $ref: "#/components/parameters/LeadId" },
+        ],
+        responses: {
+          "200": {
+            description: "The archived lead.",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/Lead" } } },
+          },
+          "401": { $ref: "#/components/responses/Error" },
+          "403": { $ref: "#/components/responses/Error" },
+          "404": { $ref: "#/components/responses/Error" },
+          "429": { $ref: "#/components/responses/Error" },
+        },
+      },
+    },
+    "/leads/{id}/unarchive": {
+      post: {
+        operationId: "unarchiveLead",
+        summary: "Unarchive a lead",
+        description:
+          "Restores an archived lead. Idempotent — restoring an already-active lead is a no-op that " +
+          "returns the lead and emits NOTHING. Only an actual state change returns the lead and emits " +
+          "`lead.updated`. A lead from another firm returns 404.",
+        security: [{ apiKey: ["leads:write"] }],
+        parameters: [
+          { $ref: "#/components/parameters/VersionHeader" },
+          { $ref: "#/components/parameters/LeadId" },
+        ],
+        responses: {
+          "200": {
+            description: "The restored lead.",
             content: { "application/json": { schema: { $ref: "#/components/schemas/Lead" } } },
           },
           "401": { $ref: "#/components/responses/Error" },
@@ -128,6 +238,22 @@ export const openapiDocument = {
         required: false,
         description: "Requested API version (ISO date). Absent → latest stable. Echoed on the response.",
         schema: { type: "string", example: LATEST_VERSION },
+      },
+      IdempotencyKey: {
+        name: "Idempotency-Key",
+        in: "header",
+        required: false,
+        description:
+          "Optional opaque key making an API-key create safe to retry: a repeat with the same key " +
+          "(per firm + key) replays the original response instead of creating a second lead.",
+        schema: { type: "string", maxLength: 255 },
+      },
+      LeadId: {
+        name: "id",
+        in: "path",
+        required: true,
+        description: "Lead id (UUID).",
+        schema: { type: "string", format: "uuid" },
       },
       Limit: {
         name: "limit",
@@ -192,6 +318,70 @@ export const openapiDocument = {
             additionalProperties: true,
             description: "Firm-defined / source-mapped extra fields (schemaless).",
           },
+        },
+      },
+      LeadData: {
+        type: "object",
+        additionalProperties: true,
+        description:
+          "Lead data fields. The constrained fields (case_type / hierarchy / qualification, written " +
+          "here as caseType / hierarchy / qualification) are validated against the firm's taxonomy; " +
+          "the rest are free text. On WRITE only the fields below are stored — other keys you send are " +
+          "ignored, not persisted; keys already on the record (e.g. from ingestion) are preserved on " +
+          "update and returned on read.",
+        properties: {
+          caseType: { type: "string" },
+          hierarchy: { type: "string" },
+          qualification: { type: "string" },
+          preferredLanguage: { type: "string" },
+          countryOfOrigin: { type: "string" },
+          city: { type: "string" },
+          state: { type: "string" },
+          zip: { type: "string" },
+          gender: { type: "string" },
+          dob: { type: "string" },
+          referralSource: { type: "string" },
+        },
+      },
+      LeadCreate: {
+        type: "object",
+        description: "Create payload (API-key path). The lead lands in the firm's first open stage.",
+        required: ["first_name", "last_name", "source"],
+        // At least one of email/phone must be present — a lead has to be reachable.
+        anyOf: [{ required: ["email"] }, { required: ["phone"] }],
+        properties: {
+          first_name: { type: "string" },
+          last_name: { type: "string" },
+          email: { type: "string", description: "Email; required if no phone is given." },
+          phone: { type: "string", description: "Phone; required if no email is given." },
+          source: { type: "string" },
+          assignee_id: {
+            type: ["string", "null"],
+            format: "uuid",
+            description: "Optional assignee (must be a member of the firm).",
+          },
+          data: { $ref: "#/components/schemas/LeadData" },
+        },
+      },
+      LeadPatch: {
+        type: "object",
+        description:
+          "Partial update payload. Only the keys present are changed; omitting a key leaves it " +
+          "untouched. A provided name/source can't be blanked, and you can't remove the last contact " +
+          "method (phone and email both empty).",
+        properties: {
+          first_name: { type: "string" },
+          last_name: { type: "string" },
+          email: { type: "string" },
+          phone: { type: "string" },
+          source: { type: "string" },
+          assignee_id: {
+            type: ["string", "null"],
+            format: "uuid",
+            description: "Set to a UUID to assign, or null to unassign.",
+          },
+          status: { type: "string", description: "The firm-defined status key to move the lead to." },
+          data: { $ref: "#/components/schemas/LeadData" },
         },
       },
       Error: {
