@@ -7,6 +7,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 import { WEBHOOK_EVENT_TYPES, type WebhookEventType } from "@/lib/webhooks/events"
 import { generateSecret } from "@/lib/webhooks/secret"
+import { isSafeWebhookUrl } from "@/lib/webhooks/url"
 
 export type ActionResult = { ok: true } | { error: string }
 // create returns the raw signing secret ONCE (it's never stored readably) so the UI can show it.
@@ -25,17 +26,6 @@ async function requireAdmin(): Promise<Gate> {
   return { ok: true, user }
 }
 
-// Reject anything that isn't an http(s) URL up front (a clearer error than a delivery that silently
-// never connects).
-function isHttpUrl(value: string): boolean {
-  try {
-    const u = new URL(value)
-    return u.protocol === "https:" || u.protocol === "http:"
-  } catch {
-    return false
-  }
-}
-
 // Keep only known event types; drop anything else a crafted submit might include.
 function cleanEventTypes(values: string[]): WebhookEventType[] {
   const known = new Set<string>(WEBHOOK_EVENT_TYPES)
@@ -48,7 +38,8 @@ export async function createWebhookEndpoint(formData: FormData): Promise<SecretR
 
   const url = String(formData.get("url") ?? "").trim()
   if (!url) return { error: "Enter an endpoint URL." }
-  if (!isHttpUrl(url)) return { error: "Enter a valid http(s) URL." }
+  if (!isSafeWebhookUrl(url))
+    return { error: "Enter a public http(s) URL — localhost and private addresses aren't allowed." }
 
   const eventTypes = cleanEventTypes(formData.getAll("eventTypes").map(String))
   if (eventTypes.length === 0) return { error: "Select at least one event to send." }
@@ -73,7 +64,11 @@ export async function createWebhookEndpoint(formData: FormData): Promise<SecretR
     .from("webhook_endpoint_secrets")
     .insert({ endpoint_id: endpoint.id, firm_id: gate.user.firmId, secret: raw })
   if (secretErr) {
-    await admin.from("webhook_endpoints").delete().eq("id", endpoint.id)
+    // Roll back the endpoint so we never leave one that can't be signed for. If the rollback ALSO
+    // fails the endpoint is orphaned (emitEvent skips it) — log it so it isn't silently lost.
+    const { error: rollbackErr } = await admin.from("webhook_endpoints").delete().eq("id", endpoint.id)
+    if (rollbackErr)
+      console.error("webhook endpoint rollback failed (orphaned, no secret):", endpoint.id, rollbackErr.message)
     return { error: "Couldn't create the endpoint." }
   }
 

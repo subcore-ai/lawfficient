@@ -78,6 +78,13 @@ describe("verifySignature (round-trip)", () => {
     expect(verifySignature(secret, body, "not-a-signature", now)).toBe(false)
     expect(verifySignature(secret, body, "t=abc,v1=", now)).toBe(false)
   })
+
+  test("returns false (never throws) for a multi-byte v1 of matching string length", () => {
+    // 64 'é' = a 64-char string (matches a hex digest's length) but 128 UTF-8 bytes — the byte-length
+    // guard must catch this so timingSafeEqual never throws on unequal-length buffers.
+    const header = `t=${now},v1=${"é".repeat(64)}`
+    expect(verifySignature(secret, body, header, now)).toBe(false)
+  })
 })
 
 describe("SIGNATURE_HEADER", () => {

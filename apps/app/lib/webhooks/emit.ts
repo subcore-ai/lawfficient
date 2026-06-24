@@ -78,7 +78,7 @@ async function recordDelivery(
   },
 ): Promise<void> {
   try {
-    await admin.from("webhook_deliveries").insert({
+    const { error } = await admin.from("webhook_deliveries").insert({
       firm_id: row.firmId,
       endpoint_id: row.endpointId,
       event_type: row.eventType,
@@ -89,6 +89,7 @@ async function recordDelivery(
       error: row.outcome.error,
       delivered_at: new Date().toISOString(),
     })
+    if (error) console.error("webhook delivery log failed:", error.message)
   } catch (err) {
     console.error("webhook delivery log failed:", err)
   }

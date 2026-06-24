@@ -18,7 +18,10 @@ create table public.webhook_endpoints (
   secret_last4 text not null,
   event_types text[] not null default '{}',
   enabled boolean not null default true,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  -- composite-unique so the child tables can FK (id, firm_id): the DB then enforces that a secret /
+  -- delivery always belongs to the SAME firm as its endpoint (tenant safety, not just app logic).
+  unique (id, firm_id)
 );
 create index webhook_endpoints_firm_id_idx on public.webhook_endpoints (firm_id);
 
@@ -42,10 +45,13 @@ create policy "webhook_endpoints_rw" on public.webhook_endpoints
 -- table, not a readable column" 0021 (line 49) called for. Plaintext-at-rest is acceptable for
 -- Phase 1 (consistent with lead_sources.key); encrypting it / a KMS is a follow-up.
 create table public.webhook_endpoint_secrets (
-  endpoint_id uuid primary key references public.webhook_endpoints(id) on delete cascade,
+  endpoint_id uuid primary key,
   firm_id uuid not null references public.firms(id) on delete cascade,
   secret text not null,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  -- (endpoint_id, firm_id) must match a real endpoint of the SAME firm — DB-enforced, so a write
+  -- bug can't attach a secret to another firm's endpoint.
+  foreign key (endpoint_id, firm_id) references public.webhook_endpoints (id, firm_id) on delete cascade
 );
 
 alter table public.webhook_endpoint_secrets enable row level security;
@@ -58,7 +64,7 @@ alter table public.webhook_endpoint_secrets enable row level security;
 create table public.webhook_deliveries (
   id uuid primary key default gen_random_uuid(),
   firm_id uuid not null references public.firms(id) on delete cascade,
-  endpoint_id uuid not null references public.webhook_endpoints(id) on delete cascade,
+  endpoint_id uuid not null,
   event_type text not null,
   payload jsonb not null default '{}'::jsonb,
   status text not null default 'pending'
@@ -67,7 +73,9 @@ create table public.webhook_deliveries (
   response_status integer,
   error text,
   created_at timestamptz not null default now(),
-  delivered_at timestamptz
+  delivered_at timestamptz,
+  -- a delivery's endpoint must belong to its firm (DB-enforced tenant safety)
+  foreign key (endpoint_id, firm_id) references public.webhook_endpoints (id, firm_id) on delete cascade
 );
 create index webhook_deliveries_firm_idx on public.webhook_deliveries (firm_id, created_at desc);
 create index webhook_deliveries_endpoint_idx on public.webhook_deliveries (endpoint_id, created_at desc);

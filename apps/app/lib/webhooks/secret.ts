@@ -57,7 +57,11 @@ export function verifySignature(
   if (Math.abs(now - t) > toleranceSeconds) return false
 
   const expected = createHmac("sha256", secret).update(signedPayload(t, body)).digest("hex")
-  // Constant-time compare on equal-length hex digests (both are sha256 → 64 chars).
-  if (expected.length !== v1.length) return false
-  return timingSafeEqual(Buffer.from(expected), Buffer.from(v1))
+  // Constant-time compare. Build the buffers first and compare BYTE lengths — a v1 carrying
+  // multi-byte chars has a UTF-8 byte length ≠ its string length, which would make timingSafeEqual
+  // throw on unequal buffers instead of returning a clean false.
+  const expectedBuf = Buffer.from(expected)
+  const providedBuf = Buffer.from(v1)
+  if (expectedBuf.length !== providedBuf.length) return false
+  return timingSafeEqual(expectedBuf, providedBuf)
 }
