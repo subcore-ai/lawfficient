@@ -206,9 +206,11 @@ export async function createLeadViaApi(
     p_api_key_id: idempotency?.apiKeyId,
     p_idempotency_key: idempotency?.key,
   })
-  // A bad assignee (wrong firm / unknown) trips the composite FK (23503) inside the function; surface
-  // it as a clean 422 rather than a generic 500.
-  if (error?.code === "23503") {
+  // A bad assignee (wrong firm / unknown) trips the composite assignee FK (23503) inside the function;
+  // surface it as a clean 422 — but ONLY when an assignee was actually sent. A 23503 with no assignee
+  // is a different FK (e.g. the stage looked up above was deleted between then and the insert), which
+  // is a transient 500, not an assignee error.
+  if (error?.code === "23503" && core.value.assignedToId) {
     return { ok: false, status: 422, code: "invalid_request", message: "assignee_id is not a member of this firm." }
   }
   const row = rows?.[0]

@@ -1479,11 +1479,11 @@ export type Database = {
         }
         Returns: {
           archived: boolean
-          assigned_to_id: string
+          assigned_to_id: string | null
           created_at: string
           data: Json
           email: string
-          external_id: string
+          external_id: string | null
           firm_id: string
           first_name: string
           id: string

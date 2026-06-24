@@ -105,10 +105,19 @@ describe("createLeadViaApi (RPC result handling)", () => {
     if (res.ok) expect(res.events).toEqual([])
   })
 
-  test("a bad assignee (FK 23503 from the RPC) → 422", async () => {
+  test("a bad assignee (FK 23503 WITH an assignee sent) → 422", async () => {
+    const admin = fakeAdmin({ rpc: { data: null, error: { code: "23503" } } })
+    const res = await createLeadViaApi(admin, "firm-1", {
+      ...INPUT,
+      assignedToId: "11111111-1111-1111-1111-111111111111",
+    })
+    expect(res).toMatchObject({ ok: false, status: 422, code: "invalid_request" })
+  })
+
+  test("a 23503 with NO assignee sent (a different FK, e.g. stage deleted mid-flight) → 500, not a 422", async () => {
     const admin = fakeAdmin({ rpc: { data: null, error: { code: "23503" } } })
     const res = await createLeadViaApi(admin, "firm-1", INPUT)
-    expect(res).toMatchObject({ ok: false, status: 422, code: "invalid_request" })
+    expect(res).toMatchObject({ ok: false, status: 500 })
   })
 
   test("any other RPC error → 500", async () => {
