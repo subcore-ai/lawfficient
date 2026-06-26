@@ -33,6 +33,19 @@ export function zonedWallTimeToUtcISO(wall: string, timeZone: string): string | 
   const mi = Number(m[5])
   const s = Number(m[6] ?? "0")
   const guess = Date.UTC(y, mo - 1, d, h, mi, s)
+  // Reject out-of-range components (e.g. month 13, day 32, Feb 30) rather than letting Date.UTC
+  // silently roll them over into a different — unintended — date/time.
+  const back = new Date(guess)
+  if (
+    back.getUTCFullYear() !== y ||
+    back.getUTCMonth() !== mo - 1 ||
+    back.getUTCDate() !== d ||
+    back.getUTCHours() !== h ||
+    back.getUTCMinutes() !== mi ||
+    back.getUTCSeconds() !== s
+  ) {
+    return null
+  }
   let offset: number
   try {
     offset = zoneOffsetMs(timeZone, guess)
@@ -41,6 +54,21 @@ export function zonedWallTimeToUtcISO(wall: string, timeZone: string): string | 
   }
   if (!Number.isFinite(offset)) return null
   return new Date(guess - offset).toISOString()
+}
+
+// Render a stored UTC instant in the consultation's own zone (so a New-York consult shows the New-York
+// wall time + abbreviation, not the server/UTC clock). Falls back to the raw ISO on a bad zone.
+export function formatConsultationWhen(iso: string, timeZone: string): string {
+  try {
+    return new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      dateStyle: "medium",
+      timeStyle: "short",
+      timeZoneName: "short",
+    }).format(new Date(iso))
+  } catch {
+    return iso
+  }
 }
 
 // Whether `value` is a valid IANA time-zone name (cheap Intl probe).

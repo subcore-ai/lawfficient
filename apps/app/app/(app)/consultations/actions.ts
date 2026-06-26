@@ -105,21 +105,7 @@ export async function updateConsultation(id: string, formData: FormData): Promis
   if (!startAt) return { error: "Couldn't read the date/time for that time zone." }
 
   const supabase = await createClient()
-  // Keep `status` consistent with `paid` for scheduling-state consults; never reopen a terminal or
-  // rescheduled one from an edit.
-  const { data: current, error: readErr } = await supabase
-    .from("consultations")
-    .select("status")
-    .eq("id", id)
-    .single()
-  if (readErr || !current) return { error: "Couldn't update the consultation." }
-  const nextStatus: ConsultationStatus =
-    current.status === "scheduled" || current.status === "paid"
-      ? core.value.paid
-        ? "paid"
-        : "scheduled"
-      : current.status
-
+  // Edit the fields; status is owned by reschedule / setStatus, not the edit form.
   const { data: updated, error } = await supabase
     .from("consultations")
     .update({
@@ -130,7 +116,6 @@ export async function updateConsultation(id: string, formData: FormData): Promis
       time_zone: core.value.timeZone,
       paid: core.value.paid,
       amount: core.value.amount,
-      status: nextStatus,
       last_activity: new Date().toISOString(),
     })
     .eq("id", id)
@@ -138,6 +123,16 @@ export async function updateConsultation(id: string, formData: FormData): Promis
     .single()
   if (error?.code === "23503") return { error: "That attorney isn't in your firm." }
   if (error || !updated) return { error: "Couldn't update the consultation." }
+
+  // Keep status in sync with `paid` — but ONLY for a scheduling-state consult. The `.in()` filter is
+  // an atomic guard (no read-then-write race): a concurrently terminal/rescheduled consult is excluded,
+  // so the edit can't reopen or regress it.
+  const { error: syncErr } = await supabase
+    .from("consultations")
+    .update({ status: core.value.paid ? "paid" : "scheduled" })
+    .eq("id", id)
+    .in("status", ["scheduled", "paid"])
+  if (syncErr) console.error("consultation status sync failed:", syncErr.message)
 
   await audit(supabase, gate.user.id, id, core.value.type, "updated")
   revalidate()
@@ -153,21 +148,28 @@ export async function rescheduleConsultation(id: string, startAtWall: string): P
   const supabase = await createClient()
   const { data: current, error: readErr } = await supabase
     .from("consultations")
-    .select("time_zone")
+    .select("time_zone, status")
     .eq("id", id)
     .single()
   if (readErr || !current) return { error: "Couldn't reschedule the consultation." }
+  if (current.status === "completed" || current.status === "canceled" || current.status === "no_show") {
+    return { error: "This consultation is finalized and can't be rescheduled." }
+  }
 
   const startAt = zonedWallTimeToUtcISO(startAtWall, current.time_zone)
   if (!startAt) return { error: "Choose a valid date and time." }
 
+  // The `.in()` filter makes the move atomic — a consult that became terminal between the read and the
+  // write is excluded (0 rows), so we never reschedule a finalized one.
   const { data: updated, error } = await supabase
     .from("consultations")
     .update({ start_at: startAt, status: "rescheduled", last_activity: new Date().toISOString() })
     .eq("id", id)
+    .in("status", ["scheduled", "paid", "rescheduled"])
     .select("id")
-    .single()
-  if (error || !updated) return { error: "Couldn't reschedule the consultation." }
+    .maybeSingle()
+  if (error) return { error: "Couldn't reschedule the consultation." }
+  if (!updated) return { error: "This consultation is finalized and can't be rescheduled." }
 
   await audit(supabase, gate.user.id, id, "", "rescheduled")
   revalidate()
@@ -181,13 +183,17 @@ export async function setConsultationStatus(id: string, status: string): Promise
   if (!STATUS_TRANSITIONS.includes(status as ConsultationStatus)) return { error: "Unsupported status change." }
 
   const supabase = await createClient()
+  // Transition only FROM a non-terminal state — the `.in()` filter is the atomic guard, so an
+  // already-finalized consult (completed / canceled / no-show) can't be overwritten.
   const { data: updated, error } = await supabase
     .from("consultations")
     .update({ status: status as ConsultationStatus, last_activity: new Date().toISOString() })
     .eq("id", id)
+    .in("status", ["scheduled", "paid", "rescheduled"])
     .select("id")
-    .single()
-  if (error || !updated) return { error: "Couldn't update the consultation." }
+    .maybeSingle()
+  if (error) return { error: "Couldn't update the consultation." }
+  if (!updated) return { error: "This consultation is already finalized." }
 
   await audit(supabase, gate.user.id, id, status, "status_changed")
   revalidate()

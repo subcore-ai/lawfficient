@@ -23,6 +23,12 @@ describe("zonedWallTimeToUtcISO", () => {
     expect(zonedWallTimeToUtcISO("not-a-date", "America/New_York")).toBeNull()
     expect(zonedWallTimeToUtcISO("2026-07-01T15:00", "Mars/Phobos")).toBeNull()
   })
+
+  test("rejects out-of-range components instead of silently rolling them over", () => {
+    expect(zonedWallTimeToUtcISO("2026-13-01T10:00", "UTC")).toBeNull() // month 13
+    expect(zonedWallTimeToUtcISO("2026-02-30T10:00", "UTC")).toBeNull() // Feb 30
+    expect(zonedWallTimeToUtcISO("2026-01-01T25:00", "UTC")).toBeNull() // hour 25
+  })
 })
 
 describe("isValidTimeZone", () => {

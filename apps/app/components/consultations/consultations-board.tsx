@@ -32,7 +32,8 @@ import {
 import { Field } from "@/components/form-field"
 import { StatusPill } from "@/components/status-pill"
 import { consultationStatusMeta, type ConsultationView } from "@/lib/consultations/queries"
-import { formatCurrency, formatDateTime } from "@/lib/format"
+import { formatConsultationWhen } from "@/lib/consultations/time"
+import { formatCurrency } from "@/lib/format"
 
 function useRun() {
   const [pending, startTransition] = React.useTransition()
@@ -121,7 +122,7 @@ function ConsultationCard({ consultation: c, canManage }: { consultation: Consul
 
       <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
         <CalendarClock className="size-3.5 shrink-0" />
-        {formatDateTime(c.startAt)} · {c.durationMin} min{c.attorneyName ? ` · ${c.attorneyName}` : ""}
+        {formatConsultationWhen(c.startAt, c.timeZone)} · {c.durationMin} min{c.attorneyName ? ` · ${c.attorneyName}` : ""}
       </p>
 
       <div className="flex items-center justify-between gap-2 text-xs">

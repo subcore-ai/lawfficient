@@ -19,6 +19,7 @@ alter table public.consultations
   add column if not exists last_activity timestamptz not null default now();
 
 create index if not exists consultations_lead_id_idx on public.consultations (lead_id);
+create index if not exists consultations_attorney_id_idx on public.consultations (attorney_id);
 create index if not exists consultations_start_at_idx on public.consultations (firm_id, start_at desc);
 
 -- Tenant isolation: a consult's lead + attorney must belong to the SAME firm. A plain id FK is
@@ -32,6 +33,15 @@ do $$ begin
     alter table public.leads add constraint leads_id_firm_id_key unique (id, firm_id);
   end if;
 end $$;
+
+-- Null out any pre-existing rows whose lead/attorney isn't in the consult's firm, so adding the
+-- composite FKs can't fail at deploy time. (The table is dormant/empty today, so this is a no-op now.)
+update public.consultations c set lead_id = null
+  where c.lead_id is not null
+    and not exists (select 1 from public.leads l where l.id = c.lead_id and l.firm_id = c.firm_id);
+update public.consultations c set attorney_id = null
+  where c.attorney_id is not null
+    and not exists (select 1 from public.profiles p where p.id = c.attorney_id and p.firm_id = c.firm_id);
 
 alter table public.consultations drop constraint if exists consultations_lead_id_fkey;
 alter table public.consultations drop constraint if exists consultations_attorney_id_fkey;
