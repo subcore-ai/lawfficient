@@ -10,7 +10,7 @@ import {
   type LeadView,
 } from "@/lib/leads/queries"
 import { mapNoteRow, type NoteView } from "@/lib/notes/queries"
-import { mapConsultationRow, type ConsultationView } from "@/lib/consultations/queries"
+import { mapConsultationRow, partitionConsultations, type ConsultationView } from "@/lib/consultations/queries"
 import {
   getFirmStaff,
   getFirmStatusRows,
@@ -31,7 +31,7 @@ type Loaded = {
   canManage: boolean
   consultations: ConsultationView[]
   canViewConsultations: boolean
-  canBookConsultations: boolean
+  canManageConsultations: boolean
   consultDefaultTimeZone: string | null
 }
 
@@ -52,7 +52,7 @@ async function load(id: string): Promise<Loaded | null> {
     // The lead's own consultations (newest/upcoming first). RLS scopes to consultations.view, so a
     // user without it just gets an empty list (the card is also hidden via canViewConsultations).
     supabase.from("consultations").select("*").eq("lead_id", id).order("start_at", { ascending: false }),
-    supabase.from("firms").select("timezone").single(),
+    supabase.from("firms").select("timezone").maybeSingle(),
     getFirmStatusRows(me.firmId),
     getFirmTaxonomyRows(me.firmId),
     getFirmStaff(me.firmId),
@@ -67,9 +67,13 @@ async function load(id: string): Promise<Loaded | null> {
   const lead = mapLeadRow(leadRes.data, byId)
   if (!lead) return null
   const namesById = new Map(staff.map((p) => [p.id, p.name]))
-  // This lead's own name resolves the consultation rows (they all point back to it).
+  // This lead's own name resolves the consultation rows (they all point back to it). Order them like
+  // the consultations page does — soonest upcoming first, then past — not raw start_at desc (which would
+  // surface a far-future or terminal consult above the nearest active one).
   const leadNames = new Map([[lead.id, `${lead.firstName} ${lead.lastName}`.trim()]])
-  const consultations = (consultRes.data ?? []).map((r) => mapConsultationRow(r, leadNames, namesById))
+  const consultViews = (consultRes.data ?? []).map((r) => mapConsultationRow(r, leadNames, namesById))
+  const { upcoming, past } = partitionConsultations(consultViews, new Date().toISOString())
+  const consultations = [...upcoming, ...past]
 
   return {
     lead,
@@ -85,7 +89,7 @@ async function load(id: string): Promise<Loaded | null> {
     canManage: me.permissions?.includes("settings.manage") ?? false,
     consultations,
     canViewConsultations: me.permissions?.includes("consultations.view") ?? false,
-    canBookConsultations: me.permissions?.includes("consultations.edit") ?? false,
+    canManageConsultations: me.permissions?.includes("consultations.edit") ?? false,
     // Best-effort: a firm-read failure just falls back to the dialog's own default zone.
     consultDefaultTimeZone: firmRes.data?.timezone ?? null,
   }
@@ -108,7 +112,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       canManage={data.canManage}
       consultations={data.consultations}
       canViewConsultations={data.canViewConsultations}
-      canBookConsultations={data.canBookConsultations}
+      canManageConsultations={data.canManageConsultations}
       consultDefaultTimeZone={data.consultDefaultTimeZone}
     />
   )

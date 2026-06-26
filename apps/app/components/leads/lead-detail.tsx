@@ -60,7 +60,7 @@ export function LeadDetail({
   canManage,
   consultations,
   canViewConsultations,
-  canBookConsultations,
+  canManageConsultations,
   consultDefaultTimeZone,
 }: {
   lead: LeadView
@@ -74,7 +74,7 @@ export function LeadDetail({
   canManage: boolean
   consultations: ConsultationView[]
   canViewConsultations: boolean
-  canBookConsultations: boolean
+  canManageConsultations: boolean
   consultDefaultTimeZone: string | null
 }) {
   const [editOpen, setEditOpen] = React.useState(false)
@@ -338,7 +338,7 @@ export function LeadDetail({
           consultations={consultations}
           attorneys={assignees}
           defaultTimeZone={consultDefaultTimeZone}
-          canBook={canBookConsultations}
+          canManage={canManageConsultations}
         />
       ) : null}
 

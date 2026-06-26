@@ -2,7 +2,7 @@
 
 import { CalendarClock } from "lucide-react"
 
-import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card"
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card"
 
 import { BookConsultationDialog } from "@/components/consultations/book-consultation-dialog"
 import { ConsultationActions } from "@/components/consultations/consultation-actions"
@@ -21,26 +21,28 @@ export function LeadConsultations({
   consultations,
   attorneys,
   defaultTimeZone,
-  canBook,
+  canManage,
 }: {
   leadId: string
   consultations: ConsultationView[]
   attorneys: Attorney[]
   defaultTimeZone: string | null
-  canBook: boolean
+  canManage: boolean
 }) {
   return (
     <Card>
-      <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
+      <CardHeader>
         <CardTitle>Consultations</CardTitle>
-        {canBook ? (
-          <BookConsultationDialog
-            leads={[]}
-            attorneys={attorneys}
-            triggerLeadId={leadId}
-            defaultTimeZone={defaultTimeZone}
-            label="Book"
-          />
+        {canManage ? (
+          <CardAction>
+            <BookConsultationDialog
+              leads={[]}
+              attorneys={attorneys}
+              triggerLeadId={leadId}
+              defaultTimeZone={defaultTimeZone}
+              label="Book"
+            />
+          </CardAction>
         ) : null}
       </CardHeader>
       <CardContent>
@@ -65,7 +67,7 @@ export function LeadConsultations({
                     <span className="text-muted-foreground text-xs tabular-nums">{formatCurrency(c.amount)}</span>
                   ) : null}
                   <StatusPill {...consultationStatusMeta(c.status)} dot />
-                  {canBook ? (
+                  {canManage ? (
                     <ConsultationActions consultationId={c.id} status={c.status} outcome={c.outcome} compact />
                   ) : null}
                 </div>

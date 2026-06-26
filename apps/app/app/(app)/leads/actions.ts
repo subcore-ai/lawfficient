@@ -11,9 +11,9 @@ import {
   type LeadDataInput,
   type LeadVocab,
 } from "@/lib/leads/data-schema"
+import { recordLeadEvent } from "@/lib/leads/events"
 import { emitLeadEvents } from "@/lib/leads/mutations"
 import { parseLeadInput } from "@/lib/leads/validation"
-import { createAdminClient } from "@/lib/supabase/admin"
 import type { Json } from "@/lib/supabase/database.types"
 import { createClient } from "@/lib/supabase/server"
 import { groupTaxonomies, toLeadVocab } from "@/lib/taxonomies/queries"
@@ -57,32 +57,6 @@ async function audit(
     if (error) console.error("audit_log insert failed:", error.message)
   } catch (err) {
     console.error("audit_log insert threw:", err)
-  }
-}
-
-// Record a read-only lifecycle event on the lead's activity timeline (a kind='event' note row).
-// Best-effort — a failed event log must never fail the underlying action.
-async function recordEvent(
-  firmId: string,
-  leadId: string,
-  body: string,
-  byUserId: string
-) {
-  // kind='event' is blocked for authenticated users by guard_notes, so events are written via the
-  // service-role admin client — which bypasses RLS, so firm_id must be set explicitly.
-  try {
-    const admin = createAdminClient()
-    const { error } = await admin.from("notes").insert({
-      firm_id: firmId,
-      entity_type: "lead",
-      entity_id: leadId,
-      kind: "event",
-      body,
-      created_by_id: byUserId,
-    })
-    if (error) console.error("note event insert failed:", error.message)
-  } catch (err) {
-    console.error("note event insert threw:", err)
   }
 }
 
@@ -319,7 +293,7 @@ export async function setLeadStatus(
     .select("name")
     .eq("id", statusId)
     .maybeSingle()
-  await recordEvent(
+  await recordLeadEvent(
     gate.user.firmId,
     id,
     `Moved to ${status?.name ?? "a new status"}`,
@@ -368,7 +342,7 @@ export async function assignLead(
       .maybeSingle()
     body = `Assigned to ${assignee?.name ?? "a teammate"}`
   }
-  await recordEvent(gate.user.firmId, id, body, gate.user.id)
+  await recordLeadEvent(gate.user.firmId, id, body, gate.user.id)
   emitLeadEvent(gate.user.firmId, id, "lead.assigned")
   revalidateLeads(id)
   return { ok: true }
@@ -417,7 +391,7 @@ export async function setLeadQualification(
   // null = no row matched (wrong id or RLS) — don't claim success or log a phantom event.
   if (!updatedId) return { error: "Couldn't update the qualification." }
 
-  await recordEvent(
+  await recordLeadEvent(
     gate.user.firmId,
     id,
     next ? `Qualification → ${next}` : "Qualification cleared",
@@ -462,7 +436,7 @@ export async function setLeadArchived(
     label,
     archived ? "archived" : "unarchived"
   )
-  await recordEvent(
+  await recordLeadEvent(
     gate.user.firmId,
     id,
     archived ? "Archived the lead" : "Restored the lead",
