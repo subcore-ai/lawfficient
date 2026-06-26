@@ -59,6 +59,14 @@ describe("parseConsultationInput", () => {
     expect(parseConsultationInput({ ...VALID, paid: false })).toMatchObject({ ok: true, value: { paid: false } })
     expect(parseConsultationInput({ ...VALID, paid: undefined })).toMatchObject({ ok: true, value: { paid: false } })
   })
+
+  test("durationMin accepts a numeric string (the real FormData path)", () => {
+    expect(parseConsultationInput({ ...VALID, durationMin: "45" })).toMatchObject({ ok: true, value: { durationMin: 45 } })
+  })
+
+  test("rejects an invalid IANA time zone", () => {
+    expect(parseConsultationInput({ ...VALID, timeZone: "Mars/Phobos" })).toMatchObject({ ok: false })
+  })
 })
 
 describe("parseConsultationPatch", () => {
@@ -90,5 +98,9 @@ describe("parseConsultationPatch", () => {
   test("attorney null unassigns; a non-string is rejected", () => {
     expect(parseConsultationPatch({ attorneyId: null })).toEqual({ ok: true, value: { attorneyId: null } })
     expect(parseConsultationPatch({ attorneyId: 9 })).toMatchObject({ ok: false })
+  })
+
+  test("rejects an invalid time zone", () => {
+    expect(parseConsultationPatch({ timeZone: "Mars/Phobos" })).toMatchObject({ ok: false })
   })
 })

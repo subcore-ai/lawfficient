@@ -38,13 +38,17 @@ function useRun() {
   const [pending, startTransition] = React.useTransition()
   const run = (fn: () => Promise<ActionResult>, okMsg?: string, onOk?: () => void) =>
     startTransition(async () => {
-      const res = await fn()
-      if ("error" in res) {
-        toast.error(res.error)
-        return
+      try {
+        const res = await fn()
+        if ("error" in res) {
+          toast.error(res.error)
+          return
+        }
+        if (okMsg) toast.success(okMsg)
+        onOk?.()
+      } catch {
+        toast.error("Something went wrong. Please try again.")
       }
-      if (okMsg) toast.success(okMsg)
-      onOk?.()
     })
   return { pending, run }
 }
@@ -101,6 +105,9 @@ function ConsultationCard({ consultation: c, canManage }: { consultation: Consul
   const { pending, run } = useRun()
   const [rescheduleOpen, setRescheduleOpen] = React.useState(false)
   const [outcomeOpen, setOutcomeOpen] = React.useState(false)
+  // Reschedule / cancel / complete / no-show only apply to a live consult; a terminal one
+  // (completed / canceled / no-show) can still have its outcome recorded.
+  const isActive = c.status === "scheduled" || c.status === "paid" || c.status === "rescheduled"
 
   return (
     <div className="flex flex-col gap-2 rounded-lg border p-3">
@@ -133,21 +140,29 @@ function ConsultationCard({ consultation: c, canManage }: { consultation: Consul
               <MoreHorizontal className="size-4" /> Actions
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
-              <DropdownMenuItem onClick={() => setRescheduleOpen(true)}>Reschedule…</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => run(() => setConsultationStatus(c.id, "completed"), "Marked completed")}>
-                Mark completed
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => run(() => setConsultationStatus(c.id, "no_show"), "Marked no-show")}>
-                Mark no-show
-              </DropdownMenuItem>
+              {isActive ? (
+                <>
+                  <DropdownMenuItem onClick={() => setRescheduleOpen(true)}>Reschedule…</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => run(() => setConsultationStatus(c.id, "completed"), "Marked completed")}>
+                    Mark completed
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => run(() => setConsultationStatus(c.id, "no_show"), "Marked no-show")}>
+                    Mark no-show
+                  </DropdownMenuItem>
+                </>
+              ) : null}
               <DropdownMenuItem onClick={() => setOutcomeOpen(true)}>Set outcome…</DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                variant="destructive"
-                onClick={() => run(() => setConsultationStatus(c.id, "canceled"), "Consultation canceled")}
-              >
-                Cancel consultation
-              </DropdownMenuItem>
+              {isActive ? (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    variant="destructive"
+                    onClick={() => run(() => setConsultationStatus(c.id, "canceled"), "Consultation canceled")}
+                  >
+                    Cancel consultation
+                  </DropdownMenuItem>
+                </>
+              ) : null}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

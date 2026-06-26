@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import { consultationStatusMeta, mapConsultationRow, partitionConsultations, type ConsultationView } from "./queries"
+import { CONSULTATION_STATUSES } from "./validation"
 import type { Database } from "@/lib/supabase/database.types"
 
 type ConsultationRow = Database["public"]["Tables"]["consultations"]["Row"]
@@ -43,9 +44,15 @@ describe("mapConsultationRow", () => {
     expect(mapConsultationRow(row({ attorney_id: null }), leadNames, profileNames).attorneyName).toBeNull()
   })
 
-  test("a non-object data jsonb falls back to {}", () => {
+  test("a non-object data jsonb (string or array) falls back to {}", () => {
     expect(mapConsultationRow(row({ data: "oops" as never }), leadNames, profileNames).data).toEqual({})
+    expect(mapConsultationRow(row({ data: ["x"] as never }), leadNames, profileNames).data).toEqual({})
     expect(mapConsultationRow(row({ data: { city: "NYC" } }), leadNames, profileNames).data).toEqual({ city: "NYC" })
+  })
+
+  test("passes the outcome through", () => {
+    expect(mapConsultationRow(row({ outcome: "qualified" }), leadNames, profileNames).outcome).toBe("qualified")
+    expect(mapConsultationRow(row({ outcome: null }), leadNames, profileNames).outcome).toBeNull()
   })
 })
 
@@ -82,7 +89,12 @@ describe("partitionConsultations", () => {
 })
 
 describe("consultationStatusMeta", () => {
-  test("every status has a label + tone", () => {
+  test("every status maps to a non-empty label + tone (exhaustive)", () => {
+    for (const s of CONSULTATION_STATUSES) {
+      const m = consultationStatusMeta(s)
+      expect(m.label.length).toBeGreaterThan(0)
+      expect(m.tone).toBeTruthy()
+    }
     expect(consultationStatusMeta("completed")).toEqual({ label: "Completed", tone: "success" })
     expect(consultationStatusMeta("no_show").tone).toBe("danger")
   })

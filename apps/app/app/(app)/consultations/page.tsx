@@ -27,18 +27,26 @@ async function load(): Promise<Loaded> {
   // the attorney picker + name map) are firm reference data.
   const [consultRes, leadsRes, staffRes] = await Promise.all([
     supabase.from("consultations").select("*").eq("archived", false).order("start_at", { ascending: false }),
-    supabase.from("leads").select("id, first_name, last_name").eq("archived", false).order("created_at", { ascending: false }),
-    supabase.from("profiles").select("id, name").eq("status", "active").order("name"),
+    supabase.from("leads").select("id, first_name, last_name, archived").order("created_at", { ascending: false }),
+    supabase.from("profiles").select("id, name, status").order("name"),
   ])
+  // Fail fast on any read — a swallowed leads/profiles error would render with empty name maps
+  // ("Unknown lead", blank attorneys) and unusable pickers instead of surfacing the failure.
   if (consultRes.error) throw consultRes.error
+  if (leadsRes.error) throw leadsRes.error
+  if (staffRes.error) throw staffRes.error
 
-  const leadOptions: Option[] = (leadsRes.data ?? []).map((l) => ({
-    id: l.id,
-    name: `${l.first_name} ${l.last_name}`.trim(),
-  }))
-  const attorneys: Option[] = (staffRes.data ?? []).map((p) => ({ id: p.id, name: p.name }))
-  const leadNames = new Map(leadOptions.map((l) => [l.id, l.name]))
-  const profileNames = new Map(attorneys.map((p) => [p.id, p.name]))
+  const allLeads = leadsRes.data ?? []
+  const allProfiles = staffRes.data ?? []
+  // Name maps resolve EVERY referenced record (incl. archived leads / inactive attorneys) so a consult
+  // never shows "Unknown lead" or a blank attorney just because they're no longer active.
+  const leadNames = new Map(allLeads.map((l) => [l.id, `${l.first_name} ${l.last_name}`.trim()]))
+  const profileNames = new Map(allProfiles.map((p) => [p.id, p.name]))
+  // Pickers offer only the currently-bookable options: non-archived leads, active staff.
+  const leadOptions: Option[] = allLeads
+    .filter((l) => !l.archived)
+    .map((l) => ({ id: l.id, name: `${l.first_name} ${l.last_name}`.trim() }))
+  const attorneys: Option[] = allProfiles.filter((p) => p.status === "active").map((p) => ({ id: p.id, name: p.name }))
 
   const views = (consultRes.data ?? []).map((r) => mapConsultationRow(r, leadNames, profileNames))
   const { upcoming, past } = partitionConsultations(views, new Date().toISOString())

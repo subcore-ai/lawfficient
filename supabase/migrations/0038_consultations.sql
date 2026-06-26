@@ -21,8 +21,32 @@ alter table public.consultations
 create index if not exists consultations_lead_id_idx on public.consultations (lead_id);
 create index if not exists consultations_start_at_idx on public.consultations (firm_id, start_at desc);
 
+-- Tenant isolation: a consult's lead + attorney must belong to the SAME firm. A plain id FK is
+-- bypassed by RLS (referential checks run as the table owner), so a known cross-firm id could be
+-- linked. Use COMPOSITE FKs to (id, firm_id) — the pattern leads.status_id uses. ON DELETE SET NULL
+-- nulls only the referencing id (firm_id is NOT NULL and stays).
+-- leads needs a (id, firm_id) unique key for the composite FK to reference (profiles already has one
+-- from 0008). `id` alone is the PK, so this just exposes the referenceable composite key.
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'leads_id_firm_id_key') then
+    alter table public.leads add constraint leads_id_firm_id_key unique (id, firm_id);
+  end if;
+end $$;
+
+alter table public.consultations drop constraint if exists consultations_lead_id_fkey;
+alter table public.consultations drop constraint if exists consultations_attorney_id_fkey;
+alter table public.consultations
+  add constraint consultations_lead_id_fkey foreign key (lead_id, firm_id)
+    references public.leads (id, firm_id) on delete set null (lead_id),
+  add constraint consultations_attorney_id_fkey foreign key (attorney_id, firm_id)
+    references public.profiles (id, firm_id) on delete set null (attorney_id);
+
+-- audit_entity already includes 'consultation' (from the 0002 scaffold), so no enum change is needed.
+
 -- RLS: firm-scoped, keyed to consultations.view / consultations.edit. Inlines authorize() exactly like
--- the leads/notes policies (authorize() is INVOKER + JWT-only; no SECURITY DEFINER helper needed).
+-- the leads/notes policies (authorize() is INVOKER + JWT-only; no SECURITY DEFINER helper needed). The
+-- write side is split into INSERT + UPDATE (NOT a FOR ALL): there is no DELETE policy (consultations
+-- are soft-deleted via `archived`), and read access stays solely on the consultations.view policy.
 alter table public.consultations enable row level security;
 
 drop policy if exists "consultations_select" on public.consultations;
@@ -30,15 +54,19 @@ create policy "consultations_select" on public.consultations
   for select to authenticated
   using (firm_id = public.current_firm_id() and public.authorize('consultations.view'));
 
+-- No DELETE policy (soft-delete via `archived`); drop a stray one if a prior run left it.
+drop policy if exists "consultations_delete" on public.consultations;
 drop policy if exists "consultations_write" on public.consultations;
-create policy "consultations_write" on public.consultations
-  for all to authenticated
-  using (firm_id = public.current_firm_id() and public.authorize('consultations.edit'))
+drop policy if exists "consultations_insert" on public.consultations;
+create policy "consultations_insert" on public.consultations
+  for insert to authenticated
   with check (firm_id = public.current_firm_id() and public.authorize('consultations.edit'));
 
--- Audit the consultation lifecycle (same enum-extension pattern as 'role'/0010, 'lead_source'/0021,
--- 'taxonomy'/0024, 'api_key'/0037). Only ADD the value here (not used in this transaction) — safe.
-alter type public.audit_entity add value if not exists 'consultation';
+drop policy if exists "consultations_update" on public.consultations;
+create policy "consultations_update" on public.consultations
+  for update to authenticated
+  using (firm_id = public.current_firm_id() and public.authorize('consultations.edit'))
+  with check (firm_id = public.current_firm_id() and public.authorize('consultations.edit'));
 
 -- ── Consultation notes: extend the generic notes system (0028) to the 'consultation' entity ──────
 -- The notes table was built entity-agnostic for exactly this ("extend the entity_type check + RLS per

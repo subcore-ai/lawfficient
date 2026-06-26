@@ -29,18 +29,12 @@ import { toast } from "@workspace/ui/components/sonner"
 import { createConsultation } from "@/app/(app)/consultations/actions"
 import { Field } from "@/components/form-field"
 import { DEFAULT_CONSULTATION_TYPES } from "@/lib/consultations/validation"
+import { FIRM_TIMEZONES } from "@/lib/firm/timezones"
 
 type Option = { id: string; name: string }
 
 const UNASSIGNED = "__none__"
-// IANA zones for the picker; free text in the DB, so a firm can refine later.
-const TIME_ZONES = [
-  { value: "America/New_York", label: "Eastern (New York)" },
-  { value: "America/Chicago", label: "Central (Chicago)" },
-  { value: "America/Denver", label: "Mountain (Denver)" },
-  { value: "America/Los_Angeles", label: "Pacific (Los Angeles)" },
-  { value: "Pacific/Honolulu", label: "Hawaii (Honolulu)" },
-]
+const DEFAULT_TZ = "America/New_York"
 
 export function BookConsultationDialog({
   leads,
@@ -54,19 +48,24 @@ export function BookConsultationDialog({
   triggerLeadId?: string
   label?: string
 }) {
+  const startAtId = React.useId()
+  const durationId = React.useId()
+  const amountId = React.useId()
   const [open, setOpen] = React.useState(false)
-  const [leadId, setLeadId] = React.useState(triggerLeadId ?? leads[0]?.id ?? "")
+  // No global preselect: an unset lead forces an explicit choice so a missed selection can't silently
+  // book onto whichever lead loaded first.
+  const [leadId, setLeadId] = React.useState(triggerLeadId ?? "")
   const [attorney, setAttorney] = React.useState(UNASSIGNED)
   const [type, setType] = React.useState(DEFAULT_CONSULTATION_TYPES[0]!)
-  const [zone, setZone] = React.useState("America/New_York")
+  const [zone, setZone] = React.useState(DEFAULT_TZ)
   const [paid, setPaid] = React.useState(false)
   const [pending, startTransition] = React.useTransition()
 
   function reset() {
-    setLeadId(triggerLeadId ?? leads[0]?.id ?? "")
+    setLeadId(triggerLeadId ?? "")
     setAttorney(UNASSIGNED)
     setType(DEFAULT_CONSULTATION_TYPES[0]!)
-    setZone("America/New_York")
+    setZone(DEFAULT_TZ)
     setPaid(false)
   }
 
@@ -84,13 +83,17 @@ export function BookConsultationDialog({
     fd.set("timeZone", zone)
     fd.set("paid", paid ? "on" : "")
     startTransition(async () => {
-      const res = await createConsultation(fd)
-      if ("error" in res) {
-        toast.error(res.error)
-        return
+      try {
+        const res = await createConsultation(fd)
+        if ("error" in res) {
+          toast.error(res.error)
+          return
+        }
+        toast.success("Consultation booked")
+        onOpenChange(false)
+      } catch {
+        toast.error("Something went wrong booking the consultation. Please try again.")
       }
-      toast.success("Consultation booked")
-      onOpenChange(false)
     })
   }
 
@@ -152,19 +155,19 @@ export function BookConsultationDialog({
                 </SelectContent>
               </Select>
             </Field>
-            <Field label="When">
-              <Input name="startAt" type="datetime-local" required />
+            <Field label="When" htmlFor={startAtId}>
+              <Input id={startAtId} name="startAt" type="datetime-local" required />
             </Field>
-            <Field label="Duration (min)">
-              <Input name="durationMin" type="number" min={5} step={5} defaultValue={30} required />
+            <Field label="Duration (min)" htmlFor={durationId}>
+              <Input id={durationId} name="durationMin" type="number" min={5} step={5} defaultValue={30} required />
             </Field>
             <Field label="Time zone" className="sm:col-span-2">
-              <Select value={zone} onValueChange={(v) => setZone(v ?? "America/New_York")} items={TIME_ZONES}>
+              <Select value={zone} onValueChange={(v) => setZone(v ?? DEFAULT_TZ)} items={FIRM_TIMEZONES.map((z) => ({ value: z.value, label: z.label }))}>
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {TIME_ZONES.map((z) => (
+                  {FIRM_TIMEZONES.map((z) => (
                     <SelectItem key={z.value} value={z.value}>
                       {z.label}
                     </SelectItem>
@@ -180,7 +183,7 @@ export function BookConsultationDialog({
                 </Label>
               </div>
               {paid ? (
-                <Input name="amount" type="number" min={0} step={25} defaultValue={150} className="h-8 w-28" aria-label="Amount" />
+                <Input id={amountId} name="amount" type="number" min={0} step={25} defaultValue={150} className="h-8 w-28" aria-label="Amount" />
               ) : null}
             </div>
           </div>

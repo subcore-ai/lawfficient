@@ -3,6 +3,7 @@
 // text (firm-pickable in the UI, taxonomy-upgradeable later); `data` (jsonb) holds practice-specific
 // fields. Status is a fixed, universal booking lifecycle.
 import type { Database } from "@/lib/supabase/database.types"
+import { isValidTimeZone } from "./time"
 
 export type ConsultationStatus = Database["public"]["Enums"]["consultation_status"]
 export const CONSULTATION_STATUSES: ConsultationStatus[] = [
@@ -78,6 +79,7 @@ export function parseConsultationInput(raw: {
   if (!amount.ok) return amount
 
   const timeZone = str(raw.timeZone) || "America/New_York"
+  if (!isValidTimeZone(timeZone)) return { ok: false, error: "Choose a valid time zone." }
 
   return { ok: true, value: { leadId, attorneyId, type, startAt, durationMin, timeZone, paid, amount: amount.amount } }
 }
@@ -120,6 +122,7 @@ export function parseConsultationPatch(
   if (has("timeZone")) {
     const v = str(raw.timeZone)
     if (!v) return { ok: false, error: "Time zone can't be empty." }
+    if (!isValidTimeZone(v)) return { ok: false, error: "Choose a valid time zone." }
     patch.timeZone = v
   }
   if (has("attorneyId")) {

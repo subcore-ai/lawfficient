@@ -3,22 +3,21 @@
 import { revalidatePath } from "next/cache"
 
 import { getCurrentUser, type CurrentUser } from "@/lib/auth/session"
-import {
-  CONSULTATION_STATUSES,
-  parseConsultationInput,
-  type ConsultationStatus,
-} from "@/lib/consultations/validation"
+import { zonedWallTimeToUtcISO } from "@/lib/consultations/time"
+import { parseConsultationInput, type ConsultationStatus } from "@/lib/consultations/validation"
 import { createClient } from "@/lib/supabase/server"
 
 export type ActionResult = { ok: true } | { error: string }
 
 const PATH = "/consultations"
 
+// The lifecycle moves this action represents (cancel / complete / mark no-show). Scheduling states
+// (`scheduled`/`paid`/`rescheduled`) are reached via create + reschedule, not here.
+const STATUS_TRANSITIONS: ConsultationStatus[] = ["completed", "no_show", "canceled"]
+
 type Gate = { ok: true; user: CurrentUser } | { ok: false; error: string }
 type DbClient = Awaited<ReturnType<typeof createClient>>
 
-// Consultation writes require consultations.edit. RLS is the real enforcement; this returns a clean
-// error first.
 async function requireConsultEdit(): Promise<Gate> {
   const user = await getCurrentUser()
   if (!user) return { ok: false, error: "You're not signed in." }
@@ -27,7 +26,6 @@ async function requireConsultEdit(): Promise<Gate> {
   return { ok: true, user }
 }
 
-// Best-effort — an audit failure must never fail the user's action.
 async function audit(supabase: DbClient, byUserId: string, id: string, label: string, action: string) {
   try {
     const { error } = await supabase
@@ -39,11 +37,10 @@ async function audit(supabase: DbClient, byUserId: string, id: string, label: st
   }
 }
 
-// Consultation counts feed the dashboard (/), so revalidate it alongside the list + detail.
-function revalidate(id?: string) {
+// Consultation counts feed the dashboard (/), so revalidate it alongside the list.
+function revalidate() {
   revalidatePath(PATH)
   revalidatePath("/")
-  if (id) revalidatePath(`${PATH}/${id}`)
 }
 
 function readInput(formData: FormData) {
@@ -66,16 +63,20 @@ export async function createConsultation(formData: FormData): Promise<ActionResu
   const core = readInput(formData)
   if (!core.ok) return { error: core.error }
 
+  // The form sends a naive wall time + the chosen zone; store the true UTC instant.
+  const startAt = zonedWallTimeToUtcISO(core.value.startAt, core.value.timeZone)
+  if (!startAt) return { error: "Couldn't read the date/time for that time zone." }
+
   const supabase = await createClient()
-  // firm_id defaults to current_firm_id(). A paid booking starts in the combined "scheduled & paid"
-  // state; otherwise plain "scheduled".
+  // firm_id defaults to current_firm_id(); the composite FKs reject a lead/attorney from another firm.
+  // A paid booking starts in the combined "scheduled & paid" state; otherwise plain "scheduled".
   const { data: inserted, error } = await supabase
     .from("consultations")
     .insert({
       lead_id: core.value.leadId,
       attorney_id: core.value.attorneyId,
       type: core.value.type,
-      start_at: core.value.startAt,
+      start_at: startAt,
       duration_min: core.value.durationMin,
       time_zone: core.value.timeZone,
       paid: core.value.paid,
@@ -85,7 +86,6 @@ export async function createConsultation(formData: FormData): Promise<ActionResu
     })
     .select("id")
     .single()
-  // A lead/attorney from another firm trips a FK (23503); surface it cleanly rather than a 500.
   if (error?.code === "23503") return { error: "That lead or attorney isn't in your firm." }
   if (error || !inserted) return { error: "Couldn't book the consultation." }
 
@@ -101,19 +101,36 @@ export async function updateConsultation(id: string, formData: FormData): Promis
   const core = readInput(formData)
   if (!core.ok) return { error: core.error }
 
+  const startAt = zonedWallTimeToUtcISO(core.value.startAt, core.value.timeZone)
+  if (!startAt) return { error: "Couldn't read the date/time for that time zone." }
+
   const supabase = await createClient()
-  // .select().single() makes a 0-row update (RLS / wrong id) a real error, not a silent ok. lead_id is
-  // not editable here — a consult stays attached to its lead.
+  // Keep `status` consistent with `paid` for scheduling-state consults; never reopen a terminal or
+  // rescheduled one from an edit.
+  const { data: current, error: readErr } = await supabase
+    .from("consultations")
+    .select("status")
+    .eq("id", id)
+    .single()
+  if (readErr || !current) return { error: "Couldn't update the consultation." }
+  const nextStatus: ConsultationStatus =
+    current.status === "scheduled" || current.status === "paid"
+      ? core.value.paid
+        ? "paid"
+        : "scheduled"
+      : current.status
+
   const { data: updated, error } = await supabase
     .from("consultations")
     .update({
       attorney_id: core.value.attorneyId,
       type: core.value.type,
-      start_at: core.value.startAt,
+      start_at: startAt,
       duration_min: core.value.durationMin,
       time_zone: core.value.timeZone,
       paid: core.value.paid,
       amount: core.value.amount,
+      status: nextStatus,
       last_activity: new Date().toISOString(),
     })
     .eq("id", id)
@@ -123,17 +140,27 @@ export async function updateConsultation(id: string, formData: FormData): Promis
   if (error || !updated) return { error: "Couldn't update the consultation." }
 
   await audit(supabase, gate.user.id, id, core.value.type, "updated")
-  revalidate(id)
+  revalidate()
   return { ok: true }
 }
 
-// Move the start time + flag the consult as rescheduled.
-export async function rescheduleConsultation(id: string, startAt: string): Promise<ActionResult> {
+// Move the start time + flag the consult as rescheduled. `startAtWall` is a naive wall time; it's
+// interpreted in the consult's stored time zone.
+export async function rescheduleConsultation(id: string, startAtWall: string): Promise<ActionResult> {
   const gate = await requireConsultEdit()
   if (!gate.ok) return { error: gate.error }
-  if (!startAt || Number.isNaN(Date.parse(startAt))) return { error: "Choose a valid date and time." }
 
   const supabase = await createClient()
+  const { data: current, error: readErr } = await supabase
+    .from("consultations")
+    .select("time_zone")
+    .eq("id", id)
+    .single()
+  if (readErr || !current) return { error: "Couldn't reschedule the consultation." }
+
+  const startAt = zonedWallTimeToUtcISO(startAtWall, current.time_zone)
+  if (!startAt) return { error: "Choose a valid date and time." }
+
   const { data: updated, error } = await supabase
     .from("consultations")
     .update({ start_at: startAt, status: "rescheduled", last_activity: new Date().toISOString() })
@@ -143,15 +170,15 @@ export async function rescheduleConsultation(id: string, startAt: string): Promi
   if (error || !updated) return { error: "Couldn't reschedule the consultation." }
 
   await audit(supabase, gate.user.id, id, "", "rescheduled")
-  revalidate(id)
+  revalidate()
   return { ok: true }
 }
 
-// Cancel / complete / mark no-show — a constrained lifecycle move.
+// Cancel / complete / mark no-show — the only transitions this action represents.
 export async function setConsultationStatus(id: string, status: string): Promise<ActionResult> {
   const gate = await requireConsultEdit()
   if (!gate.ok) return { error: gate.error }
-  if (!CONSULTATION_STATUSES.includes(status as ConsultationStatus)) return { error: "Unknown consultation status." }
+  if (!STATUS_TRANSITIONS.includes(status as ConsultationStatus)) return { error: "Unsupported status change." }
 
   const supabase = await createClient()
   const { data: updated, error } = await supabase
@@ -163,7 +190,7 @@ export async function setConsultationStatus(id: string, status: string): Promise
   if (error || !updated) return { error: "Couldn't update the consultation." }
 
   await audit(supabase, gate.user.id, id, status, "status_changed")
-  revalidate(id)
+  revalidate()
   return { ok: true }
 }
 
@@ -183,6 +210,6 @@ export async function setConsultationOutcome(id: string, outcome: string | null)
   if (error || !updated) return { error: "Couldn't update the outcome." }
 
   await audit(supabase, gate.user.id, id, next ?? "", "outcome_set")
-  revalidate(id)
+  revalidate()
   return { ok: true }
 }
