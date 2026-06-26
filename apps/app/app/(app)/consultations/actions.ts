@@ -105,7 +105,8 @@ export async function updateConsultation(id: string, formData: FormData): Promis
   if (!startAt) return { error: "Couldn't read the date/time for that time zone." }
 
   const supabase = await createClient()
-  // Edit the fields; status is owned by reschedule / setStatus, not the edit form.
+  // Edit the fields — only for a NON-terminal consult (a finalized one can't be edited, consistent
+  // with reschedule / setStatus). The `.in()` is the atomic guard; status is owned by those actions.
   const { data: updated, error } = await supabase
     .from("consultations")
     .update({
@@ -119,20 +120,21 @@ export async function updateConsultation(id: string, formData: FormData): Promis
       last_activity: new Date().toISOString(),
     })
     .eq("id", id)
+    .in("status", ["scheduled", "paid", "rescheduled"])
     .select("id")
-    .single()
+    .maybeSingle()
   if (error?.code === "23503") return { error: "That attorney isn't in your firm." }
-  if (error || !updated) return { error: "Couldn't update the consultation." }
+  if (error) return { error: "Couldn't update the consultation." }
+  if (!updated) return { error: "This consultation is finalized and can't be edited." }
 
-  // Keep status in sync with `paid` — but ONLY for a scheduling-state consult. The `.in()` filter is
-  // an atomic guard (no read-then-write race): a concurrently terminal/rescheduled consult is excluded,
-  // so the edit can't reopen or regress it.
+  // Keep status in sync with `paid` for a scheduled/paid consult (leaves a rescheduled one alone). The
+  // `.in()` filter is atomic; a sync failure is SURFACED — never report success with paid/status diverged.
   const { error: syncErr } = await supabase
     .from("consultations")
     .update({ status: core.value.paid ? "paid" : "scheduled" })
     .eq("id", id)
     .in("status", ["scheduled", "paid"])
-  if (syncErr) console.error("consultation status sync failed:", syncErr.message)
+  if (syncErr) return { error: "Couldn't fully update the consultation. Please try again." }
 
   await audit(supabase, gate.user.id, id, core.value.type, "updated")
   revalidate()
