@@ -1,58 +1,12 @@
 "use client"
 
-import * as React from "react"
-import { CalendarClock, MoreHorizontal } from "lucide-react"
+import { CalendarClock } from "lucide-react"
 
-import { Button } from "@workspace/ui/components/button"
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@workspace/ui/components/dialog"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@workspace/ui/components/dropdown-menu"
-import { Input } from "@workspace/ui/components/input"
-import { toast } from "@workspace/ui/components/sonner"
-
-import {
-  rescheduleConsultation,
-  setConsultationOutcome,
-  setConsultationStatus,
-  type ActionResult,
-} from "@/app/(app)/consultations/actions"
-import { Field } from "@/components/form-field"
+import { ConsultationActions } from "@/components/consultations/consultation-actions"
 import { StatusPill } from "@/components/status-pill"
 import { consultationStatusMeta, type ConsultationView } from "@/lib/consultations/queries"
 import { formatConsultationWhen } from "@/lib/consultations/time"
 import { formatCurrency } from "@/lib/format"
-
-function useRun() {
-  const [pending, startTransition] = React.useTransition()
-  const run = (fn: () => Promise<ActionResult>, okMsg?: string, onOk?: () => void) =>
-    startTransition(async () => {
-      try {
-        const res = await fn()
-        if ("error" in res) {
-          toast.error(res.error)
-          return
-        }
-        if (okMsg) toast.success(okMsg)
-        onOk?.()
-      } catch {
-        toast.error("Something went wrong. Please try again.")
-      }
-    })
-  return { pending, run }
-}
 
 export function ConsultationsBoard({
   upcoming,
@@ -103,12 +57,6 @@ function Section({
 
 function ConsultationCard({ consultation: c, canManage }: { consultation: ConsultationView; canManage: boolean }) {
   const meta = consultationStatusMeta(c.status)
-  const { pending, run } = useRun()
-  const [rescheduleOpen, setRescheduleOpen] = React.useState(false)
-  const [outcomeOpen, setOutcomeOpen] = React.useState(false)
-  // Reschedule / cancel / complete / no-show only apply to a live consult; a terminal one
-  // (completed / canceled / no-show) can still have its outcome recorded.
-  const isActive = c.status === "scheduled" || c.status === "paid" || c.status === "rescheduled"
 
   return (
     <div className="flex flex-col gap-2 rounded-lg border p-3">
@@ -136,123 +84,9 @@ function ConsultationCard({ consultation: c, canManage }: { consultation: Consul
 
       {canManage ? (
         <div className="mt-1">
-          <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant="ghost" size="sm" disabled={pending} />}>
-              <MoreHorizontal className="size-4" /> Actions
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              {isActive ? (
-                <>
-                  <DropdownMenuItem onClick={() => setRescheduleOpen(true)}>Reschedule…</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => run(() => setConsultationStatus(c.id, "completed"), "Marked completed")}>
-                    Mark completed
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => run(() => setConsultationStatus(c.id, "no_show"), "Marked no-show")}>
-                    Mark no-show
-                  </DropdownMenuItem>
-                </>
-              ) : null}
-              <DropdownMenuItem onClick={() => setOutcomeOpen(true)}>Set outcome…</DropdownMenuItem>
-              {isActive ? (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    variant="destructive"
-                    onClick={() => run(() => setConsultationStatus(c.id, "canceled"), "Consultation canceled")}
-                  >
-                    Cancel consultation
-                  </DropdownMenuItem>
-                </>
-              ) : null}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <ConsultationActions consultationId={c.id} status={c.status} outcome={c.outcome} />
         </div>
       ) : null}
-
-      <RescheduleDialog open={rescheduleOpen} onOpenChange={setRescheduleOpen} consultationId={c.id} />
-      <OutcomeDialog open={outcomeOpen} onOpenChange={setOutcomeOpen} consultationId={c.id} current={c.outcome} />
     </div>
-  )
-}
-
-function RescheduleDialog({
-  open,
-  onOpenChange,
-  consultationId,
-}: {
-  open: boolean
-  onOpenChange: (o: boolean) => void
-  consultationId: string
-}) {
-  const { pending, run } = useRun()
-  function onSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    const startAt = String(new FormData(e.currentTarget).get("startAt") ?? "")
-    run(() => rescheduleConsultation(consultationId, startAt), "Consultation rescheduled", () => onOpenChange(false))
-  }
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-sm">
-        <form onSubmit={onSubmit}>
-          <DialogHeader>
-            <DialogTitle>Reschedule consultation</DialogTitle>
-            <DialogDescription>Pick a new date and time. The consult is marked rescheduled.</DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <Field label="New date &amp; time">
-              <Input name="startAt" type="datetime-local" required />
-            </Field>
-          </div>
-          <DialogFooter>
-            <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
-            <Button type="submit" disabled={pending}>
-              {pending ? "Saving…" : "Reschedule"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-function OutcomeDialog({
-  open,
-  onOpenChange,
-  consultationId,
-  current,
-}: {
-  open: boolean
-  onOpenChange: (o: boolean) => void
-  consultationId: string
-  current: string | null
-}) {
-  const { pending, run } = useRun()
-  function onSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    const outcome = String(new FormData(e.currentTarget).get("outcome") ?? "")
-    run(() => setConsultationOutcome(consultationId, outcome), "Outcome saved", () => onOpenChange(false))
-  }
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-sm">
-        <form onSubmit={onSubmit}>
-          <DialogHeader>
-            <DialogTitle>Set consultation outcome</DialogTitle>
-            <DialogDescription>The post-consult qualification (e.g. qualified, not qualified, follow-up).</DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <Field label="Outcome">
-              <Input name="outcome" defaultValue={current ?? ""} placeholder="Qualified to retain" autoComplete="off" />
-            </Field>
-          </div>
-          <DialogFooter>
-            <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
-            <Button type="submit" disabled={pending}>
-              {pending ? "Saving…" : "Save outcome"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
   )
 }

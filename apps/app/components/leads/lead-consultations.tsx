@@ -5,6 +5,7 @@ import { CalendarClock } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card"
 
 import { BookConsultationDialog } from "@/components/consultations/book-consultation-dialog"
+import { ConsultationActions } from "@/components/consultations/consultation-actions"
 import { StatusPill } from "@/components/status-pill"
 import { consultationStatusMeta, type ConsultationView } from "@/lib/consultations/queries"
 import { formatConsultationWhen } from "@/lib/consultations/time"
@@ -64,6 +65,9 @@ export function LeadConsultations({
                     <span className="text-muted-foreground text-xs tabular-nums">{formatCurrency(c.amount)}</span>
                   ) : null}
                   <StatusPill {...consultationStatusMeta(c.status)} dot />
+                  {canBook ? (
+                    <ConsultationActions consultationId={c.id} status={c.status} outcome={c.outcome} compact />
+                  ) : null}
                 </div>
               </li>
             ))}
