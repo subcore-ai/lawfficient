@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { isValidTimeZone, zonedWallTimeToUtcISO } from "./time"
+import { formatConsultationWhen, isValidTimeZone, zonedWallTimeToUtcISO } from "./time"
 
 describe("zonedWallTimeToUtcISO", () => {
   test("interprets the wall time in the given zone → correct UTC instant (DST)", () => {
@@ -28,6 +28,20 @@ describe("zonedWallTimeToUtcISO", () => {
     expect(zonedWallTimeToUtcISO("2026-13-01T10:00", "UTC")).toBeNull() // month 13
     expect(zonedWallTimeToUtcISO("2026-02-30T10:00", "UTC")).toBeNull() // Feb 30
     expect(zonedWallTimeToUtcISO("2026-01-01T25:00", "UTC")).toBeNull() // hour 25
+  })
+})
+
+describe("formatConsultationWhen", () => {
+  test("renders a UTC instant in the consult's zone (no dateStyle/timeZoneName throw)", () => {
+    const out = formatConsultationWhen("2026-07-01T19:00:00.000Z", "America/New_York")
+    expect(out).toContain("3:00") // 19:00Z == 3:00 PM EDT
+    expect(out).toContain("EDT")
+    // Regression guard: combining dateStyle/timeStyle with timeZoneName throws → raw-ISO fallback.
+    expect(out).not.toBe("2026-07-01T19:00:00.000Z")
+  })
+
+  test("falls back to the raw ISO on a bad zone", () => {
+    expect(formatConsultationWhen("2026-07-01T19:00:00.000Z", "Mars/Phobos")).toBe("2026-07-01T19:00:00.000Z")
   })
 })
 

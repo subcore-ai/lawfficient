@@ -54,6 +54,10 @@ export function BookConsultationDialog({
   const startAtId = React.useId()
   const durationId = React.useId()
   const amountId = React.useId()
+  const leadSelectId = React.useId()
+  const typeSelectId = React.useId()
+  const attorneySelectId = React.useId()
+  const zoneSelectId = React.useId()
   // Seed the picker with the firm's configured zone so a non-Eastern firm doesn't silently book in
   // Eastern; fall back to DEFAULT_TZ when it's unset or not one of the offered zones.
   const initialZone =
@@ -118,9 +122,9 @@ export function BookConsultationDialog({
 
           <div className="grid gap-4 py-5 sm:grid-cols-2">
             {triggerLeadId ? null : (
-              <Field label="Lead" className="sm:col-span-2">
+              <Field label="Lead" htmlFor={leadSelectId} className="sm:col-span-2">
                 <Select value={leadId} onValueChange={(v) => setLeadId(v ?? "")} items={leads.map((l) => ({ value: l.id, label: l.name }))}>
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger id={leadSelectId} className="w-full">
                     <SelectValue placeholder={leads.length ? "Select a lead" : "No leads yet"} />
                   </SelectTrigger>
                   <SelectContent>
@@ -133,9 +137,9 @@ export function BookConsultationDialog({
                 </Select>
               </Field>
             )}
-            <Field label="Consultation type">
+            <Field label="Consultation type" htmlFor={typeSelectId}>
               <Select value={type} onValueChange={(v) => setType(v ?? DEFAULT_CONSULTATION_TYPES[0]!)} items={DEFAULT_CONSULTATION_TYPES.map((t) => ({ value: t, label: t }))}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger id={typeSelectId} className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -147,9 +151,9 @@ export function BookConsultationDialog({
                 </SelectContent>
               </Select>
             </Field>
-            <Field label="Attorney">
+            <Field label="Attorney" htmlFor={attorneySelectId}>
               <Select value={attorney} onValueChange={(v) => setAttorney(v ?? UNASSIGNED)} items={[{ value: UNASSIGNED, label: "Unassigned" }, ...attorneys.map((a) => ({ value: a.id, label: a.name }))]}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger id={attorneySelectId} className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -168,9 +172,9 @@ export function BookConsultationDialog({
             <Field label="Duration (min)" htmlFor={durationId}>
               <Input id={durationId} name="durationMin" type="number" min={5} step={5} defaultValue={30} required />
             </Field>
-            <Field label="Time zone" className="sm:col-span-2">
+            <Field label="Time zone" htmlFor={zoneSelectId} className="sm:col-span-2">
               <Select value={zone} onValueChange={(v) => setZone(v ?? DEFAULT_TZ)} items={FIRM_TIMEZONES.map((z) => ({ value: z.value, label: z.label }))}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger id={zoneSelectId} className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

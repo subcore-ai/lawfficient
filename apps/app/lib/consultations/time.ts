@@ -49,6 +49,10 @@ export function zonedWallTimeToUtcISO(wall: string, timeZone: string): string | 
   let offset: number
   try {
     offset = zoneOffsetMs(timeZone, guess)
+    // Re-evaluate the offset at the first-pass instant: near a DST change the offset at `guess`
+    // (wall-as-UTC) can differ from the offset at the true instant. One correction pass fixes all
+    // non-gap wall times (e.g. an afternoon on a spring-forward/fall-back day).
+    offset = zoneOffsetMs(timeZone, guess - offset)
   } catch {
     return null // invalid IANA zone
   }
@@ -60,10 +64,15 @@ export function zonedWallTimeToUtcISO(wall: string, timeZone: string): string | 
 // wall time + abbreviation, not the server/UTC clock). Falls back to the raw ISO on a bad zone.
 export function formatConsultationWhen(iso: string, timeZone: string): string {
   try {
+    // Explicit component options — NOT dateStyle/timeStyle, which can't be combined with timeZoneName
+    // (that throws, silently dropping us to the raw-ISO fallback so the zone never shows).
     return new Intl.DateTimeFormat("en-US", {
       timeZone,
-      dateStyle: "medium",
-      timeStyle: "short",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
       timeZoneName: "short",
     }).format(new Date(iso))
   } catch {
