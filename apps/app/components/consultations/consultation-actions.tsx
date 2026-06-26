@@ -30,6 +30,7 @@ import {
   type ActionResult,
 } from "@/app/(app)/consultations/actions"
 import { Field } from "@/components/form-field"
+import { utcToZonedInput } from "@/lib/consultations/time"
 import type { ConsultationStatus } from "@/lib/consultations/validation"
 
 function useRun() {
@@ -58,11 +59,15 @@ export function ConsultationActions({
   consultationId,
   status,
   outcome,
+  startAt,
+  timeZone,
   compact = false,
 }: {
   consultationId: string
   status: ConsultationStatus
   outcome: string | null
+  startAt: string
+  timeZone: string
   compact?: boolean
 }) {
   const { pending, run } = useRun()
@@ -117,7 +122,13 @@ export function ConsultationActions({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <RescheduleDialog open={rescheduleOpen} onOpenChange={setRescheduleOpen} consultationId={consultationId} />
+      <RescheduleDialog
+        open={rescheduleOpen}
+        onOpenChange={setRescheduleOpen}
+        consultationId={consultationId}
+        startAt={startAt}
+        timeZone={timeZone}
+      />
       <OutcomeDialog open={outcomeOpen} onOpenChange={setOutcomeOpen} consultationId={consultationId} current={outcome} />
     </>
   )
@@ -127,10 +138,14 @@ function RescheduleDialog({
   open,
   onOpenChange,
   consultationId,
+  startAt,
+  timeZone,
 }: {
   open: boolean
   onOpenChange: (o: boolean) => void
   consultationId: string
+  startAt: string
+  timeZone: string
 }) {
   const startId = React.useId()
   const { pending, run } = useRun()
@@ -149,7 +164,13 @@ function RescheduleDialog({
           </DialogHeader>
           <div className="py-4">
             <Field label="New date &amp; time" htmlFor={startId}>
-              <Input id={startId} name="startAt" type="datetime-local" required />
+              <Input
+                id={startId}
+                name="startAt"
+                type="datetime-local"
+                defaultValue={utcToZonedInput(startAt, timeZone)}
+                required
+              />
             </Field>
           </div>
           <DialogFooter>
