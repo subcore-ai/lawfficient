@@ -236,6 +236,13 @@ export function LeadDetail({
               <DetailRow label="Last activity">
                 <LocalTime iso={lead.lastActivity} mode="date" />
               </DetailRow>
+              <DetailRow label="Lead message" className="sm:col-span-2">
+                {data.message ? (
+                  <p className="max-h-48 overflow-y-auto whitespace-pre-wrap break-words">{data.message}</p>
+                ) : (
+                  "—"
+                )}
+              </DetailRow>
             </DetailList>
           </CardContent>
         </Card>

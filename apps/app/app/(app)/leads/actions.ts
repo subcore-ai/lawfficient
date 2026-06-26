@@ -92,6 +92,7 @@ function readDataFields(formData: FormData): LeadDataInput {
     gender: get("gender"),
     dob: get("dob"),
     referralSource: get("referralSource"),
+    message: get("message"),
   }
 }
 

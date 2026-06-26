@@ -79,4 +79,13 @@ describe("parseCanonicalPayload", () => {
     const parsed = parseCanonicalPayload({ firstName: "A", lastName: "B", notes: "left a voicemail" }, VOCAB)
     expect(parsed.extra).toEqual({ notes: "left a voicemail" })
   })
+
+  test("the sender's message is a known data field (not extra), trimmed", () => {
+    const parsed = parseCanonicalPayload(
+      { firstName: "A", lastName: "B", message: "  my case was denied  " },
+      VOCAB
+    )
+    expect(parsed.data.message).toBe("my case was denied")
+    expect(parsed.extra).toEqual({})
+  })
 })
