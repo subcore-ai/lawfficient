@@ -59,7 +59,8 @@ export function LeadDetail({
   currentUserName,
   canEdit,
   canManage,
-  consultations,
+  upcomingConsultations,
+  pastConsultations,
   canViewConsultations,
   canManageConsultations,
   consultDefaultTimeZone,
@@ -73,7 +74,8 @@ export function LeadDetail({
   currentUserName: string | null
   canEdit: boolean
   canManage: boolean
-  consultations: ConsultationView[]
+  upcomingConsultations: ConsultationView[]
+  pastConsultations: ConsultationView[]
   canViewConsultations: boolean
   canManageConsultations: boolean
   consultDefaultTimeZone: string | null
@@ -343,7 +345,8 @@ export function LeadDetail({
       {canViewConsultations ? (
         <LeadConsultations
           leadId={lead.id}
-          consultations={consultations}
+          upcoming={upcomingConsultations}
+          past={pastConsultations}
           attorneys={assignees}
           defaultTimeZone={consultDefaultTimeZone}
           canManage={canManageConsultations}
