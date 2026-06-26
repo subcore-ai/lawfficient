@@ -29,6 +29,16 @@ describe("zonedWallTimeToUtcISO", () => {
     expect(zonedWallTimeToUtcISO("2026-02-30T10:00", "UTC")).toBeNull() // Feb 30
     expect(zonedWallTimeToUtcISO("2026-01-01T25:00", "UTC")).toBeNull() // hour 25
   })
+
+  test("rejects a nonexistent spring-forward gap wall time", () => {
+    // 2026-03-08: NY springs forward 02:00 -> 03:00, so 02:30 never occurs → reject, don't mis-book.
+    expect(zonedWallTimeToUtcISO("2026-03-08T02:30", "America/New_York")).toBeNull()
+  })
+
+  test("converts a valid time on a DST-change day", () => {
+    // 10:00 on the same spring-forward day is valid (EDT, UTC-4) -> 14:00Z.
+    expect(zonedWallTimeToUtcISO("2026-03-08T10:00", "America/New_York")).toBe("2026-03-08T14:00:00.000Z")
+  })
 })
 
 describe("formatConsultationWhen", () => {

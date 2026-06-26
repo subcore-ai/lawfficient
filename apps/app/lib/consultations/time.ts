@@ -3,8 +3,9 @@
 // server's zone and the appointment drifts. We convert the wall time, interpreted in the chosen IANA
 // zone, to a UTC instant before storing.
 
-// ms that `timeZone` is ahead of UTC at the given instant (negative across the Americas).
-function zoneOffsetMs(timeZone: string, utcMs: number): number {
+// The wall clock shown in `timeZone` at instant `utcMs`, expressed as a UTC-epoch ms — so two wall
+// clocks can be compared/subtracted directly.
+function zoneWallMs(timeZone: string, utcMs: number): number {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone,
     hourCycle: "h23",
@@ -16,8 +17,12 @@ function zoneOffsetMs(timeZone: string, utcMs: number): number {
     second: "2-digit",
   }).formatToParts(new Date(utcMs))
   const get = (t: string) => Number(parts.find((p) => p.type === t)?.value)
-  const asTz = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second"))
-  return asTz - utcMs
+  return Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second"))
+}
+
+// ms that `timeZone` is ahead of UTC at the given instant (negative across the Americas).
+function zoneOffsetMs(timeZone: string, utcMs: number): number {
+  return zoneWallMs(timeZone, utcMs) - utcMs
 }
 
 // Convert "YYYY-MM-DDTHH:mm[:ss]" interpreted in `timeZone` to a UTC ISO instant. Returns null on a
@@ -57,7 +62,12 @@ export function zonedWallTimeToUtcISO(wall: string, timeZone: string): string | 
     return null // invalid IANA zone
   }
   if (!Number.isFinite(offset)) return null
-  return new Date(guess - offset).toISOString()
+  const result = guess - offset
+  // Reject a NONEXISTENT wall time (the spring-forward gap, e.g. 02:30 on a spring-forward day): round
+  // the instant back to its wall clock in the zone; if it doesn't match the requested wall time, that
+  // wall time never occurs — so don't silently book an off-by-an-hour instant.
+  if (zoneWallMs(timeZone, result) !== guess) return null
+  return new Date(result).toISOString()
 }
 
 // Render a stored UTC instant in the consultation's own zone (so a New-York consult shows the New-York
