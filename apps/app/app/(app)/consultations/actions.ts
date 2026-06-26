@@ -3,8 +3,9 @@
 import { revalidatePath } from "next/cache"
 
 import { getCurrentUser, type CurrentUser } from "@/lib/auth/session"
-import { zonedWallTimeToUtcISO } from "@/lib/consultations/time"
+import { formatConsultationWhen, zonedWallTimeToUtcISO } from "@/lib/consultations/time"
 import { parseConsultationInput, type ConsultationStatus } from "@/lib/consultations/validation"
+import { recordLeadEvent } from "@/lib/leads/events"
 import { createClient } from "@/lib/supabase/server"
 
 export type ActionResult = { ok: true } | { error: string }
@@ -14,6 +15,13 @@ const PATH = "/consultations"
 // The lifecycle moves this action represents (cancel / complete / mark no-show). Scheduling states
 // (`scheduled`/`paid`/`rescheduled`) are reached via create + reschedule, not here.
 const STATUS_TRANSITIONS: ConsultationStatus[] = ["completed", "no_show", "canceled"]
+
+// Timeline wording for each terminal transition (recorded on the consult's lead).
+const STATUS_EVENT: Record<string, string> = {
+  completed: "Consultation completed",
+  no_show: "Consultation marked no-show",
+  canceled: "Consultation canceled",
+}
 
 type Gate = { ok: true; user: CurrentUser } | { ok: false; error: string }
 type DbClient = Awaited<ReturnType<typeof createClient>>
@@ -37,10 +45,12 @@ async function audit(supabase: DbClient, byUserId: string, id: string, label: st
   }
 }
 
-// Consultation counts feed the dashboard (/), so revalidate it alongside the list.
-function revalidate() {
+// Consultation counts feed the dashboard (/), so revalidate it alongside the list. The consult's lead
+// page (its consultations card + activity timeline) is revalidated too when a lead is involved.
+function revalidate(leadId?: string | null) {
   revalidatePath(PATH)
   revalidatePath("/")
+  if (leadId) revalidatePath(`/leads/${leadId}`)
 }
 
 function readInput(formData: FormData) {
@@ -91,7 +101,11 @@ export async function createConsultation(formData: FormData): Promise<ActionResu
   if (error || !inserted) return { error: "Couldn't book the consultation." }
 
   await audit(supabase, gate.user.id, inserted.id, core.value.type, "created")
-  revalidate()
+  await recordLeadEvent(
+    core.value.leadId,
+    `Consultation booked — ${core.value.type}, ${formatConsultationWhen(startAt, core.value.timeZone)}`,
+  )
+  revalidate(core.value.leadId)
   return { ok: true }
 }
 
@@ -123,14 +137,15 @@ export async function updateConsultation(id: string, formData: FormData): Promis
     })
     .eq("id", id)
     .in("status", ["scheduled", "paid", "rescheduled"])
-    .select("id")
+    .select("id, lead_id")
     .maybeSingle()
   if (error?.code === "23503") return { error: "That attorney isn't in your firm." }
   if (error) return { error: "Couldn't update the consultation." }
   if (!updated) return { error: "This consultation is finalized and can't be edited." }
 
   await audit(supabase, gate.user.id, id, core.value.type, "updated")
-  revalidate()
+  await recordLeadEvent(updated.lead_id, `Consultation updated — ${core.value.type}`)
+  revalidate(updated.lead_id)
   return { ok: true }
 }
 
@@ -143,7 +158,7 @@ export async function rescheduleConsultation(id: string, startAtWall: string): P
   const supabase = await createClient()
   const { data: current, error: readErr } = await supabase
     .from("consultations")
-    .select("time_zone, status")
+    .select("time_zone, status, lead_id")
     .eq("id", id)
     .single()
   if (readErr || !current) return { error: "Couldn't reschedule the consultation." }
@@ -167,7 +182,11 @@ export async function rescheduleConsultation(id: string, startAtWall: string): P
   if (!updated) return { error: "This consultation is finalized and can't be rescheduled." }
 
   await audit(supabase, gate.user.id, id, "", "rescheduled")
-  revalidate()
+  await recordLeadEvent(
+    current.lead_id,
+    `Consultation rescheduled to ${formatConsultationWhen(startAt, current.time_zone)}`,
+  )
+  revalidate(current.lead_id)
   return { ok: true }
 }
 
@@ -185,13 +204,14 @@ export async function setConsultationStatus(id: string, status: string): Promise
     .update({ status: status as ConsultationStatus, last_activity: new Date().toISOString() })
     .eq("id", id)
     .in("status", ["scheduled", "paid", "rescheduled"])
-    .select("id")
+    .select("id, lead_id")
     .maybeSingle()
   if (error) return { error: "Couldn't update the consultation." }
   if (!updated) return { error: "This consultation is already finalized." }
 
   await audit(supabase, gate.user.id, id, status, "status_changed")
-  revalidate()
+  await recordLeadEvent(updated.lead_id, STATUS_EVENT[status] ?? "Consultation updated")
+  revalidate(updated.lead_id)
   return { ok: true }
 }
 
@@ -206,11 +226,15 @@ export async function setConsultationOutcome(id: string, outcome: string | null)
     .from("consultations")
     .update({ outcome: next, last_activity: new Date().toISOString() })
     .eq("id", id)
-    .select("id")
+    .select("id, lead_id")
     .single()
   if (error || !updated) return { error: "Couldn't update the outcome." }
 
   await audit(supabase, gate.user.id, id, next ?? "", "outcome_set")
-  revalidate()
+  await recordLeadEvent(
+    updated.lead_id,
+    next ? `Consultation outcome — ${next}` : "Consultation outcome cleared",
+  )
+  revalidate(updated.lead_id)
   return { ok: true }
 }

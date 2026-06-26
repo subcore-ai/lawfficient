@@ -23,9 +23,11 @@ import { DetailList, DetailRow } from "@/components/detail-list"
 import { EditLeadDialog } from "@/components/leads/edit-lead-dialog"
 import { InlineSelect } from "@/components/inline-select"
 import { LocalTime } from "@/components/local-time"
+import { LeadConsultations } from "@/components/leads/lead-consultations"
 import { NoteComposer } from "@/components/notes/note-composer"
 import { NotesTimeline } from "@/components/notes/notes-timeline"
 import { StatusPill } from "@/components/status-pill"
+import type { ConsultationView } from "@/lib/consultations/queries"
 import type {
   AssigneeOption,
   LeadStatusView,
@@ -56,6 +58,10 @@ export function LeadDetail({
   currentUserName,
   canEdit,
   canManage,
+  consultations,
+  canViewConsultations,
+  canManageConsultations,
+  consultDefaultTimeZone,
 }: {
   lead: LeadView
   statuses: LeadStatusView[]
@@ -66,6 +72,10 @@ export function LeadDetail({
   currentUserName: string | null
   canEdit: boolean
   canManage: boolean
+  consultations: ConsultationView[]
+  canViewConsultations: boolean
+  canManageConsultations: boolean
+  consultDefaultTimeZone: string | null
 }) {
   const [editOpen, setEditOpen] = React.useState(false)
   const [, startTransition] = React.useTransition()
@@ -321,6 +331,16 @@ export function LeadDetail({
           ) : null}
         </div>
       </div>
+
+      {canViewConsultations ? (
+        <LeadConsultations
+          leadId={lead.id}
+          consultations={consultations}
+          attorneys={assignees}
+          defaultTimeZone={consultDefaultTimeZone}
+          canManage={canManageConsultations}
+        />
+      ) : null}
 
       <Card>
         <CardHeader>
