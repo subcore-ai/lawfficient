@@ -55,7 +55,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     label: "Clients & Cases",
     items: [
       { title: "Leads", href: "/leads", icon: Users, data: "live" },
-      { title: "Consultations", href: "/consultations", icon: CalendarClock, data: "mock" },
+      { title: "Consultations", href: "/consultations", icon: CalendarClock, data: "live" },
       { title: "Clients", href: "/clients", icon: UserCheck, data: "mock" },
       { title: "Cases", href: "/cases", icon: FolderKanban, data: "mock" },
     ],

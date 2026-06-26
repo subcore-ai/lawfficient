@@ -25,101 +25,126 @@ import {
   SelectValue,
 } from "@workspace/ui/components/select"
 import { toast } from "@workspace/ui/components/sonner"
-import { Textarea } from "@workspace/ui/components/textarea"
 
+import { createConsultation } from "@/app/(app)/consultations/actions"
 import { Field } from "@/components/form-field"
-import { CASE_TYPES, STAFF } from "@/data"
-import { useStore } from "@/data/store"
-import type { CaseType } from "@/data/types"
+import { DEFAULT_CONSULTATION_TYPES } from "@/lib/consultations/validation"
 
-const ATTORNEYS = STAFF.filter((u) => u.role === "attorney")
-const DEFAULT_ATTORNEY = ATTORNEYS[0]?.id ?? "u1"
-const TYPES = ["Initial consultation", "Paid consultation", "Follow-up", "Strategy session"]
-const ZONES = ["PT", "MT", "CT", "ET", "HT"]
+type Option = { id: string; name: string }
 
-export function BookConsultationDialog() {
-  const { addConsultation } = useStore()
+const UNASSIGNED = "__none__"
+// IANA zones for the picker; free text in the DB, so a firm can refine later.
+const TIME_ZONES = [
+  { value: "America/New_York", label: "Eastern (New York)" },
+  { value: "America/Chicago", label: "Central (Chicago)" },
+  { value: "America/Denver", label: "Mountain (Denver)" },
+  { value: "America/Los_Angeles", label: "Pacific (Los Angeles)" },
+  { value: "Pacific/Honolulu", label: "Hawaii (Honolulu)" },
+]
+
+export function BookConsultationDialog({
+  leads,
+  attorneys,
+  triggerLeadId,
+  label = "Book consultation",
+}: {
+  leads: Option[]
+  attorneys: Option[]
+  // When booking from a specific lead, pre-select it + hide the picker.
+  triggerLeadId?: string
+  label?: string
+}) {
   const [open, setOpen] = React.useState(false)
-  const [attorney, setAttorney] = React.useState(DEFAULT_ATTORNEY)
-  const [type, setType] = React.useState("Initial consultation")
-  const [zone, setZone] = React.useState("ET")
-  const [caseType, setCaseType] = React.useState("none")
+  const [leadId, setLeadId] = React.useState(triggerLeadId ?? leads[0]?.id ?? "")
+  const [attorney, setAttorney] = React.useState(UNASSIGNED)
+  const [type, setType] = React.useState(DEFAULT_CONSULTATION_TYPES[0]!)
+  const [zone, setZone] = React.useState("America/New_York")
   const [paid, setPaid] = React.useState(false)
+  const [pending, startTransition] = React.useTransition()
 
   function reset() {
-    setAttorney(DEFAULT_ATTORNEY)
-    setType("Initial consultation")
-    setZone("ET")
-    setCaseType("none")
+    setLeadId(triggerLeadId ?? leads[0]?.id ?? "")
+    setAttorney(UNASSIGNED)
+    setType(DEFAULT_CONSULTATION_TYPES[0]!)
+    setZone("America/New_York")
     setPaid(false)
+  }
+
+  function onOpenChange(next: boolean) {
+    setOpen(next)
+    if (!next) reset()
   }
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    const form = e.currentTarget
-    const fd = new FormData(form)
-    const get = (k: string) => String(fd.get(k) ?? "").trim()
-    const name = `${get("firstName")} ${get("lastName")}`.trim() || "New client"
-    const startAt = `${get("date")}T${get("time")}:00`
-    const amount = Number(get("amount")) || 150
-
-    addConsultation({
-      leadName: name,
-      attorneyId: attorney,
-      type,
-      paid,
-      amount: paid ? amount : undefined,
-      startAt,
-      timeZone: zone,
-      caseType: caseType === "none" ? undefined : (caseType as CaseType),
+    const fd = new FormData(e.currentTarget)
+    fd.set("leadId", leadId)
+    fd.set("attorneyId", attorney === UNASSIGNED ? "" : attorney)
+    fd.set("type", type)
+    fd.set("timeZone", zone)
+    fd.set("paid", paid ? "on" : "")
+    startTransition(async () => {
+      const res = await createConsultation(fd)
+      if ("error" in res) {
+        toast.error(res.error)
+        return
+      }
+      toast.success("Consultation booked")
+      onOpenChange(false)
     })
-
-    toast.success("Consultation booked", {
-      description: "Added to the attorney's calendar; confirmation sent.",
-    })
-    form.reset()
-    reset()
-    setOpen(false)
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogTrigger render={<Button size="sm" />}>
-        <Plus className="size-4" /> Book consultation
+        <Plus className="size-4" /> {label}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent className="sm:max-w-lg">
         <form onSubmit={onSubmit}>
           <DialogHeader>
             <DialogTitle>Book a consultation</DialogTitle>
-            <DialogDescription>
-              Schedule a paid or unpaid consultation against an attorney&apos;s calendar.
-            </DialogDescription>
+            <DialogDescription>Schedule a paid or unpaid consultation against an attorney&apos;s calendar.</DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-4 py-5 sm:grid-cols-2">
-            <Field label="First name">
-              <Input name="firstName" required placeholder="Maria" />
-            </Field>
-            <Field label="Last name">
-              <Input name="lastName" required placeholder="Gonzalez" />
-            </Field>
-            <Field label="Phone">
-              <Input name="phone" type="tel" placeholder="(305) 555-0142" />
-            </Field>
-            <Field label="Email">
-              <Input name="email" type="email" placeholder="maria@email.com" />
-            </Field>
-            <Field label="Attorney">
-              <Select
-                value={attorney}
-                onValueChange={(v) => setAttorney(v ?? DEFAULT_ATTORNEY)}
-                items={ATTORNEYS.map((a) => ({ value: a.id, label: a.name }))}
-              >
+            {triggerLeadId ? null : (
+              <Field label="Lead" className="sm:col-span-2">
+                <Select value={leadId} onValueChange={(v) => setLeadId(v ?? "")} items={leads.map((l) => ({ value: l.id, label: l.name }))}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder={leads.length ? "Select a lead" : "No leads yet"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {leads.map((l) => (
+                      <SelectItem key={l.id} value={l.id}>
+                        {l.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            )}
+            <Field label="Consultation type">
+              <Select value={type} onValueChange={(v) => setType(v ?? DEFAULT_CONSULTATION_TYPES[0]!)} items={DEFAULT_CONSULTATION_TYPES.map((t) => ({ value: t, label: t }))}>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select attorney" />
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {ATTORNEYS.map((a) => (
+                  {DEFAULT_CONSULTATION_TYPES.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {t}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Attorney">
+              <Select value={attorney} onValueChange={(v) => setAttorney(v ?? UNASSIGNED)} items={[{ value: UNASSIGNED, label: "Unassigned" }, ...attorneys.map((a) => ({ value: a.id, label: a.name }))]}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
+                  {attorneys.map((a) => (
                     <SelectItem key={a.id} value={a.id}>
                       {a.name}
                     </SelectItem>
@@ -127,58 +152,21 @@ export function BookConsultationDialog() {
                 </SelectContent>
               </Select>
             </Field>
-            <Field label="Appointment type">
-              <Select
-                value={type}
-                onValueChange={(v) => setType(v ?? "Initial consultation")}
-                items={TYPES.map((t) => ({ value: t, label: t }))}
-              >
+            <Field label="When">
+              <Input name="startAt" type="datetime-local" required />
+            </Field>
+            <Field label="Duration (min)">
+              <Input name="durationMin" type="number" min={5} step={5} defaultValue={30} required />
+            </Field>
+            <Field label="Time zone" className="sm:col-span-2">
+              <Select value={zone} onValueChange={(v) => setZone(v ?? "America/New_York")} items={TIME_ZONES}>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select type" />
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {TYPES.map((t) => (
-                    <SelectItem key={t} value={t}>
-                      {t}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field label="Date">
-              <Input name="date" type="date" required />
-            </Field>
-            <Field label="Time">
-              <Input name="time" type="time" required />
-            </Field>
-            <Field label="Time zone">
-              <Select value={zone} onValueChange={(v) => setZone(v ?? "ET")} items={ZONES.map((z) => ({ value: z, label: z }))}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Zone" />
-                </SelectTrigger>
-                <SelectContent>
-                  {ZONES.map((z) => (
-                    <SelectItem key={z} value={z}>
-                      {z}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field label="Case type">
-              <Select
-                value={caseType}
-                onValueChange={(v) => setCaseType(v ?? "none")}
-                items={[{ value: "none", label: "Not set" }, ...CASE_TYPES.map((t) => ({ value: t, label: t }))]}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Case type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Not set</SelectItem>
-                  {CASE_TYPES.map((t) => (
-                    <SelectItem key={t} value={t}>
-                      {t}
+                  {TIME_ZONES.map((z) => (
+                    <SelectItem key={z.value} value={z.value}>
+                      {z.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -192,27 +180,16 @@ export function BookConsultationDialog() {
                 </Label>
               </div>
               {paid ? (
-                <Input
-                  name="amount"
-                  type="number"
-                  min={0}
-                  step={25}
-                  defaultValue={150}
-                  className="h-8 w-28"
-                  aria-label="Amount"
-                />
+                <Input name="amount" type="number" min={0} step={25} defaultValue={150} className="h-8 w-28" aria-label="Amount" />
               ) : null}
-            </div>
-            <div className="sm:col-span-2">
-              <Field label="Notes">
-                <Textarea name="notes" rows={2} placeholder="Case background, referral source…" />
-              </Field>
             </div>
           </div>
 
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
-            <Button type="submit">Schedule appointment</Button>
+            <Button type="submit" disabled={pending || !leadId}>
+              {pending ? "Booking…" : "Book consultation"}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
