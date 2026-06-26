@@ -15,20 +15,23 @@ type Loaded = {
   leads: Option[]
   attorneys: Option[]
   canManage: boolean
+  // The firm's configured zone, used as the booking picker's default (null → the dialog's own fallback).
+  defaultTimeZone: string | null
 }
 
 async function load(): Promise<Loaded> {
   if (!isSupabaseConfigured()) {
-    return { upcoming: [], past: [], leads: [], attorneys: [], canManage: false }
+    return { upcoming: [], past: [], leads: [], attorneys: [], canManage: false, defaultTimeZone: null }
   }
   const me = await getCurrentUser()
   const supabase = await createClient()
   // Consultations are per-record (RLS client). Leads (for the picker + name map) and active staff (for
-  // the attorney picker + name map) are firm reference data.
-  const [consultRes, leadsRes, staffRes] = await Promise.all([
+  // the attorney picker + name map) are firm reference data; the firm's timezone seeds the booking picker.
+  const [consultRes, leadsRes, staffRes, firmRes] = await Promise.all([
     supabase.from("consultations").select("*").eq("archived", false).order("start_at", { ascending: false }),
     supabase.from("leads").select("id, first_name, last_name, archived").order("created_at", { ascending: false }),
     supabase.from("profiles").select("id, name, status").order("name"),
+    supabase.from("firms").select("timezone").single(),
   ])
   // Fail fast on any read — a swallowed leads/profiles error would render with empty name maps
   // ("Unknown lead", blank attorneys) and unusable pickers instead of surfacing the failure.
@@ -57,15 +60,17 @@ async function load(): Promise<Loaded> {
     leads: leadOptions,
     attorneys,
     canManage: me?.permissions?.includes("consultations.edit") ?? false,
+    // Best-effort: a firm-read failure just falls back to the dialog's own default zone.
+    defaultTimeZone: firmRes.data?.timezone ?? null,
   }
 }
 
 export default async function ConsultationsPage() {
-  const { upcoming, past, leads, attorneys, canManage } = await load()
+  const { upcoming, past, leads, attorneys, canManage, defaultTimeZone } = await load()
   return (
     <>
       <PageHeader title="Consultations" description="Book and manage consultations across attorney calendars.">
-        {canManage ? <BookConsultationDialog leads={leads} attorneys={attorneys} /> : null}
+        {canManage ? <BookConsultationDialog leads={leads} attorneys={attorneys} defaultTimeZone={defaultTimeZone} /> : null}
       </PageHeader>
       <ConsultationsBoard upcoming={upcoming} past={past} canManage={canManage} />
     </>

@@ -69,7 +69,8 @@ export async function createConsultation(formData: FormData): Promise<ActionResu
 
   const supabase = await createClient()
   // firm_id defaults to current_firm_id(); the composite FKs reject a lead/attorney from another firm.
-  // A paid booking starts in the combined "scheduled & paid" state; otherwise plain "scheduled".
+  // `paid` + `amount` track payment INDEPENDENTLY of the lifecycle `status`, so a booking always starts
+  // "scheduled" (the card shows payment separately) — nothing to keep in sync on later edits.
   const { data: inserted, error } = await supabase
     .from("consultations")
     .insert({
@@ -81,7 +82,7 @@ export async function createConsultation(formData: FormData): Promise<ActionResu
       time_zone: core.value.timeZone,
       paid: core.value.paid,
       amount: core.value.amount,
-      status: core.value.paid ? "paid" : "scheduled",
+      status: "scheduled",
       booked_by_id: gate.user.id,
     })
     .select("id")
@@ -105,8 +106,9 @@ export async function updateConsultation(id: string, formData: FormData): Promis
   if (!startAt) return { error: "Couldn't read the date/time for that time zone." }
 
   const supabase = await createClient()
-  // Edit the fields — only for a NON-terminal consult (a finalized one can't be edited, consistent
-  // with reschedule / setStatus). The `.in()` is the atomic guard; status is owned by those actions.
+  // A single atomic write — only for a NON-terminal consult (a finalized one can't be edited, consistent
+  // with reschedule / setStatus). The `.in()` is the atomic guard. `status` is NOT touched here (it's
+  // owned by reschedule / setStatus and is independent of `paid`), so there's no second write to diverge.
   const { data: updated, error } = await supabase
     .from("consultations")
     .update({
@@ -126,15 +128,6 @@ export async function updateConsultation(id: string, formData: FormData): Promis
   if (error?.code === "23503") return { error: "That attorney isn't in your firm." }
   if (error) return { error: "Couldn't update the consultation." }
   if (!updated) return { error: "This consultation is finalized and can't be edited." }
-
-  // Keep status in sync with `paid` for a scheduled/paid consult (leaves a rescheduled one alone). The
-  // `.in()` filter is atomic; a sync failure is SURFACED — never report success with paid/status diverged.
-  const { error: syncErr } = await supabase
-    .from("consultations")
-    .update({ status: core.value.paid ? "paid" : "scheduled" })
-    .eq("id", id)
-    .in("status", ["scheduled", "paid"])
-  if (syncErr) return { error: "Couldn't fully update the consultation. Please try again." }
 
   await audit(supabase, gate.user.id, id, core.value.type, "updated")
   revalidate()

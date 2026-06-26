@@ -41,23 +41,30 @@ export function BookConsultationDialog({
   attorneys,
   triggerLeadId,
   label = "Book consultation",
+  defaultTimeZone,
 }: {
   leads: Option[]
   attorneys: Option[]
   // When booking from a specific lead, pre-select it + hide the picker.
   triggerLeadId?: string
   label?: string
+  // The firm's configured zone, used as the picker's default.
+  defaultTimeZone?: string | null
 }) {
   const startAtId = React.useId()
   const durationId = React.useId()
   const amountId = React.useId()
+  // Seed the picker with the firm's configured zone so a non-Eastern firm doesn't silently book in
+  // Eastern; fall back to DEFAULT_TZ when it's unset or not one of the offered zones.
+  const initialZone =
+    defaultTimeZone && FIRM_TIMEZONES.some((z) => z.value === defaultTimeZone) ? defaultTimeZone : DEFAULT_TZ
   const [open, setOpen] = React.useState(false)
   // No global preselect: an unset lead forces an explicit choice so a missed selection can't silently
   // book onto whichever lead loaded first.
   const [leadId, setLeadId] = React.useState(triggerLeadId ?? "")
   const [attorney, setAttorney] = React.useState(UNASSIGNED)
   const [type, setType] = React.useState(DEFAULT_CONSULTATION_TYPES[0]!)
-  const [zone, setZone] = React.useState(DEFAULT_TZ)
+  const [zone, setZone] = React.useState(initialZone)
   const [paid, setPaid] = React.useState(false)
   const [pending, startTransition] = React.useTransition()
 
@@ -65,7 +72,7 @@ export function BookConsultationDialog({
     setLeadId(triggerLeadId ?? "")
     setAttorney(UNASSIGNED)
     setType(DEFAULT_CONSULTATION_TYPES[0]!)
-    setZone(DEFAULT_TZ)
+    setZone(initialZone)
     setPaid(false)
   }
 
