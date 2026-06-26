@@ -293,12 +293,7 @@ export async function setLeadStatus(
     .select("name")
     .eq("id", statusId)
     .maybeSingle()
-  await recordLeadEvent(
-    gate.user.firmId,
-    id,
-    `Moved to ${status?.name ?? "a new status"}`,
-    gate.user.id
-  )
+  await recordLeadEvent(id, `Moved to ${status?.name ?? "a new status"}`)
   emitLeadEvent(gate.user.firmId, id, "lead.status_changed")
   revalidateLeads(id)
   return { ok: true }
@@ -342,7 +337,7 @@ export async function assignLead(
       .maybeSingle()
     body = `Assigned to ${assignee?.name ?? "a teammate"}`
   }
-  await recordLeadEvent(gate.user.firmId, id, body, gate.user.id)
+  await recordLeadEvent(id, body)
   emitLeadEvent(gate.user.firmId, id, "lead.assigned")
   revalidateLeads(id)
   return { ok: true }
@@ -391,12 +386,7 @@ export async function setLeadQualification(
   // null = no row matched (wrong id or RLS) — don't claim success or log a phantom event.
   if (!updatedId) return { error: "Couldn't update the qualification." }
 
-  await recordLeadEvent(
-    gate.user.firmId,
-    id,
-    next ? `Qualification → ${next}` : "Qualification cleared",
-    gate.user.id
-  )
+  await recordLeadEvent(id, next ? `Qualification → ${next}` : "Qualification cleared")
   // Qualification lives in the lead's data; there's no dedicated event, so it's a lead.updated.
   emitLeadEvent(gate.user.firmId, id, "lead.updated")
   revalidateLeads(id)
@@ -436,12 +426,7 @@ export async function setLeadArchived(
     label,
     archived ? "archived" : "unarchived"
   )
-  await recordLeadEvent(
-    gate.user.firmId,
-    id,
-    archived ? "Archived the lead" : "Restored the lead",
-    gate.user.id
-  )
+  await recordLeadEvent(id, archived ? "Archived the lead" : "Restored the lead")
   // lead.archived is the archive lifecycle event; a restore is a generic state change → lead.updated.
   emitLeadEvent(gate.user.firmId, id, archived ? "lead.archived" : "lead.updated")
   revalidateLeads(id)

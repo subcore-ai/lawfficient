@@ -102,10 +102,8 @@ export async function createConsultation(formData: FormData): Promise<ActionResu
 
   await audit(supabase, gate.user.id, inserted.id, core.value.type, "created")
   await recordLeadEvent(
-    gate.user.firmId,
     core.value.leadId,
     `Consultation booked — ${core.value.type}, ${formatConsultationWhen(startAt, core.value.timeZone)}`,
-    gate.user.id,
   )
   revalidate(core.value.leadId)
   return { ok: true }
@@ -146,7 +144,7 @@ export async function updateConsultation(id: string, formData: FormData): Promis
   if (!updated) return { error: "This consultation is finalized and can't be edited." }
 
   await audit(supabase, gate.user.id, id, core.value.type, "updated")
-  await recordLeadEvent(gate.user.firmId, updated.lead_id, `Consultation updated — ${core.value.type}`, gate.user.id)
+  await recordLeadEvent(updated.lead_id, `Consultation updated — ${core.value.type}`)
   revalidate(updated.lead_id)
   return { ok: true }
 }
@@ -185,10 +183,8 @@ export async function rescheduleConsultation(id: string, startAtWall: string): P
 
   await audit(supabase, gate.user.id, id, "", "rescheduled")
   await recordLeadEvent(
-    gate.user.firmId,
     current.lead_id,
     `Consultation rescheduled to ${formatConsultationWhen(startAt, current.time_zone)}`,
-    gate.user.id,
   )
   revalidate(current.lead_id)
   return { ok: true }
@@ -214,7 +210,7 @@ export async function setConsultationStatus(id: string, status: string): Promise
   if (!updated) return { error: "This consultation is already finalized." }
 
   await audit(supabase, gate.user.id, id, status, "status_changed")
-  await recordLeadEvent(gate.user.firmId, updated.lead_id, STATUS_EVENT[status] ?? "Consultation updated", gate.user.id)
+  await recordLeadEvent(updated.lead_id, STATUS_EVENT[status] ?? "Consultation updated")
   revalidate(updated.lead_id)
   return { ok: true }
 }
@@ -236,10 +232,8 @@ export async function setConsultationOutcome(id: string, outcome: string | null)
 
   await audit(supabase, gate.user.id, id, next ?? "", "outcome_set")
   await recordLeadEvent(
-    gate.user.firmId,
     updated.lead_id,
     next ? `Consultation outcome — ${next}` : "Consultation outcome cleared",
-    gate.user.id,
   )
   revalidate(updated.lead_id)
   return { ok: true }

@@ -49,9 +49,9 @@ async function load(id: string): Promise<Loaded | null> {
       .eq("entity_type", "lead")
       .eq("entity_id", id)
       .order("created_at", { ascending: false }),
-    // The lead's own consultations (newest/upcoming first). RLS scopes to consultations.view, so a
-    // user without it just gets an empty list (the card is also hidden via canViewConsultations).
-    supabase.from("consultations").select("*").eq("lead_id", id).order("start_at", { ascending: false }),
+    // The lead's own consultations (partitionConsultations orders them below, so no SQL order needed).
+    // RLS scopes to consultations.view, so a user without it gets an empty list (the card is hidden too).
+    supabase.from("consultations").select("*").eq("lead_id", id),
     supabase.from("firms").select("timezone").maybeSingle(),
     getFirmStatusRows(me.firmId),
     getFirmTaxonomyRows(me.firmId),
