@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { CalendarClock } from "lucide-react"
 
 import { ConsultationActions } from "@/components/consultations/consultation-actions"
@@ -62,7 +63,13 @@ function ConsultationCard({ consultation: c, canManage }: { consultation: Consul
     <div className="flex flex-col gap-2 rounded-lg border p-3">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="truncate text-sm font-medium">{c.leadName}</p>
+          {c.leadId ? (
+            <Link href={`/leads/${c.leadId}`} className="block truncate text-sm font-medium hover:underline">
+              {c.leadName}
+            </Link>
+          ) : (
+            <p className="truncate text-sm font-medium">{c.leadName}</p>
+          )}
           <p className="text-muted-foreground text-xs">{c.type}</p>
         </div>
         <StatusPill label={meta.label} tone={meta.tone} dot />
