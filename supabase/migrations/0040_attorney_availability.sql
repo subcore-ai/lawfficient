@@ -71,6 +71,10 @@ security invoker
 set search_path = ''
 as $$
 begin
+  -- Serialize concurrent replaces for the same attorney: without this, two callers can each delete only
+  -- the rows they can see and keep both inserts, merging schedules instead of replacing. Transaction-
+  -- scoped (releases on commit/rollback); pg_catalog-qualified because search_path is locked to ''.
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(p_attorney_id::text, 0));
   delete from public.attorney_availability where attorney_id = p_attorney_id;
   insert into public.attorney_availability (attorney_id, weekday, start_time, end_time)
   select p_attorney_id, (w->>'weekday')::smallint, (w->>'startTime')::time, (w->>'endTime')::time

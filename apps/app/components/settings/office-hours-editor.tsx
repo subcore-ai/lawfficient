@@ -111,6 +111,17 @@ function AttorneyCard({ attorney, canManage }: { attorney: Attorney; canManage: 
   const [dirty, setDirty] = React.useState(false)
   const [pending, startTransition] = React.useTransition()
 
+  // Re-sync the draft when the server props change (a teammate's edit, another tab, or our own post-save
+  // revalidation) — but only when there are no unsaved edits, so in-progress changes are never clobbered.
+  // Adjusting state during render is React's documented pattern for "reset state on prop change" and
+  // avoids the extra render pass an effect would cost.
+  const serverKey = JSON.stringify(attorney.windows)
+  const [syncedKey, setSyncedKey] = React.useState(serverKey)
+  if (serverKey !== syncedKey && !dirty) {
+    setSyncedKey(serverKey)
+    setDraft(attorney.windows.map((w) => ({ weekday: w.weekday, startTime: w.startTime, endTime: w.endTime })))
+  }
+
   function addWindow(weekday: number) {
     setDraft((d) => [...d, { weekday, startTime: "09:00", endTime: "17:00" }])
     setDirty(true)
