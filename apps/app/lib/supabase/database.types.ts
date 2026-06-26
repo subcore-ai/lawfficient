@@ -107,6 +107,54 @@ export type Database = {
           },
         ]
       }
+      attorney_availability: {
+        Row: {
+          attorney_id: string
+          created_at: string
+          data: Json
+          end_time: string
+          firm_id: string
+          id: string
+          start_time: string
+          weekday: number
+        }
+        Insert: {
+          attorney_id: string
+          created_at?: string
+          data?: Json
+          end_time: string
+          firm_id?: string
+          id?: string
+          start_time: string
+          weekday: number
+        }
+        Update: {
+          attorney_id?: string
+          created_at?: string
+          data?: Json
+          end_time?: string
+          firm_id?: string
+          id?: string
+          start_time?: string
+          weekday?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attorney_availability_attorney_fkey"
+            columns: ["attorney_id", "firm_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id", "firm_id"]
+          },
+          {
+            foreignKeyName: "attorney_availability_firm_id_fkey"
+            columns: ["firm_id"]
+            isOneToOne: false
+            referencedRelation: "firms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_log: {
         Row: {
           action: string
@@ -1131,6 +1179,7 @@ export type Database = {
           name: string
           pod_id: string | null
           role: Database["public"]["Enums"]["staff_role"]
+          schedulable: boolean
           status: Database["public"]["Enums"]["staff_status"]
         }
         Insert: {
@@ -1143,6 +1192,7 @@ export type Database = {
           name: string
           pod_id?: string | null
           role?: Database["public"]["Enums"]["staff_role"]
+          schedulable?: boolean
           status?: Database["public"]["Enums"]["staff_status"]
         }
         Update: {
@@ -1155,6 +1205,7 @@ export type Database = {
           name?: string
           pod_id?: string | null
           role?: Database["public"]["Enums"]["staff_role"]
+          schedulable?: boolean
           status?: Database["public"]["Enums"]["staff_status"]
         }
         Relationships: [
@@ -1526,6 +1577,10 @@ export type Database = {
       seed_firm_taxonomies: { Args: { p_firm_id: string }; Returns: undefined }
       seed_lead_statuses: { Args: { p_firm_id: string }; Returns: undefined }
       seed_system_roles: { Args: { p_firm_id: string }; Returns: undefined }
+      set_attorney_availability: {
+        Args: { p_attorney_id: string; p_windows: Json }
+        Returns: undefined
+      }
       set_lead_qualification: {
         Args: { p_id: string; p_value: string }
         Returns: string
