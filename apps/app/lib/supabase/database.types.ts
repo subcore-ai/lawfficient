@@ -286,12 +286,14 @@ export type Database = {
           archived: boolean
           attorney_id: string | null
           booked_by_id: string | null
-          case_type: string | null
+          created_at: string
+          data: Json
           duration_min: number
           firm_id: string
           id: string
+          last_activity: string
           lead_id: string | null
-          lead_name: string
+          outcome: string | null
           paid: boolean
           start_at: string
           status: Database["public"]["Enums"]["consultation_status"]
@@ -303,12 +305,14 @@ export type Database = {
           archived?: boolean
           attorney_id?: string | null
           booked_by_id?: string | null
-          case_type?: string | null
+          created_at?: string
+          data?: Json
           duration_min?: number
           firm_id?: string
           id?: string
+          last_activity?: string
           lead_id?: string | null
-          lead_name: string
+          outcome?: string | null
           paid?: boolean
           start_at: string
           status?: Database["public"]["Enums"]["consultation_status"]
@@ -320,12 +324,14 @@ export type Database = {
           archived?: boolean
           attorney_id?: string | null
           booked_by_id?: string | null
-          case_type?: string | null
+          created_at?: string
+          data?: Json
           duration_min?: number
           firm_id?: string
           id?: string
+          last_activity?: string
           lead_id?: string | null
-          lead_name?: string
+          outcome?: string | null
           paid?: boolean
           start_at?: string
           status?: Database["public"]["Enums"]["consultation_status"]
