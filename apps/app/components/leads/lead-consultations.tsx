@@ -54,14 +54,15 @@ export function LeadConsultations({
 }) {
   const [filter, setFilter] = React.useState("upcoming")
   const all = React.useMemo(() => [...upcoming, ...past], [upcoming, past])
-  const shown =
-    filter === "upcoming"
-      ? upcoming
-      : filter === "past"
-        ? past
-        : filter === "all"
-          ? all
-          : all.filter((c) => c.status === filter)
+  const shown = React.useMemo(() => {
+    if (filter === "upcoming") return upcoming
+    if (filter === "past") return past
+    if (filter === "all") return all
+    // "Scheduled" includes the combined "scheduled & paid" lifecycle state, so a paid consult (rendered
+    // "Scheduled · paid") isn't hidden under the status filter.
+    if (filter === "scheduled") return all.filter((c) => c.status === "scheduled" || c.status === "paid")
+    return all.filter((c) => c.status === filter)
+  }, [filter, upcoming, past, all])
 
   return (
     <Card>
