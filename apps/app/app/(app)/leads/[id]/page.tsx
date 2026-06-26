@@ -29,7 +29,8 @@ type Loaded = {
   currentUserName: string | null
   canEdit: boolean
   canManage: boolean
-  consultations: ConsultationView[]
+  upcomingConsultations: ConsultationView[]
+  pastConsultations: ConsultationView[]
   canViewConsultations: boolean
   canManageConsultations: boolean
   consultDefaultTimeZone: string | null
@@ -74,7 +75,6 @@ async function load(id: string): Promise<Loaded | null> {
   const leadNames = new Map([[lead.id, `${lead.firstName} ${lead.lastName}`.trim()]])
   const consultViews = (consultRes.data ?? []).map((r) => mapConsultationRow(r, leadNames, namesById))
   const { upcoming, past } = partitionConsultations(consultViews, new Date().toISOString())
-  const consultations = [...upcoming, ...past]
 
   return {
     lead,
@@ -88,7 +88,8 @@ async function load(id: string): Promise<Loaded | null> {
     currentUserName: me.name,
     canEdit: me.permissions?.includes("leads.edit") ?? false,
     canManage: me.permissions?.includes("settings.manage") ?? false,
-    consultations,
+    upcomingConsultations: upcoming,
+    pastConsultations: past,
     canViewConsultations: me.permissions?.includes("consultations.view") ?? false,
     canManageConsultations: me.permissions?.includes("consultations.edit") ?? false,
     // Best-effort: a firm-read failure just falls back to the dialog's own default zone.
@@ -111,7 +112,8 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       currentUserName={data.currentUserName}
       canEdit={data.canEdit}
       canManage={data.canManage}
-      consultations={data.consultations}
+      upcomingConsultations={data.upcomingConsultations}
+      pastConsultations={data.pastConsultations}
       canViewConsultations={data.canViewConsultations}
       canManageConsultations={data.canManageConsultations}
       consultDefaultTimeZone={data.consultDefaultTimeZone}

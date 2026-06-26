@@ -238,3 +238,27 @@ export async function setConsultationOutcome(id: string, outcome: string | null)
   revalidate(updated.lead_id)
   return { ok: true }
 }
+
+// Permanently delete a consultation — a HARD delete (gated by the consultations_delete RLS policy,
+// migration 0039), distinct from the soft cancel (status) or `archived`. Records a "deleted" event on
+// the lead's timeline so its history keeps a trace.
+export async function deleteConsultation(id: string): Promise<ActionResult> {
+  const gate = await requireConsultEdit()
+  if (!gate.ok) return { error: gate.error }
+
+  const supabase = await createClient()
+  // .select().single() turns a 0-row delete (RLS / wrong id) into a real error, and returns the row so
+  // we can audit + record the event after it's gone.
+  const { data: deleted, error } = await supabase
+    .from("consultations")
+    .delete()
+    .eq("id", id)
+    .select("id, lead_id, type")
+    .single()
+  if (error || !deleted) return { error: "Couldn't delete the consultation." }
+
+  await audit(supabase, gate.user.id, id, deleted.type, "deleted")
+  await recordLeadEvent(deleted.lead_id, `Consultation deleted — ${deleted.type}`)
+  revalidate(deleted.lead_id)
+  return { ok: true }
+}

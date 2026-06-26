@@ -24,6 +24,7 @@ import { Input } from "@workspace/ui/components/input"
 import { toast } from "@workspace/ui/components/sonner"
 
 import {
+  deleteConsultation,
   rescheduleConsultation,
   setConsultationOutcome,
   setConsultationStatus,
@@ -73,6 +74,7 @@ export function ConsultationActions({
   const { pending, run } = useRun()
   const [rescheduleOpen, setRescheduleOpen] = React.useState(false)
   const [outcomeOpen, setOutcomeOpen] = React.useState(false)
+  const [deleteOpen, setDeleteOpen] = React.useState(false)
   const isActive = status === "scheduled" || status === "paid" || status === "rescheduled"
 
   return (
@@ -108,17 +110,18 @@ export function ConsultationActions({
             </>
           ) : null}
           <DropdownMenuItem onClick={() => setOutcomeOpen(true)}>Set outcome…</DropdownMenuItem>
+          <DropdownMenuSeparator />
           {isActive ? (
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                variant="destructive"
-                onClick={() => run(() => setConsultationStatus(consultationId, "canceled"), "Consultation canceled")}
-              >
-                Cancel consultation
-              </DropdownMenuItem>
-            </>
+            <DropdownMenuItem
+              variant="destructive"
+              onClick={() => run(() => setConsultationStatus(consultationId, "canceled"), "Consultation canceled")}
+            >
+              Cancel consultation
+            </DropdownMenuItem>
           ) : null}
+          <DropdownMenuItem variant="destructive" onClick={() => setDeleteOpen(true)}>
+            Delete consultation
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -130,6 +133,7 @@ export function ConsultationActions({
         timeZone={timeZone}
       />
       <OutcomeDialog open={outcomeOpen} onOpenChange={setOutcomeOpen} consultationId={consultationId} current={outcome} />
+      <DeleteConfirmDialog open={deleteOpen} onOpenChange={setDeleteOpen} consultationId={consultationId} />
     </>
   )
 }
@@ -246,6 +250,39 @@ function OutcomeDialog({
             </Button>
           </DialogFooter>
         </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function DeleteConfirmDialog({
+  open,
+  onOpenChange,
+  consultationId,
+}: {
+  open: boolean
+  onOpenChange: (o: boolean) => void
+  consultationId: string
+}) {
+  const { pending, run } = useRun()
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Delete consultation?</DialogTitle>
+          <DialogDescription>This permanently deletes the consultation. This can&apos;t be undone.</DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={pending}
+            onClick={() => run(() => deleteConsultation(consultationId), "Consultation deleted", () => onOpenChange(false))}
+          >
+            {pending ? "Deleting…" : "Delete"}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )
