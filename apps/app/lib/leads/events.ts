@@ -13,9 +13,11 @@ import { createAdminClient } from "@/lib/supabase/admin"
 // no-op.
 export async function recordLeadEvent(leadId: string | null, body: string): Promise<void> {
   if (!leadId) return
-  const user = await getCurrentUser()
-  if (!user) return
   try {
+    // Inside the try: getCurrentUser() can throw, and this helper is best-effort — a failed event log
+    // must never bubble up and fail the caller's action.
+    const user = await getCurrentUser()
+    if (!user) return
     const admin = createAdminClient()
     const { error } = await admin.from("notes").insert({
       firm_id: user.firmId,
