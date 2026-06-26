@@ -7,6 +7,29 @@
 alter table public.profiles add column if not exists schedulable boolean not null default false;
 update public.profiles set schedulable = true where role = 'attorney';
 
+-- schedulable is admin-managed (settings.manage, via the service-role action). Extend the self-edit
+-- privilege guard (0001) so a user can't flip it on their OWN row through profiles_update_self in the
+-- browser client — that would self-add them as a bookable attorney, bypassing the admin gate. The admin
+-- action runs as the service role (auth.uid() is null), so this only blocks genuine self-edits.
+create or replace function public.guard_profile_privileges()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if (select auth.uid()) = new.id then
+    if new.role is distinct from old.role
+       or new.status is distinct from old.status
+       or new.firm_id is distinct from old.firm_id
+       or new.schedulable is distinct from old.schedulable then
+      raise exception 'cannot change role, status, firm, or schedulable on your own profile';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
 -- Recurring weekly office hours. weekday 0=Sunday .. 6=Saturday (JS getDay / Postgres DOW). start/end are
 -- naive wall times in the firm's timezone (firms.timezone). Multiple rows per (attorney, weekday) allow
 -- split shifts, e.g. 09:00-12:00 + 13:00-17:00.
