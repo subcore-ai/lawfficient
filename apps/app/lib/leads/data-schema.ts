@@ -18,6 +18,8 @@ export type LeadData = {
   gender?: string
   dob?: string
   referralSource?: string
+  // The sender's free-text intake message (their own words — what they wrote on the source form).
+  message?: string
 }
 
 // The firm's allowed values per constrained field (active taxonomy labels). buildLeadData
@@ -34,6 +36,7 @@ export const LEAD_DATA_TEXT_KEYS = [
   "gender",
   "dob",
   "referralSource",
+  "message",
 ] as const
 
 function cleanString(value: unknown): string | undefined {

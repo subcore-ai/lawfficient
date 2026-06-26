@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@workspace/ui/components/select"
+import { Textarea } from "@workspace/ui/components/textarea"
 
 import { Field } from "@/components/form-field"
 import { TaxonomySelect } from "@/components/taxonomy-select"
@@ -176,6 +177,9 @@ export function LeadFormFields({
 
       <Field label="Referral source" className="sm:col-span-2">
         <Input name="referralSource" defaultValue={lead?.data.referralSource} placeholder="Who referred them?" />
+      </Field>
+      <Field label="Message" className="sm:col-span-2">
+        <Textarea name="message" defaultValue={lead?.data.message} rows={4} placeholder="The sender's message / intake notes" />
       </Field>
     </div>
   )

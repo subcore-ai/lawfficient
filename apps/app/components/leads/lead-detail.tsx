@@ -333,6 +333,17 @@ export function LeadDetail({
         </div>
       </div>
 
+      {data.message ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Message</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="whitespace-pre-wrap text-sm">{data.message}</p>
+          </CardContent>
+        </Card>
+      ) : null}
+
       {canViewConsultations ? (
         <LeadConsultations
           leadId={lead.id}

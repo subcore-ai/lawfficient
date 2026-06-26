@@ -53,6 +53,10 @@ describe("parseLeadData", () => {
       preferredLanguage: "Spanish",
     })
   })
+
+  test("surfaces the sender's message (free-text), trimmed", () => {
+    expect(parseLeadData({ message: "  my case was denied  " })).toEqual({ message: "my case was denied" })
+  })
 })
 
 describe("buildLeadData", () => {
@@ -65,6 +69,10 @@ describe("buildLeadData", () => {
 
   test("empty input is valid (an empty payload)", () => {
     expect(buildLeadData({}, VOCAB)).toEqual({ ok: true, value: {} })
+  })
+
+  test("keeps the message (free-text), trimmed", () => {
+    expect(buildLeadData({ message: " their words " }, VOCAB)).toEqual({ ok: true, value: { message: "their words" } })
   })
 
   test("rejects values outside the firm's vocabulary", () => {

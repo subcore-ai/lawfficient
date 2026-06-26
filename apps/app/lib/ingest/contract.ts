@@ -27,6 +27,7 @@ const KNOWN_KEYS = new Set<string>([
   "gender",
   "dob",
   "referralSource",
+  "message",
 ])
 
 export type ParsedPayload = {
@@ -90,6 +91,7 @@ export function parseCanonicalPayload(
       gender: str(payload.gender) || undefined,
       dob: str(payload.dob) || undefined,
       referralSource: str(payload.referralSource) || undefined,
+      message: str(payload.message) || undefined,
     },
     extra,
     externalId: str(payload.externalId) || null,
