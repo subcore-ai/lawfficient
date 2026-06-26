@@ -1577,6 +1577,10 @@ export type Database = {
       seed_firm_taxonomies: { Args: { p_firm_id: string }; Returns: undefined }
       seed_lead_statuses: { Args: { p_firm_id: string }; Returns: undefined }
       seed_system_roles: { Args: { p_firm_id: string }; Returns: undefined }
+      set_attorney_availability: {
+        Args: { p_attorney_id: string; p_windows: Json }
+        Returns: undefined
+      }
       set_lead_qualification: {
         Args: { p_id: string; p_value: string }
         Returns: string

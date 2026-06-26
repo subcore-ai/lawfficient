@@ -12,10 +12,15 @@ export default async function SettingsSchedulingPage() {
 
   // RLS scopes both to the firm. Pull all staff (to list schedulable ones + offer the rest) and every
   // availability row, then fan the windows out per attorney.
-  const [{ data: staff }, { data: avail }] = await Promise.all([
+  const [staffRes, availRes] = await Promise.all([
     supabase.from("profiles").select("id, name, email, schedulable, status").order("name"),
     supabase.from("attorney_availability").select("*"),
   ])
+  // Surface a load failure instead of silently rendering an empty editor (which a save could persist).
+  if (staffRes.error) throw staffRes.error
+  if (availRes.error) throw availRes.error
+  const staff = staffRes.data
+  const avail = availRes.data
 
   const windows = (avail ?? []).map(mapAvailabilityRow)
   const attorneys = (staff ?? [])

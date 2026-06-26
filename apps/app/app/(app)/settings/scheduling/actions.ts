@@ -17,6 +17,9 @@ type Gate = { ok: true; user: CurrentUser } | { ok: false; error: string }
 async function requireAdmin(): Promise<Gate> {
   const user = await getCurrentUser()
   if (!user) return { ok: false, error: "You're not signed in." }
+  // Never run a firm-scoped query with an empty firm id: PostgREST drops an `.eq(col, undefined)`
+  // predicate, which on the service-role client (no RLS) would be cross-tenant. Fail closed.
+  if (!user.firmId) return { ok: false, error: "Your session is missing firm context." }
   if (!(user.permissions?.includes("settings.manage") ?? false))
     return { ok: false, error: "You don't have permission to manage scheduling." }
   return { ok: true, user }
@@ -50,21 +53,14 @@ export async function setAttorneyAvailability(
   if (!prof) return { error: "That team member isn't in your firm." }
   if (!prof.schedulable) return { error: "Mark this person schedulable before setting office hours." }
 
-  // attorney_availability writes go through RLS (settings.manage); firm_id defaults to current_firm_id().
+  // Replace the whole week atomically: the RPC does delete-all + insert in ONE transaction (under the
+  // caller's RLS — settings.manage), so a mid-save failure can't leave the attorney with no hours.
   const supabase = await createClient()
-  const del = await supabase.from("attorney_availability").delete().eq("attorney_id", attorneyId)
-  if (del.error) return { error: "Couldn't save office hours." }
-
-  if (valid.value.length > 0) {
-    const rows = valid.value.map((w) => ({
-      attorney_id: attorneyId,
-      weekday: w.weekday,
-      start_time: w.startTime,
-      end_time: w.endTime,
-    }))
-    const ins = await supabase.from("attorney_availability").insert(rows)
-    if (ins.error) return { error: "Couldn't save office hours." }
-  }
+  const { error: rpcErr } = await supabase.rpc("set_attorney_availability", {
+    p_attorney_id: attorneyId,
+    p_windows: valid.value,
+  })
+  if (rpcErr) return { error: "Couldn't save office hours." }
 
   revalidatePath(PATH)
   return { ok: true }
@@ -79,6 +75,9 @@ export async function setSchedulable(attorneyId: string, schedulable: boolean): 
   // Toggling 'schedulable' is a profiles write (users.manage-gated under RLS), but this feature is
   // settings.manage — so update via the service-role client, firm-scoped, touching only schedulable.
   // The last-admin guard (0006) still fires; schedulable isn't a privileged field, so it won't block.
+  // We deliberately KEEP any existing office hours when turning this off: the rows are inert while a
+  // person isn't schedulable (the editor + booking only consider schedulable staff), and re-enabling
+  // restores their schedule instead of silently dropping it.
   const admin = createAdminClient()
   const { data, error } = await admin
     .from("profiles")
@@ -88,11 +87,6 @@ export async function setSchedulable(attorneyId: string, schedulable: boolean): 
     .select("id")
   if (error || !data || data.length === 0) return { error: "Couldn't update." }
 
-  if (!schedulable) {
-    // Office hours are meaningless once someone isn't bookable — clear them (RLS, settings.manage).
-    const supabase = await createClient()
-    await supabase.from("attorney_availability").delete().eq("attorney_id", attorneyId)
-  }
   revalidatePath(PATH)
   return { ok: true }
 }

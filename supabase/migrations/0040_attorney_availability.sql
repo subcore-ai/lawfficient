@@ -36,7 +36,12 @@ alter table public.attorney_availability enable row level security;
 drop policy if exists "attorney_availability_select" on public.attorney_availability;
 create policy "attorney_availability_select" on public.attorney_availability
   for select to authenticated
-  using (firm_id = public.current_firm_id() and public.authorize('consultations.view'));
+  using (
+    firm_id = public.current_firm_id()
+    -- Anyone who can WRITE office hours (settings.manage) must also READ them — otherwise the editor
+    -- loads an empty schedule and a save wipes the real one. Booking reads via consultations.view.
+    and (public.authorize('consultations.view') or public.authorize('settings.manage'))
+  );
 
 drop policy if exists "attorney_availability_insert" on public.attorney_availability;
 create policy "attorney_availability_insert" on public.attorney_availability
@@ -53,3 +58,22 @@ drop policy if exists "attorney_availability_delete" on public.attorney_availabi
 create policy "attorney_availability_delete" on public.attorney_availability
   for delete to authenticated
   using (firm_id = public.current_firm_id() and public.authorize('settings.manage'));
+
+-- Atomic replace of an attorney's weekly office hours (delete-all + insert in ONE transaction), so a
+-- mid-save failure can't leave them with no hours. SECURITY INVOKER: the delete + insert run under the
+-- caller's RLS (settings.manage write + firm scope), firm_id defaults to current_firm_id() on insert,
+-- and the composite FK then guarantees the attorney belongs to the caller's firm. Empty p_windows just
+-- clears the schedule.
+create or replace function public.set_attorney_availability(p_attorney_id uuid, p_windows jsonb)
+returns void
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+begin
+  delete from public.attorney_availability where attorney_id = p_attorney_id;
+  insert into public.attorney_availability (attorney_id, weekday, start_time, end_time)
+  select p_attorney_id, (w->>'weekday')::smallint, (w->>'startTime')::time, (w->>'endTime')::time
+  from jsonb_array_elements(p_windows) as w;
+end;
+$$;
