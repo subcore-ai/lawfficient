@@ -4,13 +4,16 @@
 
 export type WindowInput = { weekday: number; startTime: string; endTime: string }
 
-// "HH:MM" or "HH:MM:SS" -> minutes since midnight; null if malformed or out of range.
+// "HH:MM" or "HH:MM:SS" -> minutes since midnight; null if malformed or out of range. This model is
+// minute-precision, so a non-zero seconds component (e.g. "09:00:30", "09:00:99") is rejected rather
+// than silently coerced to "09:00" — pg `time` round-trips as ":00".
 export function timeToMinutes(time: string): number | null {
   const m = /^(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(time)
   if (!m) return null
   const h = Number(m[1])
   const min = Number(m[2])
   if (h > 23 || min > 59) return null
+  if (m[3] !== undefined && m[3] !== "00") return null
   return h * 60 + min
 }
 

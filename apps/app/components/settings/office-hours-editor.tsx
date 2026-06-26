@@ -174,7 +174,7 @@ function AttorneyCard({ attorney, canManage }: { attorney: Attorney; canManage: 
                         type="time"
                         value={w.startTime}
                         onChange={(e) => updateWindow(i, { startTime: e.target.value })}
-                        disabled={!canManage}
+                        disabled={!canManage || pending}
                         className="w-32"
                         aria-label={`${day.label} start time`}
                       />
@@ -183,7 +183,7 @@ function AttorneyCard({ attorney, canManage }: { attorney: Attorney; canManage: 
                         type="time"
                         value={w.endTime}
                         onChange={(e) => updateWindow(i, { endTime: e.target.value })}
-                        disabled={!canManage}
+                        disabled={!canManage || pending}
                         className="w-32"
                         aria-label={`${day.label} end time`}
                       />
@@ -192,6 +192,7 @@ function AttorneyCard({ attorney, canManage }: { attorney: Attorney; canManage: 
                           variant="ghost"
                           size="sm"
                           onClick={() => removeWindow(i)}
+                          disabled={pending}
                           aria-label={`Remove ${day.label} hours`}
                         >
                           <Trash2 className="size-4" />
@@ -206,6 +207,7 @@ function AttorneyCard({ attorney, canManage }: { attorney: Attorney; canManage: 
                     size="sm"
                     className="self-start"
                     onClick={() => addWindow(day.value)}
+                    disabled={pending}
                   >
                     <Plus className="size-4" /> Add hours
                   </Button>

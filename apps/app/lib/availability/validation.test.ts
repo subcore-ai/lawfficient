@@ -15,6 +15,12 @@ describe("timeToMinutes", () => {
     expect(timeToMinutes("10:60")).toBeNull()
     expect(timeToMinutes("noon")).toBeNull()
   })
+
+  test("accepts :00 seconds but rejects non-zero seconds (minute precision)", () => {
+    expect(timeToMinutes("09:00:00")).toBe(540)
+    expect(timeToMinutes("09:00:30")).toBeNull()
+    expect(timeToMinutes("09:00:99")).toBeNull()
+  })
 })
 
 describe("validateWindows", () => {
