@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { formatConsultationWhen, isValidTimeZone, zonedWallTimeToUtcISO } from "./time"
+import { formatConsultationWhen, isValidTimeZone, utcToZonedInput, zonedWallTimeToUtcISO } from "./time"
 
 describe("zonedWallTimeToUtcISO", () => {
   test("interprets the wall time in the given zone → correct UTC instant (DST)", () => {
@@ -38,6 +38,24 @@ describe("zonedWallTimeToUtcISO", () => {
   test("converts a valid time on a DST-change day", () => {
     // 10:00 on the same spring-forward day is valid (EDT, UTC-4) -> 14:00Z.
     expect(zonedWallTimeToUtcISO("2026-03-08T10:00", "America/New_York")).toBe("2026-03-08T14:00:00.000Z")
+  })
+})
+
+describe("utcToZonedInput", () => {
+  test("renders a UTC instant as the zone's wall time for datetime-local", () => {
+    expect(utcToZonedInput("2026-07-01T19:00:00.000Z", "America/New_York")).toBe("2026-07-01T15:00") // 3pm EDT
+    expect(utcToZonedInput("2026-01-01T20:00:00.000Z", "America/New_York")).toBe("2026-01-01T15:00") // 3pm EST
+  })
+
+  test("round-trips with zonedWallTimeToUtcISO", () => {
+    const iso = "2026-07-01T19:00:00.000Z"
+    expect(zonedWallTimeToUtcISO(utcToZonedInput(iso, "America/New_York"), "America/New_York")).toBe(iso)
+  })
+
+  test("returns empty string on a bad zone or instant", () => {
+    expect(utcToZonedInput("2026-07-01T19:00:00.000Z", "Mars/Phobos")).toBe("")
+    expect(utcToZonedInput("not-a-date", "America/New_York")).toBe("")
+    expect(utcToZonedInput("", "America/New_York")).toBe("")
   })
 })
 

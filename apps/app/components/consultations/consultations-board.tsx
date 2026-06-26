@@ -84,7 +84,13 @@ function ConsultationCard({ consultation: c, canManage }: { consultation: Consul
 
       {canManage ? (
         <div className="mt-1">
-          <ConsultationActions consultationId={c.id} status={c.status} outcome={c.outcome} />
+          <ConsultationActions
+            consultationId={c.id}
+            status={c.status}
+            outcome={c.outcome}
+            startAt={c.startAt}
+            timeZone={c.timeZone}
+          />
         </div>
       ) : null}
     </div>

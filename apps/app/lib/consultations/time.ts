@@ -70,6 +70,30 @@ export function zonedWallTimeToUtcISO(wall: string, timeZone: string): string | 
   return new Date(result).toISOString()
 }
 
+// A stored UTC instant → the "YYYY-MM-DDTHH:mm" wall-clock string in `timeZone` — the inverse of
+// zonedWallTimeToUtcISO, for seeding a <input type="datetime-local"> (which wants a naive local time).
+// Returns "" on a bad instant/zone, so the input just renders empty.
+export function utcToZonedInput(iso: string, timeZone: string): string {
+  if (!iso) return "" // new Date(null | "") is the Unix epoch, not invalid — guard so it doesn't format 1970
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      hourCycle: "h23",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).formatToParts(new Date(iso))
+    const get = (t: string) => parts.find((p) => p.type === t)?.value ?? ""
+    const value = `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}`
+    // A well-formed datetime-local value is exactly this shape; "" otherwise.
+    return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value) ? value : ""
+  } catch {
+    return ""
+  }
+}
+
 // Render a stored UTC instant in the consultation's own zone (so a New-York consult shows the New-York
 // wall time + abbreviation, not the server/UTC clock). Falls back to the raw ISO on a bad zone.
 export function formatConsultationWhen(iso: string, timeZone: string): string {

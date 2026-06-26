@@ -30,6 +30,7 @@ import {
   type ActionResult,
 } from "@/app/(app)/consultations/actions"
 import { Field } from "@/components/form-field"
+import { utcToZonedInput } from "@/lib/consultations/time"
 import type { ConsultationStatus } from "@/lib/consultations/validation"
 
 function useRun() {
@@ -58,11 +59,15 @@ export function ConsultationActions({
   consultationId,
   status,
   outcome,
+  startAt,
+  timeZone,
   compact = false,
 }: {
   consultationId: string
   status: ConsultationStatus
   outcome: string | null
+  startAt: string
+  timeZone: string
   compact?: boolean
 }) {
   const { pending, run } = useRun()
@@ -117,7 +122,13 @@ export function ConsultationActions({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <RescheduleDialog open={rescheduleOpen} onOpenChange={setRescheduleOpen} consultationId={consultationId} />
+      <RescheduleDialog
+        open={rescheduleOpen}
+        onOpenChange={setRescheduleOpen}
+        consultationId={consultationId}
+        startAt={startAt}
+        timeZone={timeZone}
+      />
       <OutcomeDialog open={outcomeOpen} onOpenChange={setOutcomeOpen} consultationId={consultationId} current={outcome} />
     </>
   )
@@ -127,17 +138,29 @@ function RescheduleDialog({
   open,
   onOpenChange,
   consultationId,
+  startAt,
+  timeZone,
 }: {
   open: boolean
   onOpenChange: (o: boolean) => void
   consultationId: string
+  startAt: string
+  timeZone: string
 }) {
   const startId = React.useId()
   const { pending, run } = useRun()
+  // Re-seed the field to the consult's current time each time the dialog opens (it stays mounted, so a
+  // defaultValue would go stale after a cancel or a prior reschedule). React-recommended: adjust state
+  // during render on the open transition rather than in an effect.
+  const [value, setValue] = React.useState("")
+  const [prevOpen, setPrevOpen] = React.useState(false)
+  if (open !== prevOpen) {
+    setPrevOpen(open)
+    if (open) setValue(utcToZonedInput(startAt, timeZone))
+  }
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    const startAt = String(new FormData(e.currentTarget).get("startAt") ?? "")
-    run(() => rescheduleConsultation(consultationId, startAt), "Consultation rescheduled", () => onOpenChange(false))
+    run(() => rescheduleConsultation(consultationId, value), "Consultation rescheduled", () => onOpenChange(false))
   }
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -149,7 +172,14 @@ function RescheduleDialog({
           </DialogHeader>
           <div className="py-4">
             <Field label="New date &amp; time" htmlFor={startId}>
-              <Input id={startId} name="startAt" type="datetime-local" required />
+              <Input
+                id={startId}
+                name="startAt"
+                type="datetime-local"
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                required
+              />
             </Field>
           </div>
           <DialogFooter>
@@ -177,10 +207,17 @@ function OutcomeDialog({
 }) {
   const outcomeId = React.useId()
   const { pending, run } = useRun()
+  // Re-seed each open (the dialog stays mounted) so a cancel or a prior save doesn't leave a stale value
+  // — adjusted during render on the open transition, not in an effect.
+  const [value, setValue] = React.useState("")
+  const [prevOpen, setPrevOpen] = React.useState(false)
+  if (open !== prevOpen) {
+    setPrevOpen(open)
+    if (open) setValue(current ?? "")
+  }
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    const outcome = String(new FormData(e.currentTarget).get("outcome") ?? "")
-    run(() => setConsultationOutcome(consultationId, outcome), "Outcome saved", () => onOpenChange(false))
+    run(() => setConsultationOutcome(consultationId, value), "Outcome saved", () => onOpenChange(false))
   }
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -192,7 +229,14 @@ function OutcomeDialog({
           </DialogHeader>
           <div className="py-4">
             <Field label="Outcome" htmlFor={outcomeId}>
-              <Input id={outcomeId} name="outcome" defaultValue={current ?? ""} placeholder="Qualified to retain" autoComplete="off" />
+              <Input
+                id={outcomeId}
+                name="outcome"
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                placeholder="Qualified to retain"
+                autoComplete="off"
+              />
             </Field>
           </div>
           <DialogFooter>

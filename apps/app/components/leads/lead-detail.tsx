@@ -28,6 +28,7 @@ import { NoteComposer } from "@/components/notes/note-composer"
 import { NotesTimeline } from "@/components/notes/notes-timeline"
 import { StatusPill } from "@/components/status-pill"
 import type { ConsultationView } from "@/lib/consultations/queries"
+import { formatDate } from "@/lib/format"
 import type {
   AssigneeOption,
   LeadStatusView,
@@ -225,7 +226,7 @@ export function LeadDetail({
                 {data.hierarchy ?? "Not set"}
               </DetailRow>
               <DetailRow label="Gender">{data.gender ?? "—"}</DetailRow>
-              <DetailRow label="Date of birth">{data.dob ?? "—"}</DetailRow>
+              <DetailRow label="Date of birth">{data.dob ? formatDate(data.dob) : "—"}</DetailRow>
               <DetailRow label="Referral source">
                 {data.referralSource ?? "—"}
               </DetailRow>
