@@ -90,17 +90,74 @@ consultation notes that drive qualification and retention.
 - [ ] A 3rd cancellation blocks re-booking pending admin approval.
 - [ ] Attorney notes capture qualification, case type, and follow-up assignee; assignee is notified.
 
+## Availability & calendar (scheduling — promoted from fast-follow)
+
+The shipped v1 books a manual date/time. This adds per-attorney **office hours** (Calendly-style) and a
+**calendar**, so a consult is booked into a free slot inside an attorney's availability and never
+double-booked.
+
+### Data model
+
+- **`profiles.schedulable`** (`boolean`) — who takes consultations (seeded `true` for `role='attorney'`;
+  a firm may mark any staff schedulable, keeping it multi-practice).
+- **AttorneyAvailability** — recurring weekly office hours: `firmId`, `attorneyId`, `weekday` (0–6),
+  `startTime`, `endTime`, `data jsonb`. Multiple rows per day (split shifts). Stored in the firm tz.
+- **AvailabilityException** *(Phase 5)* — time-off / holidays / one-off extra hours: `attorneyId`,
+  `startAt`, `endAt`, `kind (block|extra)`, `reason`.
+- **No double-booking** — a Postgres exclusion constraint (`btree_gist`) on `consultations`: no two
+  non-canceled consults for the same attorney whose `[start, start+duration)` ranges overlap. Race-proof
+  at the DB, where an app-level check can't be.
+- Slot config (interval, buffer, min-notice, max-advance) is firm/attorney **config**; the slot duration
+  comes from the consult type.
+
+### Slot engine
+
+Pure, unit-tested `generateSlots({ windows, existingConsults, date, slotMinutes, buffer, now })`: expand
+the weekday's windows → drop slots overlapping a booked consult (+ buffer) → drop past/too-soon → the
+remainder is bookable. Booking goes through `createConsultation`, now validated server-side against
+availability + the overlap constraint.
+
+### Calendar UI
+
+- `/consultations`: a **Calendar / List** toggle (List = the shipped status board).
+- **Day, multi-attorney columns** — pick 1–N schedulable attorneys (default ~3), each a column; office
+  hours shaded, booked consults as blocks, free slots click-to-book (pre-fills attorney + start + duration).
+- **Week** — single attorney, 7-day grid. Reschedule reuses the slot picker.
+
+### Timezone
+
+v1 renders in the **firm timezone** (`firms.timezone`); cross-tz / remote attorneys are later. The
+per-consult UTC instant + `timeZone` are stored as today.
+
+### Phasing
+
+1. Availability model + Settings "Office hours" editor (per attorney). **← this PR**
+2. Slot engine + the exclusion-constraint guard + server-side booking validation.
+3. Calendar UI — single attorney.
+4. Multi-attorney day view.
+5. Exceptions + booking rules (buffer / min-notice / max-advance).
+
+### Locked decisions
+
+- Bookable = `schedulable` flag, seeded from `role='attorney'`.
+- Firm-single-tz for v1.
+- Slot duration from the consult type + a configurable interval.
+- Double-booking prevented by a DB exclusion constraint.
+- Office hours are **admin-managed** (`settings.manage`); read for booking on `consultations.view`.
+- No public self-service booking page in v1 (the client portal stays deferred — [18-client-portal](18-client-portal.md)).
+
 ## Out of scope (v1) / future
 
 - Public self-service client booking page.
-- Round-the-clock availability sync to external calendars.
+- Round-the-clock availability sync to external calendars (Google/Outlook two-way).
 
 ## Decisions (v1)
 
 Resolved in [03-architecture-and-scope](03-architecture-and-scope.md):
 
-- **Scheduling:** manual date/time booking with time zone in v1. Per-attorney availability rules
-  and Google/Outlook two-way sync are fast-follow.
+- **Scheduling:** manual date/time booking with time zone shipped in v1. Per-attorney availability
+  rules + the calendar are now being built (see "Availability & calendar" above); Google/Outlook
+  two-way sync remains fast-follow.
 - **Cancellation policy is per-tenant** (fee on/off & amount, rebooking/approval limits),
   configured in Settings; the 3-cancellation approval gate (UC12b) is the default behavior.
 - **Consultation types and prices are firm-configurable** (seeded defaults), set in Settings.
