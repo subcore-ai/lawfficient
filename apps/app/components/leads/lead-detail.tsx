@@ -236,6 +236,9 @@ export function LeadDetail({
               <DetailRow label="Last activity">
                 <LocalTime iso={lead.lastActivity} mode="date" />
               </DetailRow>
+              <DetailRow label="Lead message" className="sm:col-span-2">
+                {data.message ? <p className="whitespace-pre-wrap">{data.message}</p> : "—"}
+              </DetailRow>
             </DetailList>
           </CardContent>
         </Card>
@@ -332,17 +335,6 @@ export function LeadDetail({
           ) : null}
         </div>
       </div>
-
-      {data.message ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Message</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="whitespace-pre-wrap text-sm">{data.message}</p>
-          </CardContent>
-        </Card>
-      ) : null}
 
       {canViewConsultations ? (
         <LeadConsultations
