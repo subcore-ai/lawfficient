@@ -55,6 +55,7 @@ describe("utcToZonedInput", () => {
   test("returns empty string on a bad zone or instant", () => {
     expect(utcToZonedInput("2026-07-01T19:00:00.000Z", "Mars/Phobos")).toBe("")
     expect(utcToZonedInput("not-a-date", "America/New_York")).toBe("")
+    expect(utcToZonedInput("", "America/New_York")).toBe("")
   })
 })
 

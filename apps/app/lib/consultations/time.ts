@@ -74,6 +74,7 @@ export function zonedWallTimeToUtcISO(wall: string, timeZone: string): string | 
 // zonedWallTimeToUtcISO, for seeding a <input type="datetime-local"> (which wants a naive local time).
 // Returns "" on a bad instant/zone, so the input just renders empty.
 export function utcToZonedInput(iso: string, timeZone: string): string {
+  if (!iso) return "" // new Date(null | "") is the Unix epoch, not invalid — guard so it doesn't format 1970
   try {
     const parts = new Intl.DateTimeFormat("en-US", {
       timeZone,
