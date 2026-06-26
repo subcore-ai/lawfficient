@@ -149,10 +149,18 @@ function RescheduleDialog({
 }) {
   const startId = React.useId()
   const { pending, run } = useRun()
+  // Re-seed the field to the consult's current time each time the dialog opens (it stays mounted, so a
+  // defaultValue would go stale after a cancel or a prior reschedule). React-recommended: adjust state
+  // during render on the open transition rather than in an effect.
+  const [value, setValue] = React.useState("")
+  const [prevOpen, setPrevOpen] = React.useState(false)
+  if (open !== prevOpen) {
+    setPrevOpen(open)
+    if (open) setValue(utcToZonedInput(startAt, timeZone))
+  }
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    const startAt = String(new FormData(e.currentTarget).get("startAt") ?? "")
-    run(() => rescheduleConsultation(consultationId, startAt), "Consultation rescheduled", () => onOpenChange(false))
+    run(() => rescheduleConsultation(consultationId, value), "Consultation rescheduled", () => onOpenChange(false))
   }
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -168,7 +176,8 @@ function RescheduleDialog({
                 id={startId}
                 name="startAt"
                 type="datetime-local"
-                defaultValue={utcToZonedInput(startAt, timeZone)}
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
                 required
               />
             </Field>
@@ -198,10 +207,17 @@ function OutcomeDialog({
 }) {
   const outcomeId = React.useId()
   const { pending, run } = useRun()
+  // Re-seed each open (the dialog stays mounted) so a cancel or a prior save doesn't leave a stale value
+  // — adjusted during render on the open transition, not in an effect.
+  const [value, setValue] = React.useState("")
+  const [prevOpen, setPrevOpen] = React.useState(false)
+  if (open !== prevOpen) {
+    setPrevOpen(open)
+    if (open) setValue(current ?? "")
+  }
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    const outcome = String(new FormData(e.currentTarget).get("outcome") ?? "")
-    run(() => setConsultationOutcome(consultationId, outcome), "Outcome saved", () => onOpenChange(false))
+    run(() => setConsultationOutcome(consultationId, value), "Outcome saved", () => onOpenChange(false))
   }
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -213,7 +229,14 @@ function OutcomeDialog({
           </DialogHeader>
           <div className="py-4">
             <Field label="Outcome" htmlFor={outcomeId}>
-              <Input id={outcomeId} name="outcome" defaultValue={current ?? ""} placeholder="Qualified to retain" autoComplete="off" />
+              <Input
+                id={outcomeId}
+                name="outcome"
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                placeholder="Qualified to retain"
+                autoComplete="off"
+              />
             </Field>
           </div>
           <DialogFooter>
