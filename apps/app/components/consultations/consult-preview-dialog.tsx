@@ -225,7 +225,7 @@ export function ConsultPreviewDialog({
                         aria-label="To"
                       />
                       {validTime ? (
-                        <span className="text-muted-foreground ml-2 text-xs">{formatDuration(durationMin)}</span>
+                        <span className="text-muted-foreground ml-2">{formatDuration(durationMin)}</span>
                       ) : null}
                     </div>
                   </>
