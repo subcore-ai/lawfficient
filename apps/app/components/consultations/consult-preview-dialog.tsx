@@ -206,6 +206,11 @@ export function ConsultPreviewDialog({
                         type="time"
                         value={fromTime}
                         onChange={(e) => onFromChange(e.target.value)}
+                        onClick={(e) => {
+                          try {
+                            e.currentTarget.showPicker()
+                          } catch {}
+                        }}
                         className={cn(INLINE, "[&::-webkit-calendar-picker-indicator]:hidden")}
                         aria-label="From"
                       />
@@ -214,6 +219,11 @@ export function ConsultPreviewDialog({
                         type="time"
                         value={toTime}
                         onChange={(e) => setToTime(e.target.value)}
+                        onClick={(e) => {
+                          try {
+                            e.currentTarget.showPicker()
+                          } catch {}
+                        }}
                         className={cn(INLINE, "[&::-webkit-calendar-picker-indicator]:hidden")}
                         aria-label="To"
                       />
