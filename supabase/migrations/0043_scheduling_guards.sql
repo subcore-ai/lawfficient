@@ -10,8 +10,9 @@ create extension if not exists btree_gist with schema extensions;
 
 -- No double-booking. attorney_id is a profile id (globally unique → already firm-scoped), so we key on
 -- it alone. The half-open [start, end) range means back-to-back consults (end == next start) don't
--- overlap. Only UPCOMING consults occupy a slot — canceled / no_show / completed (all terminal) +
--- archived / unassigned don't block; a finished consult mustn't reserve a future slot.
+-- overlap. canceled / no_show + archived / unassigned don't occupy a slot. `completed` DOES block (the
+-- safe default): a future consult marked completed early must not be double-bookable, and a past
+-- completed never overlaps a future slot anyway. (Can't condition on past/future — now() isn't immutable.)
 -- The end is computed by an IMMUTABLE helper. Both `start_at + interval` and `extract(epoch …)` are
 -- generically STABLE (an index expression rejects them) because day/month intervals + most date_part
 -- fields depend on the session timezone. A pure MINUTES interval, though, is tz-independent, so a
@@ -32,7 +33,7 @@ alter table public.consultations
     attorney_id with =,
     tstzrange(start_at, public.consultation_end(start_at, duration_min)) with &&
   )
-  where (attorney_id is not null and not archived and status not in ('canceled', 'no_show', 'completed'));
+  where (attorney_id is not null and not archived and status not in ('canceled', 'no_show'));
 
 -- No overlapping office-hours windows for the same attorney + weekday (adjacent windows are fine).
 -- Each window is an int4range of SECONDS-of-day (exact — no sub-minute truncation): extract(epoch from
