@@ -18,7 +18,7 @@ export function DayCalendar({
   defaultTimeZone,
   canBook,
 }: {
-  columns: { attorney: Option; cal: DayCalendarData }[]
+  columns: { attorney: Option; cal: DayCalendarData; off?: boolean }[]
   typeName: string
   leads: Option[]
   attorneys: Option[]
@@ -67,6 +67,7 @@ export function DayCalendar({
                 windows={c.cal.windows}
                 consults={c.cal.consults}
                 slots={c.cal.slots}
+                off={c.off}
                 gridStartMin={gridStartMin}
                 attorneyId={c.attorney.id}
                 typeName={typeName}

@@ -203,6 +203,48 @@ export type Database = {
           },
         ]
       }
+      availability_exceptions: {
+        Row: {
+          attorney_id: string
+          created_at: string
+          end_date: string
+          firm_id: string
+          id: string
+          start_date: string
+        }
+        Insert: {
+          attorney_id: string
+          created_at?: string
+          end_date: string
+          firm_id?: string
+          id?: string
+          start_date: string
+        }
+        Update: {
+          attorney_id?: string
+          created_at?: string
+          end_date?: string
+          firm_id?: string
+          id?: string
+          start_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "availability_exceptions_attorney_fkey"
+            columns: ["attorney_id", "firm_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id", "firm_id"]
+          },
+          {
+            foreignKeyName: "availability_exceptions_firm_id_fkey"
+            columns: ["firm_id"]
+            isOneToOne: false
+            referencedRelation: "firms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       case_tasks: {
         Row: {
           assignee_id: string | null

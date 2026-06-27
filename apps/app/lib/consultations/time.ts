@@ -124,3 +124,14 @@ export function isValidTimeZone(value: string): boolean {
     return false
   }
 }
+
+// Today's calendar date (YYYY-MM-DD) in `timeZone` — for comparing against firm-calendar `date` columns
+// (e.g. the time-off cutoff). en-CA renders ISO-style; falls back to UTC on a bad zone.
+export function currentDateInZone(timeZone: string): string {
+  const opts = { year: "numeric", month: "2-digit", day: "2-digit" } as const
+  try {
+    return new Intl.DateTimeFormat("en-CA", { timeZone, ...opts }).format(new Date())
+  } catch {
+    return new Intl.DateTimeFormat("en-CA", { timeZone: "UTC", ...opts }).format(new Date())
+  }
+}

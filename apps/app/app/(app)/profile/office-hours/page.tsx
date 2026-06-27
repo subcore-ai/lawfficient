@@ -9,15 +9,21 @@ import {
 } from "@workspace/ui/components/card"
 
 import { setMyAvailability } from "@/app/(app)/settings/scheduling/actions"
+import { TimeOffManager } from "@/components/availability/time-off-manager"
 import { WeeklyHoursEditor } from "@/components/availability/weekly-hours-editor"
+import { mapExceptionRow, type TimeOff } from "@/lib/availability/exceptions"
 import { mapAvailabilityRow, type AvailabilityWindow } from "@/lib/availability/queries"
+import { currentDateInZone } from "@/lib/consultations/time"
 import { getCurrentUser } from "@/lib/auth/session"
 import { createClient } from "@/lib/supabase/server"
 import { isSupabaseConfigured } from "@/lib/supabase/env"
 
 export const metadata = { title: "My profile · Office hours" }
 
-type Load = { state: "ok"; windows: AvailabilityWindow[] } | { state: "off" } | { state: "error" }
+type Load =
+  | { state: "ok"; attorneyId: string; windows: AvailabilityWindow[]; timeOff: TimeOff[] }
+  | { state: "off" }
+  | { state: "error" }
 
 // Best-effort: "off" = the user isn't schedulable (or Supabase isn't wired) → show a friendly notice;
 // "error" = a read failed → show a notice instead of silently hiding real hours. Self-read + stable
@@ -45,7 +51,24 @@ async function loadMyOfficeHours(): Promise<Load> {
       .order("start_time")
     if (error) return { state: "error" }
 
-    return { state: "ok", windows: (avail ?? []).map(mapAvailabilityRow) }
+    // Upcoming time off only (end_date >= today in the FIRM's zone, so a UTC rollover can't hide a
+    // still-current entry) — past entries are clutter.
+    const { data: firm } = await supabase.from("firms").select("timezone").maybeSingle()
+    const today = currentDateInZone(firm?.timezone || "America/New_York")
+    const { data: off, error: offErr } = await supabase
+      .from("availability_exceptions")
+      .select("*")
+      .eq("attorney_id", me.id)
+      .gte("end_date", today)
+      .order("start_date")
+    if (offErr) return { state: "error" }
+
+    return {
+      state: "ok",
+      attorneyId: me.id,
+      windows: (avail ?? []).map(mapAvailabilityRow),
+      timeOff: (off ?? []).map(mapExceptionRow),
+    }
   } catch {
     return { state: "error" }
   }
@@ -82,17 +105,32 @@ export default async function ProfileOfficeHoursPage() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Office hours</CardTitle>
-        <CardDescription>
-          Your weekly availability for consultations — you can only be booked into free slots inside
-          these hours.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <WeeklyHoursEditor windows={oh.windows} onSave={setMyAvailability} canEdit />
-      </CardContent>
-    </Card>
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Office hours</CardTitle>
+          <CardDescription>
+            Your weekly availability for consultations — you can only be booked into free slots inside
+            these hours.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <WeeklyHoursEditor windows={oh.windows} onSave={setMyAvailability} canEdit />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Time off</CardTitle>
+          <CardDescription>
+            Days you&apos;re unavailable — vacation, holidays, personal time. No consultations can be booked
+            on these dates.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <TimeOffManager attorneyId={oh.attorneyId} entries={oh.timeOff} canEdit />
+        </CardContent>
+      </Card>
+    </div>
   )
 }
