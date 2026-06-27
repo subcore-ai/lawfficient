@@ -25,13 +25,12 @@ import { toast } from "@workspace/ui/components/sonner"
 
 import {
   deleteConsultation,
-  rescheduleConsultation,
   setConsultationOutcome,
   setConsultationStatus,
   type ActionResult,
 } from "@/app/(app)/consultations/actions"
+import { EditConsultationDialog } from "@/components/consultations/edit-consultation-dialog"
 import { Field } from "@/components/form-field"
-import { utcToZonedInput } from "@/lib/consultations/time"
 import type { ConsultationStatus } from "@/lib/consultations/validation"
 
 function useRun() {
@@ -60,19 +59,18 @@ export function ConsultationActions({
   consultationId,
   status,
   outcome,
-  startAt,
-  timeZone,
   compact = false,
+  hideEdit = false,
 }: {
   consultationId: string
   status: ConsultationStatus
   outcome: string | null
-  startAt: string
-  timeZone: string
   compact?: boolean
+  // The calendar's detail dialog edits fields inline, so it hides this menu's "Edit consultation…" entry.
+  hideEdit?: boolean
 }) {
   const { pending, run } = useRun()
-  const [rescheduleOpen, setRescheduleOpen] = React.useState(false)
+  const [editOpen, setEditOpen] = React.useState(false)
   const [outcomeOpen, setOutcomeOpen] = React.useState(false)
   const [deleteOpen, setDeleteOpen] = React.useState(false)
   const isActive = status === "scheduled" || status === "paid" || status === "rescheduled"
@@ -100,7 +98,9 @@ export function ConsultationActions({
         <DropdownMenuContent align="end">
           {isActive ? (
             <>
-              <DropdownMenuItem onClick={() => setRescheduleOpen(true)}>Reschedule…</DropdownMenuItem>
+              {hideEdit ? null : (
+                <DropdownMenuItem onClick={() => setEditOpen(true)}>Edit consultation…</DropdownMenuItem>
+              )}
               <DropdownMenuItem onClick={() => run(() => setConsultationStatus(consultationId, "completed"), "Marked completed")}>
                 Mark completed
               </DropdownMenuItem>
@@ -125,76 +125,12 @@ export function ConsultationActions({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <RescheduleDialog
-        open={rescheduleOpen}
-        onOpenChange={setRescheduleOpen}
-        consultationId={consultationId}
-        startAt={startAt}
-        timeZone={timeZone}
-      />
+      {hideEdit ? null : (
+        <EditConsultationDialog consultationId={consultationId} open={editOpen} onOpenChange={setEditOpen} />
+      )}
       <OutcomeDialog open={outcomeOpen} onOpenChange={setOutcomeOpen} consultationId={consultationId} current={outcome} />
       <DeleteConfirmDialog open={deleteOpen} onOpenChange={setDeleteOpen} consultationId={consultationId} />
     </>
-  )
-}
-
-function RescheduleDialog({
-  open,
-  onOpenChange,
-  consultationId,
-  startAt,
-  timeZone,
-}: {
-  open: boolean
-  onOpenChange: (o: boolean) => void
-  consultationId: string
-  startAt: string
-  timeZone: string
-}) {
-  const startId = React.useId()
-  const { pending, run } = useRun()
-  // Re-seed the field to the consult's current time each time the dialog opens (it stays mounted, so a
-  // defaultValue would go stale after a cancel or a prior reschedule). React-recommended: adjust state
-  // during render on the open transition rather than in an effect.
-  const [value, setValue] = React.useState("")
-  const [prevOpen, setPrevOpen] = React.useState(false)
-  if (open !== prevOpen) {
-    setPrevOpen(open)
-    if (open) setValue(utcToZonedInput(startAt, timeZone))
-  }
-  function onSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    run(() => rescheduleConsultation(consultationId, value), "Consultation rescheduled", () => onOpenChange(false))
-  }
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-sm">
-        <form onSubmit={onSubmit}>
-          <DialogHeader>
-            <DialogTitle>Reschedule consultation</DialogTitle>
-            <DialogDescription>Pick a new date and time. The consult is marked rescheduled.</DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <Field label="New date &amp; time" htmlFor={startId}>
-              <Input
-                id={startId}
-                name="startAt"
-                type="datetime-local"
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                required
-              />
-            </Field>
-          </div>
-          <DialogFooter>
-            <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
-            <Button type="submit" disabled={pending}>
-              {pending ? "Saving…" : "Reschedule"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
   )
 }
 

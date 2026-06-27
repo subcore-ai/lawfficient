@@ -1257,6 +1257,7 @@ export type Database = {
       profiles: {
         Row: {
           avatar_path: string | null
+          calendar_color: string | null
           created_at: string
           email: string
           firm_id: string
@@ -1270,6 +1271,7 @@ export type Database = {
         }
         Insert: {
           avatar_path?: string | null
+          calendar_color?: string | null
           created_at?: string
           email: string
           firm_id: string
@@ -1283,6 +1285,7 @@ export type Database = {
         }
         Update: {
           avatar_path?: string | null
+          calendar_color?: string | null
           created_at?: string
           email?: string
           firm_id?: string

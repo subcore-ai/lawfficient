@@ -5,6 +5,7 @@ import * as React from "react"
 import { CalendarColumn, PX_PER_MIN } from "@/components/consultations/calendar-column"
 import { ConsultPreviewDialog } from "@/components/consultations/consult-preview-dialog"
 import type { ConsultationType } from "@/lib/consultations/consultation-types"
+import type { CalendarColor } from "@/lib/scheduling/calendar-colors"
 import { formatHourLabel, type DayCalendar as DayCalendarData } from "@/lib/scheduling/day-calendar"
 
 type Option = { id: string; name: string }
@@ -21,7 +22,7 @@ export function DayCalendar({
   defaultTimeZone,
   canBook,
 }: {
-  columns: { attorney: Option; cal: DayCalendarData; off?: boolean }[]
+  columns: { attorney: Option; cal: DayCalendarData; off?: boolean; color?: CalendarColor | null }[]
   typeName: string
   leads: Option[]
   attorneys: Option[]
@@ -52,8 +53,12 @@ export function DayCalendar({
       {/* Per-attorney headers — shown for a single column too, so it's always clear whose calendar this is. */}
       <div className="mb-2 flex pl-12">
         {columns.map((c) => (
-          <div key={c.attorney.id} className="text-foreground flex-1 truncate px-1 text-center text-sm font-medium">
-            {c.attorney.name}
+          <div
+            key={c.attorney.id}
+            className="text-foreground flex flex-1 items-center justify-center gap-1.5 truncate px-1 text-center text-sm font-medium"
+          >
+            {c.color ? <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: c.color.solid }} /> : null}
+            <span className="truncate">{c.attorney.name}</span>
           </div>
         ))}
       </div>
@@ -79,6 +84,7 @@ export function DayCalendar({
                 consults={c.cal.consults}
                 slots={c.cal.slots}
                 off={c.off}
+                color={c.color}
                 gridStartMin={gridStartMin}
                 attorneyId={c.attorney.id}
                 typeName={typeName}

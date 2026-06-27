@@ -11,6 +11,7 @@ import { getCurrentUser } from "@/lib/auth/session"
 import { mapConsultationTypeRow, type ConsultationType } from "@/lib/consultations/consultation-types"
 import { mapConsultationRow, partitionConsultations } from "@/lib/consultations/queries"
 import { currentDateInZone, zonedWallTimeToUtcISO } from "@/lib/consultations/time"
+import { colorFor } from "@/lib/scheduling/calendar-colors"
 import { buildDayCalendar, weekdayOf } from "@/lib/scheduling/day-calendar"
 import { isSupabaseConfigured } from "@/lib/supabase/env"
 import { createClient } from "@/lib/supabase/server"
@@ -59,7 +60,7 @@ export default async function ConsultationsPage({ searchParams }: { searchParams
 
   const [leadsRes, staffRes, firmRes, typesRes] = await Promise.all([
     supabase.from("leads").select("id, first_name, last_name, archived").order("created_at", { ascending: false }),
-    supabase.from("profiles").select("id, name, status, schedulable").order("name"),
+    supabase.from("profiles").select("id, name, status, schedulable, calendar_color").order("name"),
     supabase.from("firms").select("timezone").single(),
     supabase.from("consultation_types").select("*").eq("is_active", true).order("position").order("created_at"),
   ])
@@ -118,7 +119,7 @@ async function renderCalendar({
 }: {
   sp: Search
   supabase: Awaited<ReturnType<typeof createClient>>
-  allProfiles: { id: string; name: string; status: string; schedulable: boolean }[]
+  allProfiles: { id: string; name: string; status: string; schedulable: boolean; calendar_color: string | null }[]
   leadNames: Map<string, string>
   leadOptions: Option[]
   attorneys: Option[]
@@ -128,6 +129,7 @@ async function renderCalendar({
 }) {
   const zone = tz ?? DEFAULT_TZ
   const schedulable = allProfiles.filter((p) => p.status === "active" && p.schedulable).map((p) => ({ id: p.id, name: p.name }))
+  const colorByAttorney = new Map(allProfiles.map((p) => [p.id, colorFor(p.calendar_color)]))
 
   if (schedulable.length === 0 || types.length === 0) {
     return (
@@ -146,7 +148,8 @@ async function renderCalendar({
   const valid = Array.from(new Set(requested)).filter((id) => schedulable.some((a) => a.id === id))
   const selectedIds = (valid.length ? valid : schedulable.slice(0, 3).map((a) => a.id)).slice(0, MAX_COLUMNS)
   const date = typeof sp.date === "string" && isValidYmd(sp.date) ? sp.date : currentDateInZone(zone)
-  const selectedType = types.find((t) => t.name === sp.type) ?? types[0]!
+  // The calendar slots default to the first active type's length; the actual type is chosen when booking.
+  const selectedType = types[0]!
 
   const dayEnd = zonedWallTimeToUtcISO(`${addDay(date)}T00:00`, zone)
   // Look back a day on the lower bound so a consult that STARTED yesterday but runs into this morning is
@@ -209,7 +212,7 @@ async function renderCalendar({
         outcome: c.outcome,
       }))
     const cal = buildDayCalendar({ date, tz: zone, windows, consults, durationMin: selectedType.durationMin, nowMs })
-    return { attorney: schedulable.find((a) => a.id === id)!, cal, off }
+    return { attorney: schedulable.find((a) => a.id === id)!, cal, off, color: colorByAttorney.get(id) ?? null }
   })
 
   const hasContent = columns.some((c) => c.off || c.cal.windows.length > 0 || c.cal.consults.length > 0)
@@ -221,8 +224,6 @@ async function renderCalendar({
         attorneyIds={selectedIds}
         date={date}
         today={currentDateInZone(zone)}
-        types={types}
-        typeName={selectedType.name}
       />
       <div className="rounded-lg border p-4">
         {!hasContent ? (

@@ -21,12 +21,20 @@ import {
 import { toast } from "@workspace/ui/components/sonner"
 
 import { setAttorneyAvailability, setSchedulable } from "@/app/(app)/settings/scheduling/actions"
+import { CalendarColorPicker } from "@/components/availability/calendar-color-picker"
 import { TimeOffManager } from "@/components/availability/time-off-manager"
 import { WeeklyHoursEditor } from "@/components/availability/weekly-hours-editor"
 import { type TimeOff } from "@/lib/availability/exceptions"
 import { type AvailabilityWindow } from "@/lib/availability/queries"
 
-type Attorney = { id: string; name: string; email: string; windows: AvailabilityWindow[]; timeOff: TimeOff[] }
+type Attorney = {
+  id: string
+  name: string
+  email: string
+  calendarColor: string | null
+  windows: AvailabilityWindow[]
+  timeOff: TimeOff[]
+}
 
 export function OfficeHoursEditor({
   attorneys,
@@ -139,6 +147,10 @@ function AttorneyCard({ attorney, canManage }: { attorney: Attorney; canManage: 
         <div className="space-y-2 border-t pt-4">
           <p className="text-sm font-medium">Time off</p>
           <TimeOffManager attorneyId={attorney.id} entries={attorney.timeOff} canEdit={canManage} />
+        </div>
+        <div className="space-y-2 border-t pt-4">
+          <p className="text-sm font-medium">Calendar color</p>
+          <CalendarColorPicker attorneyId={attorney.id} current={attorney.calendarColor} canEdit={canManage} />
         </div>
       </CardContent>
     </Card>

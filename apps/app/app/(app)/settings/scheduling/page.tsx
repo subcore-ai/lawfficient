@@ -26,7 +26,7 @@ export default async function SettingsSchedulingPage() {
   const { data: firm } = await supabase.from("firms").select("timezone").maybeSingle()
   const today = currentDateInZone(firm?.timezone || "America/New_York")
   const [staffRes, availRes, offRes] = await Promise.all([
-    supabase.from("profiles").select("id, name, email, schedulable, status").order("name"),
+    supabase.from("profiles").select("id, name, email, schedulable, status, calendar_color").order("name"),
     supabase.from("attorney_availability").select("*").order("weekday").order("start_time"),
     supabase.from("availability_exceptions").select("*").gte("end_date", today).order("start_date"),
   ])
@@ -45,6 +45,7 @@ export default async function SettingsSchedulingPage() {
       id: s.id,
       name: s.name,
       email: s.email,
+      calendarColor: s.calendar_color,
       windows: windows.filter((w) => w.attorneyId === s.id),
       timeOff: timeOff.filter((t) => t.attorneyId === s.id),
     }))

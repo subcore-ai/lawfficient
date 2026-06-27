@@ -1,6 +1,14 @@
 import { describe, expect, test } from "bun:test"
 
-import { formatConsultationWhen, isValidTimeZone, utcToZonedInput, zonedWallTimeToUtcISO } from "./time"
+import {
+  addMinutesToTime,
+  formatConsultationWhen,
+  isValidTimeZone,
+  minutesBetween,
+  splitWall,
+  utcToZonedInput,
+  zonedWallTimeToUtcISO,
+} from "./time"
 
 describe("zonedWallTimeToUtcISO", () => {
   test("interprets the wall time in the given zone → correct UTC instant (DST)", () => {
@@ -79,5 +87,28 @@ describe("isValidTimeZone", () => {
     expect(isValidTimeZone("UTC")).toBe(true)
     expect(isValidTimeZone("Mars/Phobos")).toBe(false)
     expect(isValidTimeZone("")).toBe(false)
+  })
+})
+
+describe("splitWall / addMinutesToTime / minutesBetween (day + from/to form inputs)", () => {
+  test("splitWall separates date + time; empty on malformed", () => {
+    expect(splitWall("2026-06-29T10:30")).toEqual({ day: "2026-06-29", time: "10:30" })
+    expect(splitWall("")).toEqual({ day: "", time: "" })
+    expect(splitWall("2026-06-29")).toEqual({ day: "", time: "" })
+  })
+
+  test("addMinutesToTime shifts within the day, clamps at 23:59, '' on malformed", () => {
+    expect(addMinutesToTime("10:30", 30)).toBe("11:00")
+    expect(addMinutesToTime("10:00", 90)).toBe("11:30")
+    expect(addMinutesToTime("23:30", 60)).toBe("23:59") // clamped — never wraps into the next day
+    expect(addMinutesToTime("bad", 30)).toBe("")
+  })
+
+  test("minutesBetween is to − from; ≤0 when not after; NaN on malformed", () => {
+    expect(minutesBetween("10:00", "10:30")).toBe(30)
+    expect(minutesBetween("09:00", "10:00")).toBe(60)
+    expect(minutesBetween("10:30", "10:00")).toBe(-30)
+    expect(minutesBetween("10:00", "10:00")).toBe(0)
+    expect(Number.isNaN(minutesBetween("x", "10:00"))).toBe(true)
   })
 })

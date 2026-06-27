@@ -27,8 +27,10 @@ import {
 import { toast } from "@workspace/ui/components/sonner"
 
 import { createConsultation } from "@/app/(app)/consultations/actions"
+import { Combobox } from "@/components/combobox"
 import { Field } from "@/components/form-field"
 import type { ConsultationType } from "@/lib/consultations/consultation-types"
+import { addMinutesToTime, minutesBetween, splitWall } from "@/lib/consultations/time"
 import { FIRM_TIMEZONES } from "@/lib/firm/timezones"
 
 type Option = { id: string; name: string }
@@ -67,13 +69,13 @@ export function BookConsultationDialog({
   // Custom trigger element (e.g. a calendar slot button); falls back to the default "Book" button.
   trigger?: React.ReactElement
 }) {
-  const startAtId = React.useId()
-  const durationId = React.useId()
+  const dayId = React.useId()
+  const fromId = React.useId()
+  const toId = React.useId()
   const amountId = React.useId()
   const leadSelectId = React.useId()
   const typeSelectId = React.useId()
   const attorneySelectId = React.useId()
-  const zoneSelectId = React.useId()
 
   const activeTypes = consultationTypes.filter((t) => t.isActive)
   const firstType = activeTypes.find((t) => t.name === prefillType) ?? activeTypes[0]
@@ -87,36 +89,52 @@ export function BookConsultationDialog({
   // book onto whichever lead loaded first.
   const [leadId, setLeadId] = React.useState(triggerLeadId ?? "")
   const [attorney, setAttorney] = React.useState(prefillAttorneyId ?? UNASSIGNED)
+  const initialWhen = splitWall(prefillStart ?? "")
   const [type, setType] = React.useState(firstType?.name ?? "")
-  const [durationMin, setDurationMin] = React.useState(firstType?.durationMin ?? 30)
   const [amount, setAmount] = React.useState(firstType?.price ?? 0)
-  const [start, setStart] = React.useState(prefillStart ?? "")
+  // Day + from/to time, instead of a single datetime + manual duration. The duration is derived (to − from).
+  const [day, setDay] = React.useState(initialWhen.day)
+  const [fromTime, setFromTime] = React.useState(initialWhen.time)
+  const [toTime, setToTime] = React.useState(
+    initialWhen.time ? addMinutesToTime(initialWhen.time, firstType?.durationMin ?? 30) : "",
+  )
   const [zone, setZone] = React.useState(initialZone)
   const [paid, setPaid] = React.useState(false)
   const [pending, startTransition] = React.useTransition()
 
   const selected = activeTypes.find((t) => t.name === type)
   const chargeable = (selected?.price ?? 0) > 0
+  const typeDuration = selected?.durationMin ?? 30
+  const durationMin = fromTime && toTime ? minutesBetween(fromTime, toTime) : 0
+  const validTime = Boolean(day) && durationMin >= 5
 
-  // Picking a type fills its default length + fee (both stay editable). A free type clears the fee +
-  // the "already paid" flag.
+  // Picking a type sets the "to" time (start + the type's default length) and its fee — both stay editable.
+  // A free type clears the fee + the "already paid" flag.
   function onTypeChange(name: string) {
     setType(name)
     const t = activeTypes.find((x) => x.name === name)
     if (t) {
-      setDurationMin(t.durationMin)
+      if (fromTime) setToTime(addMinutesToTime(fromTime, t.durationMin))
       setAmount(t.price)
       if (t.price === 0) setPaid(false)
     }
+  }
+
+  // Changing the start shifts the end to keep the current length (the type's default if no end is set yet).
+  function onFromChange(v: string) {
+    const dur = fromTime && toTime ? minutesBetween(fromTime, toTime) : typeDuration
+    setFromTime(v)
+    setToTime(v ? addMinutesToTime(v, dur > 0 ? dur : typeDuration) : "")
   }
 
   function reset() {
     setLeadId(triggerLeadId ?? "")
     setAttorney(prefillAttorneyId ?? UNASSIGNED)
     setType(firstType?.name ?? "")
-    setDurationMin(firstType?.durationMin ?? 30)
     setAmount(firstType?.price ?? 0)
-    setStart(prefillStart ?? "")
+    setDay(initialWhen.day)
+    setFromTime(initialWhen.time)
+    setToTime(initialWhen.time ? addMinutesToTime(initialWhen.time, firstType?.durationMin ?? 30) : "")
     setZone(initialZone)
     setPaid(false)
   }
@@ -134,11 +152,12 @@ export function BookConsultationDialog({
     fd.set("attorneyId", attorney === UNASSIGNED ? "" : attorney)
     fd.set("type", type)
     fd.set("durationMin", String(durationMin))
-    fd.set("startAt", start)
+    const startWall = day && fromTime ? `${day}T${fromTime}` : ""
+    fd.set("startAt", startWall)
     // An unedited click-booked slot books its exact instant (avoids the DST-fallback wall ambiguity). Only
-    // when BOTH the time AND the zone are untouched — changing either means the user re-expressed the
+    // when BOTH the start AND the zone are untouched — changing either means the user re-expressed the
     // moment, so the server re-derives it from wall + zone.
-    const unchanged = prefillStartIso && start === (prefillStart ?? "") && zone === initialZone
+    const unchanged = prefillStartIso && startWall === (prefillStart ?? "") && zone === initialZone
     fd.set("startAtIso", unchanged ? prefillStartIso : "")
     fd.set("timeZone", zone)
     // Fee + paid only apply to a chargeable type; a free booking carries no amount and is never "paid".
@@ -178,18 +197,15 @@ export function BookConsultationDialog({
           <div className="grid gap-4 py-5 sm:grid-cols-2">
             {triggerLeadId ? null : (
               <Field label="Lead" htmlFor={leadSelectId} className="sm:col-span-2">
-                <Select value={leadId} onValueChange={(v) => setLeadId(v ?? "")} items={leads.map((l) => ({ value: l.id, label: l.name }))}>
-                  <SelectTrigger id={leadSelectId} className="w-full">
-                    <SelectValue placeholder={leads.length ? "Select a lead" : "No leads yet"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {leads.map((l) => (
-                      <SelectItem key={l.id} value={l.id}>
-                        {l.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Combobox
+                  id={leadSelectId}
+                  value={leadId}
+                  onValueChange={setLeadId}
+                  options={leads.map((l) => ({ value: l.id, label: l.name }))}
+                  placeholder={leads.length ? "Select a lead" : "No leads yet"}
+                  searchPlaceholder="Search leads…"
+                  emptyText="No leads found."
+                />
               </Field>
             )}
             <Field label="Consultation type" htmlFor={typeSelectId}>
@@ -221,34 +237,28 @@ export function BookConsultationDialog({
                 </SelectContent>
               </Select>
             </Field>
-            <Field label="When" htmlFor={startAtId}>
-              <Input id={startAtId} type="datetime-local" required value={start} onChange={(e) => setStart(e.target.value)} />
-            </Field>
-            <Field label="Duration (min)" htmlFor={durationId}>
-              <Input
-                id={durationId}
-                type="number"
-                min={5}
-                step={5}
-                required
-                value={durationMin}
-                onChange={(e) => setDurationMin(Number(e.target.value) || 0)}
-              />
-            </Field>
-            <Field label="Time zone" htmlFor={zoneSelectId} className="sm:col-span-2">
-              <Select value={zone} onValueChange={(v) => setZone(v ?? DEFAULT_TZ)} items={FIRM_TIMEZONES.map((z) => ({ value: z.value, label: z.label }))}>
-                <SelectTrigger id={zoneSelectId} className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {FIRM_TIMEZONES.map((z) => (
-                    <SelectItem key={z.value} value={z.value}>
-                      {z.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
+            <div className="grid grid-cols-3 gap-3 sm:col-span-2">
+              <Field label="Day" htmlFor={dayId}>
+                <Input id={dayId} type="date" required value={day} onChange={(e) => setDay(e.target.value)} />
+              </Field>
+              <Field label="From" htmlFor={fromId}>
+                <Input id={fromId} type="time" required value={fromTime} onChange={(e) => onFromChange(e.target.value)} />
+              </Field>
+              <Field label="To" htmlFor={toId}>
+                <Input id={toId} type="time" required value={toTime} onChange={(e) => setToTime(e.target.value)} />
+              </Field>
+              <p
+                className={`col-span-3 text-xs ${
+                  fromTime && toTime && durationMin < 5 ? "text-destructive" : "text-muted-foreground"
+                }`}
+              >
+                {fromTime && toTime
+                  ? durationMin >= 5
+                    ? `Duration: ${durationMin} min`
+                    : "End time must be after the start."
+                  : "Pick a start and end time."}
+              </p>
+            </div>
             {chargeable ? (
               <div className="flex items-end gap-4 sm:col-span-2">
                 <Field label="Fee ($)" htmlFor={amountId}>
@@ -274,7 +284,7 @@ export function BookConsultationDialog({
 
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
-            <Button type="submit" disabled={pending || !leadId || !selected}>
+            <Button type="submit" disabled={pending || !leadId || !selected || !validTime}>
               {pending ? "Booking…" : "Book consultation"}
             </Button>
           </DialogFooter>

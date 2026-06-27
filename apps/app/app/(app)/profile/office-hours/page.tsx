@@ -9,6 +9,7 @@ import {
 } from "@workspace/ui/components/card"
 
 import { setMyAvailability } from "@/app/(app)/settings/scheduling/actions"
+import { CalendarColorPicker } from "@/components/availability/calendar-color-picker"
 import { TimeOffManager } from "@/components/availability/time-off-manager"
 import { WeeklyHoursEditor } from "@/components/availability/weekly-hours-editor"
 import { mapExceptionRow, type TimeOff } from "@/lib/availability/exceptions"
@@ -21,7 +22,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/env"
 export const metadata = { title: "My profile · Office hours" }
 
 type Load =
-  | { state: "ok"; attorneyId: string; windows: AvailabilityWindow[]; timeOff: TimeOff[] }
+  | { state: "ok"; attorneyId: string; calendarColor: string | null; windows: AvailabilityWindow[]; timeOff: TimeOff[] }
   | { state: "off" }
   | { state: "error" }
 
@@ -37,7 +38,7 @@ async function loadMyOfficeHours(): Promise<Load> {
     const supabase = await createClient()
     const { data: prof, error: profErr } = await supabase
       .from("profiles")
-      .select("schedulable")
+      .select("schedulable, calendar_color")
       .eq("id", me.id)
       .maybeSingle()
     if (profErr) return { state: "error" }
@@ -66,6 +67,7 @@ async function loadMyOfficeHours(): Promise<Load> {
     return {
       state: "ok",
       attorneyId: me.id,
+      calendarColor: prof.calendar_color,
       windows: (avail ?? []).map(mapAvailabilityRow),
       timeOff: (off ?? []).map(mapExceptionRow),
     }
@@ -129,6 +131,18 @@ export default async function ProfileOfficeHoursPage() {
         </CardHeader>
         <CardContent>
           <TimeOffManager attorneyId={oh.attorneyId} entries={oh.timeOff} canEdit />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Calendar color</CardTitle>
+          <CardDescription>
+            A color for your calendar column, so you stand out when several attorneys are shown together.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <CalendarColorPicker attorneyId={oh.attorneyId} current={oh.calendarColor} canEdit />
         </CardContent>
       </Card>
     </div>
