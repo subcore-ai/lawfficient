@@ -140,6 +140,10 @@ booked" error. (Buffer / min-notice are Phase 5.)
   date in any of an attorney's ranges removes their whole day from the calendar (no slots; the column shows
   a "Time off" marker). Managed self-service on the profile + by admins in Settings → Office hours
   (`components/availability/time-off-manager.tsx`). Firm-wide holidays + partial-day overrides → fast-follow.
+- **Calendar colors — built.** Each attorney can carry a pastel from a fixed 15-color palette
+  (`profiles.calendar_color`, migration 0045; `lib/scheduling/calendar-colors.ts`) that tints their column
+  (office hours + consults + slots) so they're distinguishable when several show together. Picked
+  self-service on the profile + by admins in Settings → Office hours (`calendar-color-picker.tsx`).
 - **Week** — single attorney, 7-day grid. Reschedule reuses the slot picker.
 
 ### Timezone

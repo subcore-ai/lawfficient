@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache"
 import { getCurrentUser, type CurrentUser } from "@/lib/auth/session"
 import { parseTimeOffInput } from "@/lib/availability/exceptions"
 import { validateWindows, type WindowInput } from "@/lib/availability/validation"
+import { isValidColorKey } from "@/lib/scheduling/calendar-colors"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 
@@ -192,6 +193,34 @@ export async function removeTimeOff(id: string): Promise<ActionResult> {
     .maybeSingle()
   if (error) return { error: "Couldn't remove the time off." }
   if (!data) return { error: "That time off no longer exists, or you can't remove it." }
+
+  revalidatePath(PATH)
+  revalidatePath(MY_PATH)
+  revalidatePath(CALENDAR_PATH)
+  return { ok: true }
+}
+
+// Set (or clear, with null) an attorney's calendar color — admin (settings.manage) for anyone, self for
+// own id. calendar_color is a non-privileged profiles field; written via the firm-scoped service-role
+// client (the Settings page is settings.manage, not users.manage — same as setSchedulable). The in-action
+// gate + the palette-key validation are the real checks.
+export async function setCalendarColor(attorneyId: string, color: string | null): Promise<ActionResult> {
+  const me = await getCurrentUser()
+  if (!me) return { error: "You're not signed in." }
+  if (typeof attorneyId !== "string" || !attorneyId) return { error: "Pick a team member." }
+  const isAdmin = me.permissions?.includes("settings.manage") ?? false
+  if (!isAdmin && attorneyId !== me.id) return { error: "You can only set your own calendar color." }
+  if (!me.firmId) return { error: "Your session is missing firm context." }
+  if (color !== null && !isValidColorKey(color)) return { error: "Pick a color from the palette." }
+
+  const admin = createAdminClient()
+  const { data, error } = await admin
+    .from("profiles")
+    .update({ calendar_color: color })
+    .eq("id", attorneyId)
+    .eq("firm_id", me.firmId)
+    .select("id")
+  if (error || !data || data.length === 0) return { error: "Couldn't update the calendar color." }
 
   revalidatePath(PATH)
   revalidatePath(MY_PATH)
