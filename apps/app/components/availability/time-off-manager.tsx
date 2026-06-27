@@ -34,7 +34,6 @@ export function TimeOffManager({
 }) {
   const startId = React.useId()
   const endId = React.useId()
-  const noteId = React.useId()
   const [pending, startTransition] = React.useTransition()
   const formRef = React.useRef<HTMLFormElement>(null)
 
@@ -79,10 +78,7 @@ export function TimeOffManager({
         <ul className="divide-y rounded-md border">
           {entries.map((e) => (
             <li key={e.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
-              <div className="min-w-0">
-                <span className="font-medium">{fmtRange(e.startDate, e.endDate)}</span>
-                {e.note ? <span className="text-muted-foreground"> · {e.note}</span> : null}
-              </div>
+              <span className="min-w-0 truncate font-medium">{fmtRange(e.startDate, e.endDate)}</span>
               {canEdit ? (
                 <Button
                   variant="ghost"
@@ -106,9 +102,6 @@ export function TimeOffManager({
           </Field>
           <Field label="To" htmlFor={endId}>
             <Input id={endId} name="endDate" type="date" required className="w-40" />
-          </Field>
-          <Field label="Note (optional)" htmlFor={noteId}>
-            <Input id={noteId} name="note" maxLength={100} placeholder="Vacation" className="w-44" />
           </Field>
           <Button type="submit" disabled={pending}>
             {pending ? "Adding…" : "Add time off"}

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 import { OfficeHoursEditor } from "@/components/settings/office-hours-editor"
 import { mapExceptionRow } from "@/lib/availability/exceptions"
 import { mapAvailabilityRow } from "@/lib/availability/queries"
+import { currentDateInZone } from "@/lib/consultations/time"
 import { getCurrentUser } from "@/lib/auth/session"
 import { createClient } from "@/lib/supabase/server"
 
@@ -21,7 +22,9 @@ export default async function SettingsSchedulingPage() {
 
   // RLS scopes all to the firm. Pull all staff (to list schedulable ones + offer the rest), every
   // availability row, and upcoming time off, then fan them out per attorney.
-  const today = new Date().toISOString().slice(0, 10)
+  // Time-off cutoff in the FIRM's zone, so a UTC rollover can't drop a still-current entry.
+  const { data: firm } = await supabase.from("firms").select("timezone").maybeSingle()
+  const today = currentDateInZone(firm?.timezone || "America/New_York")
   const [staffRes, availRes, offRes] = await Promise.all([
     supabase.from("profiles").select("id, name, email, schedulable, status").order("name"),
     supabase.from("attorney_availability").select("*").order("weekday").order("start_time"),

@@ -102,8 +102,10 @@ double-booked.
   a firm may mark any staff schedulable, keeping it multi-practice).
 - **AttorneyAvailability** — recurring weekly office hours: `firmId`, `attorneyId`, `weekday` (0–6),
   `startTime`, `endTime`, `data jsonb`. Multiple rows per day (split shifts). Stored in the firm tz.
-- **AvailabilityException** *(Phase 5)* — time-off / holidays / one-off extra hours: `attorneyId`,
-  `startAt`, `endAt`, `kind (block|extra)`, `reason`.
+- **AvailabilityException** *(Phase 5 — shipped, migration 0044)* — per-attorney **full-day** time off
+  (vacation / holidays): `firmId`, `attorneyId`, `startDate`, `endDate` (inclusive). A date in any of an
+  attorney's ranges removes their whole day from the calendar. Partial-day / one-off extra hours + firm-wide
+  holidays + a private label are fast-follows (`specs/_backlog.md`).
 - **No double-booking** *(built, 0043)* — a `btree_gist` exclusion constraint on `consultations`: no two
   active consults for the same attorney whose `[start, start+duration)` ranges overlap. The end is an
   IMMUTABLE epoch helper (`start + interval` is only STABLE → rejected in an index expr). A sibling

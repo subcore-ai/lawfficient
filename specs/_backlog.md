@@ -138,6 +138,11 @@ _Added 2026-06-27 (scoped out of the sellable scheduling core so each phase stay
   RLS); the calendar/slot query unions per-attorney + firm-wide.
 - **Partial-day overrides** — block part of a day (e.g. off 2–4pm) or change hours for a single date, not
   just full-day off. Today's `availability_exceptions` is whole-day only.
+- **Private time-off labels** — an optional reason/label on a time-off entry ("Vacation", "Court"),
+  visible to the owner + admins but NOT `consultations.view`. Dropped from v1 (the `note` column) because
+  RLS is row-level and can't hide one column by app-permission, and booking staff (`consultations.view`)
+  must read the row for the calendar's date-off check. Add back via a `security_invoker` view (note column
+  excluded for non-admins) or a SECURITY DEFINER reader that returns only dates to `consultations.view`.
 - **Booking rules** — per-firm **buffer** between consults, **minimum notice**, **maximum advance**; the
   slot engine (`generateSlots`) trims slots accordingly. (Spec 13 Phasing #5.)
 - **Week view** — single-attorney 7-day grid (spec 13 lists it; only Day is built).

@@ -137,26 +137,35 @@ export async function setMyAvailability(windows: WindowInput[]): Promise<ActionR
 export async function addTimeOff(attorneyId: string, formData: FormData): Promise<ActionResult> {
   const me = await getCurrentUser()
   if (!me) return { error: "You're not signed in." }
+  if (typeof attorneyId !== "string" || !attorneyId) return { error: "Pick a team member." }
   const isAdmin = me.permissions?.includes("settings.manage") ?? false
   if (!isAdmin && attorneyId !== me.id) return { error: "You can only manage your own time off." }
 
-  const parsed = parseTimeOffInput({
-    startDate: formData.get("startDate"),
-    endDate: formData.get("endDate"),
-    note: formData.get("note"),
-  })
+  const parsed = parseTimeOffInput({ startDate: formData.get("startDate"), endDate: formData.get("endDate") })
   if (!parsed.ok) return { error: parsed.error }
+
+  // Admin adding for someone else: pre-check the target is in this firm + schedulable (friendly error; the
+  // composite FK + RLS are the hard guards). Mirrors setAttorneyAvailability. The self path is gated wholly
+  // by RLS (owner + schedulable). Fail closed on a missing firm id so the admin read can't go cross-tenant.
+  if (isAdmin && attorneyId !== me.id) {
+    if (!me.firmId) return { error: "Your session is missing firm context." }
+    const admin = createAdminClient()
+    const { data: prof, error: profErr } = await admin
+      .from("profiles")
+      .select("schedulable")
+      .eq("id", attorneyId)
+      .eq("firm_id", me.firmId)
+      .maybeSingle()
+    if (profErr) return { error: "Couldn't add the time off." }
+    if (!prof) return { error: "That team member isn't in your firm." }
+    if (!prof.schedulable) return { error: "Mark this person schedulable before adding time off." }
+  }
 
   const supabase = await createClient()
   // firm_id defaults to current_firm_id(); .select().single() turns an RLS denial into a real error.
   const { error } = await supabase
     .from("availability_exceptions")
-    .insert({
-      attorney_id: attorneyId,
-      start_date: parsed.value.startDate,
-      end_date: parsed.value.endDate,
-      note: parsed.value.note,
-    })
+    .insert({ attorney_id: attorneyId, start_date: parsed.value.startDate, end_date: parsed.value.endDate })
     .select("id")
     .single()
   if (error) return { error: "Couldn't add the time off." }

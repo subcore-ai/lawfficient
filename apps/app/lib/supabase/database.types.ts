@@ -210,7 +210,6 @@ export type Database = {
           end_date: string
           firm_id: string
           id: string
-          note: string | null
           start_date: string
         }
         Insert: {
@@ -219,7 +218,6 @@ export type Database = {
           end_date: string
           firm_id?: string
           id?: string
-          note?: string | null
           start_date: string
         }
         Update: {
@@ -228,7 +226,6 @@ export type Database = {
           end_date?: string
           firm_id?: string
           id?: string
-          note?: string | null
           start_date?: string
         }
         Relationships: [

@@ -13,6 +13,7 @@ import { TimeOffManager } from "@/components/availability/time-off-manager"
 import { WeeklyHoursEditor } from "@/components/availability/weekly-hours-editor"
 import { mapExceptionRow, type TimeOff } from "@/lib/availability/exceptions"
 import { mapAvailabilityRow, type AvailabilityWindow } from "@/lib/availability/queries"
+import { currentDateInZone } from "@/lib/consultations/time"
 import { getCurrentUser } from "@/lib/auth/session"
 import { createClient } from "@/lib/supabase/server"
 import { isSupabaseConfigured } from "@/lib/supabase/env"
@@ -50,8 +51,10 @@ async function loadMyOfficeHours(): Promise<Load> {
       .order("start_time")
     if (error) return { state: "error" }
 
-    // Upcoming time off only (end_date >= today) — past entries are clutter.
-    const today = new Date().toISOString().slice(0, 10)
+    // Upcoming time off only (end_date >= today in the FIRM's zone, so a UTC rollover can't hide a
+    // still-current entry) — past entries are clutter.
+    const { data: firm } = await supabase.from("firms").select("timezone").maybeSingle()
+    const today = currentDateInZone(firm?.timezone || "America/New_York")
     const { data: off, error: offErr } = await supabase
       .from("availability_exceptions")
       .select("*")

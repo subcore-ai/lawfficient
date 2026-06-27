@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { isDateOff, isValidYmd, parseTimeOffInput } from "./exceptions"
+import { isDateOff, isValidYmd, mapExceptionRow, parseTimeOffInput } from "./exceptions"
 
 describe("isValidYmd", () => {
   test("accepts real dates, rejects malformed / impossible ones", () => {
@@ -31,16 +31,35 @@ describe("isDateOff", () => {
 })
 
 describe("parseTimeOffInput", () => {
-  test("accepts a valid range + trims an optional note", () => {
-    const r = parseTimeOffInput({ startDate: "2026-07-01", endDate: "2026-07-05", note: "  Vacation  " })
-    expect(r).toEqual({ ok: true, value: { startDate: "2026-07-01", endDate: "2026-07-05", note: "Vacation" } })
+  test("accepts a valid range", () => {
+    expect(parseTimeOffInput({ startDate: "2026-07-01", endDate: "2026-07-05" })).toEqual({
+      ok: true,
+      value: { startDate: "2026-07-01", endDate: "2026-07-05" },
+    })
   })
-  test("a single-day range is allowed and an empty note becomes null", () => {
-    const r = parseTimeOffInput({ startDate: "2026-12-25", endDate: "2026-12-25", note: "  " })
-    expect(r).toEqual({ ok: true, value: { startDate: "2026-12-25", endDate: "2026-12-25", note: null } })
+  test("a single-day range is allowed", () => {
+    expect(parseTimeOffInput({ startDate: "2026-12-25", endDate: "2026-12-25" })).toEqual({
+      ok: true,
+      value: { startDate: "2026-12-25", endDate: "2026-12-25" },
+    })
   })
   test("rejects invalid dates and end-before-start", () => {
-    expect(parseTimeOffInput({ startDate: "2026-13-01", endDate: "2026-07-05", note: null }).ok).toBe(false)
-    expect(parseTimeOffInput({ startDate: "2026-07-10", endDate: "2026-07-05", note: null }).ok).toBe(false)
+    expect(parseTimeOffInput({ startDate: "2026-13-01", endDate: "2026-07-05" }).ok).toBe(false)
+    expect(parseTimeOffInput({ startDate: "2026-07-10", endDate: "2026-07-05" }).ok).toBe(false)
+  })
+})
+
+describe("mapExceptionRow", () => {
+  test("maps a DB row to the camelCase TimeOff view", () => {
+    expect(
+      mapExceptionRow({
+        id: "e1",
+        firm_id: "f1",
+        attorney_id: "a1",
+        start_date: "2026-07-01",
+        end_date: "2026-07-05",
+        created_at: "2026-06-27T00:00:00Z",
+      }),
+    ).toEqual({ id: "e1", attorneyId: "a1", startDate: "2026-07-01", endDate: "2026-07-05" })
   })
 })

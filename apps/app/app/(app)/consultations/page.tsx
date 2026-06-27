@@ -10,7 +10,7 @@ import { PageHeader } from "@/components/page-header"
 import { getCurrentUser } from "@/lib/auth/session"
 import { mapConsultationTypeRow, type ConsultationType } from "@/lib/consultations/consultation-types"
 import { mapConsultationRow, partitionConsultations } from "@/lib/consultations/queries"
-import { zonedWallTimeToUtcISO } from "@/lib/consultations/time"
+import { currentDateInZone, zonedWallTimeToUtcISO } from "@/lib/consultations/time"
 import { buildDayCalendar, weekdayOf } from "@/lib/scheduling/day-calendar"
 import { isSupabaseConfigured } from "@/lib/supabase/env"
 import { createClient } from "@/lib/supabase/server"
@@ -20,15 +20,6 @@ export const metadata = { title: "Consultations" }
 const DEFAULT_TZ = "America/New_York"
 // Cap simultaneous attorney columns so the day grid stays legible.
 const MAX_COLUMNS = 6
-
-// The current calendar date in the firm's zone, as YYYY-MM-DD (en-CA renders ISO-style).
-function firmToday(tz: string): string {
-  try {
-    return new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date())
-  } catch {
-    return new Intl.DateTimeFormat("en-CA", { timeZone: DEFAULT_TZ, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date())
-  }
-}
 
 // Shift a calendar date by N days (string math in UTC — only the Y-M-D matters).
 function addDay(date: string, n = 1): string {
@@ -154,7 +145,7 @@ async function renderCalendar({
   // Dedupe so a repeated ?attorneys= value can't create duplicate columns / React keys.
   const valid = Array.from(new Set(requested)).filter((id) => schedulable.some((a) => a.id === id))
   const selectedIds = (valid.length ? valid : schedulable.slice(0, 3).map((a) => a.id)).slice(0, MAX_COLUMNS)
-  const date = typeof sp.date === "string" && isValidYmd(sp.date) ? sp.date : firmToday(zone)
+  const date = typeof sp.date === "string" && isValidYmd(sp.date) ? sp.date : currentDateInZone(zone)
   const selectedType = types.find((t) => t.name === sp.type) ?? types[0]!
 
   const dayEnd = zonedWallTimeToUtcISO(`${addDay(date)}T00:00`, zone)
@@ -226,7 +217,7 @@ async function renderCalendar({
         attorneys={schedulable}
         attorneyIds={selectedIds}
         date={date}
-        today={firmToday(zone)}
+        today={currentDateInZone(zone)}
         types={types}
         typeName={selectedType.name}
       />

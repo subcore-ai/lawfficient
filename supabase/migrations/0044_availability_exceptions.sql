@@ -10,7 +10,6 @@ create table if not exists public.availability_exceptions (
   attorney_id uuid not null,
   start_date date not null,
   end_date date not null, -- inclusive
-  note text, -- optional label, e.g. "Vacation"
   created_at timestamptz not null default now(),
   check (end_date >= start_date),
   -- Tenant isolation: a plain id FK is RLS-bypassed, so use a COMPOSITE FK to profiles(id, firm_id) —

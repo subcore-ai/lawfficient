@@ -9,7 +9,6 @@ export type TimeOff = {
   attorneyId: string
   startDate: string // YYYY-MM-DD (inclusive)
   endDate: string // YYYY-MM-DD (inclusive)
-  note: string | null
 }
 
 export function mapExceptionRow(row: ExceptionRow): TimeOff {
@@ -18,7 +17,6 @@ export function mapExceptionRow(row: ExceptionRow): TimeOff {
     attorneyId: row.attorney_id,
     startDate: row.start_date,
     endDate: row.end_date,
-    note: row.note,
   }
 }
 
@@ -37,21 +35,17 @@ export function isDateOff(exceptions: { startDate: string; endDate: string }[], 
   return exceptions.some((e) => date >= e.startDate && date <= e.endDate)
 }
 
-export type TimeOffInput = { startDate: string; endDate: string; note: string | null }
+export type TimeOffInput = { startDate: string; endDate: string }
 
-// Validate an add-time-off form: two real dates with end >= start, an optional short note.
+// Validate an add-time-off form: two real dates with end >= start.
 export function parseTimeOffInput(raw: {
   startDate: FormDataEntryValue | null
   endDate: FormDataEntryValue | null
-  note: FormDataEntryValue | null
 }): { ok: true; value: TimeOffInput } | { ok: false; error: string } {
   const startDate = typeof raw.startDate === "string" ? raw.startDate.trim() : ""
   const endDate = typeof raw.endDate === "string" ? raw.endDate.trim() : ""
   if (!isValidYmd(startDate) || !isValidYmd(endDate)) return { ok: false, error: "Choose valid start and end dates." }
   if (endDate < startDate) return { ok: false, error: "The end date can't be before the start date." }
 
-  const noteRaw = typeof raw.note === "string" ? raw.note.trim() : ""
-  if (noteRaw.length > 100) return { ok: false, error: "Keep the note under 100 characters." }
-
-  return { ok: true, value: { startDate, endDate, note: noteRaw === "" ? null : noteRaw } }
+  return { ok: true, value: { startDate, endDate } }
 }
