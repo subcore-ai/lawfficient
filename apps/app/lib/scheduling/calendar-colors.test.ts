@@ -7,7 +7,6 @@ describe("calendar colors", () => {
     expect(CALENDAR_COLORS).toHaveLength(15)
     expect(new Set(CALENDAR_COLORS.map((c) => c.key)).size).toBe(15)
     for (const c of CALENDAR_COLORS) {
-      expect(c.tint).toMatch(/^#[0-9a-f]{6}$/)
       expect(c.solid).toMatch(/^#[0-9a-f]{6}$/)
       expect(c.text).toMatch(/^#[0-9a-f]{6}$/)
     }

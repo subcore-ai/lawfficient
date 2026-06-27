@@ -47,8 +47,11 @@ export function CalendarColumn({
   const top = (min: number) => (min - gridStartMin) * PX_PER_MIN
   const height = (mins: number) => Math.max(mins * PX_PER_MIN, 16)
   // The attorney's color → inline tints that override the default brand classes. No color = default styling.
-  const officeTint = color ? { backgroundColor: color.tint } : {}
-  const slotTint = color ? { borderColor: color.solid, color: color.text } : {}
+  // Office hours mix the color with the THEME background, so the shading is a light tint in light mode and a
+  // dark tint in dark mode (a fixed pastel looked washed-out on dark). Slot text stays theme-aware; the
+  // consult block is the opaque color with its own readable text (mode-independent).
+  const officeTint = color ? { backgroundColor: `color-mix(in oklab, ${color.solid} 30%, var(--background))` } : {}
+  const slotTint = color ? { borderColor: color.solid, color: "var(--muted-foreground)" } : {}
   const consultTint = color ? { backgroundColor: color.solid, color: color.text } : {}
 
   return (
