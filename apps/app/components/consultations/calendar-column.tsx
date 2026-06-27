@@ -1,6 +1,9 @@
 "use client"
 
+import * as React from "react"
+
 import { BookConsultationDialog } from "@/components/consultations/book-consultation-dialog"
+import { ConsultPreviewDialog } from "@/components/consultations/consult-preview-dialog"
 import type { ConsultationType } from "@/lib/consultations/consultation-types"
 import { formatSlotTime, type CalendarConsult, type CalendarSlot, type CalendarWindow } from "@/lib/scheduling/day-calendar"
 
@@ -40,6 +43,7 @@ export function CalendarColumn({
 }) {
   const top = (min: number) => (min - gridStartMin) * PX_PER_MIN
   const height = (mins: number) => Math.max(mins * PX_PER_MIN, 16)
+  const [selected, setSelected] = React.useState<CalendarConsult | null>(null)
 
   return (
     <>
@@ -98,18 +102,29 @@ export function CalendarColumn({
         )
       })}
 
-      {/* Booked consults — drawn over slots/shading. */}
+      {/* Booked consults — drawn over slots/shading; click for the detail dialog. */}
       {consults.map((c) => (
-        <div
+        <button
           key={c.id}
+          type="button"
+          onClick={() => setSelected(c)}
           title={`${c.leadName} · ${c.type} · ${formatSlotTime(c.startMin)}`}
-          className="bg-primary/85 text-primary-foreground absolute inset-x-0.5 overflow-hidden rounded px-1.5 py-0.5 text-[11px] leading-tight shadow-sm"
+          className="bg-primary/85 text-primary-foreground hover:bg-primary absolute inset-x-0.5 cursor-pointer overflow-hidden rounded px-1.5 py-0.5 text-left text-[11px] leading-tight shadow-sm transition-colors"
           style={{ top: top(c.startMin), height: height(c.endMin - c.startMin) }}
         >
           <span className="block truncate font-medium">{c.leadName}</span>
           <span className="block truncate opacity-80">{c.type}</span>
-        </div>
+        </button>
       ))}
+
+      <ConsultPreviewDialog
+        consult={selected}
+        open={selected !== null}
+        onOpenChange={(o) => {
+          if (!o) setSelected(null)
+        }}
+        canManage={canBook}
+      />
     </>
   )
 }

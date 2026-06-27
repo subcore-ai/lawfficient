@@ -165,7 +165,7 @@ async function renderCalendar({
     loadFrom && dayEnd
       ? supabase
           .from("consultations")
-          .select("id, attorney_id, start_at, duration_min, type, lead_id, status")
+          .select("id, attorney_id, start_at, duration_min, type, lead_id, status, time_zone, outcome")
           .in("attorney_id", selectedIds)
           .eq("archived", false)
           .gte("start_at", loadFrom)
@@ -204,6 +204,9 @@ async function renderCalendar({
         type: c.type,
         leadName: leadNames.get(c.lead_id ?? "") ?? "Lead",
         status: c.status ?? "",
+        leadId: c.lead_id,
+        timeZone: c.time_zone,
+        outcome: c.outcome,
       }))
     const cal = buildDayCalendar({ date, tz: zone, windows, consults, durationMin: selectedType.durationMin, nowMs })
     return { attorney: schedulable.find((a) => a.id === id)!, cal, off }

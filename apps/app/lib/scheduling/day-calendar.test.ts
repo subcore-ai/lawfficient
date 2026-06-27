@@ -20,7 +20,7 @@ describe("buildDayCalendar (America/New_York, summer = EDT, UTC-4)", () => {
       windows: [{ startTime: "09:00", endTime: "12:00" }],
       // 14:00Z = 10:00 EDT
       consults: [
-        { id: "c1", startAt: "2026-07-01T14:00:00Z", durationMin: 30, leadName: "Maria", type: "Initial", status: "scheduled" },
+        { id: "c1", startAt: "2026-07-01T14:00:00Z", durationMin: 30, leadName: "Maria", type: "Initial", status: "scheduled", leadId: "l1", timeZone: tz, outcome: null },
       ],
       durationMin: 30,
       nowMs: 0,
@@ -49,7 +49,7 @@ describe("buildDayCalendar (America/New_York, summer = EDT, UTC-4)", () => {
       tz,
       windows: [{ startTime: "00:00", endTime: "01:00" }], // hours straddling midnight so the carry-over overlaps
       // 03:30Z = 23:30 EDT on Jun 30 (prior day), 60 min → runs to 00:30 EDT Jul 1
-      consults: [{ id: "carry", startAt: "2026-07-01T03:30:00Z", durationMin: 60, leadName: "Owl", type: "Initial", status: "scheduled" }],
+      consults: [{ id: "carry", startAt: "2026-07-01T03:30:00Z", durationMin: 60, leadName: "Owl", type: "Initial", status: "scheduled", leadId: "l2", timeZone: tz, outcome: null }],
       durationMin: 30,
       nowMs: 0,
     })
