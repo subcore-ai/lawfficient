@@ -27,6 +27,7 @@ import {
 import { toast } from "@workspace/ui/components/sonner"
 
 import { createConsultation } from "@/app/(app)/consultations/actions"
+import { Combobox } from "@/components/combobox"
 import { Field } from "@/components/form-field"
 import type { ConsultationType } from "@/lib/consultations/consultation-types"
 import { addMinutesToTime, minutesBetween, splitWall } from "@/lib/consultations/time"
@@ -196,18 +197,15 @@ export function BookConsultationDialog({
           <div className="grid gap-4 py-5 sm:grid-cols-2">
             {triggerLeadId ? null : (
               <Field label="Lead" htmlFor={leadSelectId} className="sm:col-span-2">
-                <Select value={leadId} onValueChange={(v) => setLeadId(v ?? "")} items={leads.map((l) => ({ value: l.id, label: l.name }))}>
-                  <SelectTrigger id={leadSelectId} className="w-full">
-                    <SelectValue placeholder={leads.length ? "Select a lead" : "No leads yet"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {leads.map((l) => (
-                      <SelectItem key={l.id} value={l.id}>
-                        {l.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Combobox
+                  id={leadSelectId}
+                  value={leadId}
+                  onValueChange={setLeadId}
+                  options={leads.map((l) => ({ value: l.id, label: l.name }))}
+                  placeholder={leads.length ? "Select a lead" : "No leads yet"}
+                  searchPlaceholder="Search leads…"
+                  emptyText="No leads found."
+                />
               </Field>
             )}
             <Field label="Consultation type" htmlFor={typeSelectId}>
