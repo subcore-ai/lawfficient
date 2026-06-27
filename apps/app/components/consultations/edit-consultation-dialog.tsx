@@ -48,6 +48,7 @@ export function EditConsultationDialog({
   const fromId = React.useId()
   const toId = React.useId()
   const amountId = React.useId()
+  const paidId = React.useId()
 
   const [loading, setLoading] = React.useState(true)
   const [loadError, setLoadError] = React.useState<string | null>(null)
@@ -65,6 +66,17 @@ export function EditConsultationDialog({
   const [toTime, setToTime] = React.useState("")
   const [zone, setZone] = React.useState("")
   const [pending, startTransition] = React.useTransition()
+
+  // Reset transient state when the dialog reopens (it stays mounted) so it shows the loader, not the
+  // previously-loaded consult. Adjusted during render on the open transition, not in the load effect.
+  const [wasOpen, setWasOpen] = React.useState(false)
+  if (open !== wasOpen) {
+    setWasOpen(open)
+    if (open) {
+      setLoading(true)
+      setLoadError(null)
+    }
+  }
 
   // Load + seed each time the dialog opens (it's controlled by the actions menu and stays mounted).
   React.useEffect(() => {
@@ -261,8 +273,8 @@ export function EditConsultationDialog({
                     <Input id={amountId} type="number" min={0} step="0.01" className="w-32" value={amount} onChange={(e) => setAmount(Number(e.target.value) || 0)} />
                   </Field>
                   <div className="flex h-9 items-center gap-2">
-                    <Checkbox id="edit-paid" checked={paid} onCheckedChange={(c) => setPaid(c === true)} />
-                    <Label htmlFor="edit-paid" className="text-sm font-normal">
+                    <Checkbox id={paidId} checked={paid} onCheckedChange={(c) => setPaid(c === true)} />
+                    <Label htmlFor={paidId} className="text-sm font-normal">
                       Already paid
                     </Label>
                   </div>

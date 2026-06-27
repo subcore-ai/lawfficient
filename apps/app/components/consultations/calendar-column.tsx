@@ -153,7 +153,7 @@ export function CalendarColumn({
             <span className="block truncate font-medium">{c.leadName}</span>
             <span className="block truncate opacity-80">{c.type}</span>
           </span>
-          <span className="shrink-0 text-[10px] whitespace-nowrap opacity-60 tabular-nums">
+          <span className="shrink-0 text-[10px] whitespace-nowrap opacity-75 tabular-nums">
             {formatSlotTime(c.startMin)} – {formatSlotTime(c.endMin)}
           </span>
         </button>

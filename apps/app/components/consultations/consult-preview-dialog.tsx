@@ -14,6 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@workspace/ui/components/dialog"
+import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select"
 import { toast } from "@workspace/ui/components/sonner"
@@ -23,7 +24,8 @@ import { ConsultationActions } from "@/components/consultations/consultation-act
 import { loadConsultationForEdit, updateConsultation } from "@/app/(app)/consultations/actions"
 import type { ConsultationType } from "@/lib/consultations/consultation-types"
 import { consultationStatusMeta } from "@/lib/consultations/queries"
-import { addMinutesToTime, minutesBetween, splitWall, utcToZonedInput } from "@/lib/consultations/time"
+import { addMinutesToTime, formatConsultationWhen, minutesBetween, splitWall, utcToZonedInput } from "@/lib/consultations/time"
+import type { ConsultationStatus } from "@/lib/consultations/validation"
 import type { CalendarConsult } from "@/lib/scheduling/day-calendar"
 
 type Option = { id: string; name: string }
@@ -42,8 +44,14 @@ function formatDuration(min: number): string {
   return [h ? `${h}h` : "", m ? `${m}m` : ""].filter(Boolean).join(" ") || "0m"
 }
 
-// Click-through detail for a booked consult — opens in place (no navigation) and is editable inline:
-// date/time are live immediately, type + attorney sit behind "Edit all fields". One view, not two.
+// Only live consults are editable here; finalized ones (completed/canceled/no_show) are read-only — the
+// same statuses `loadConsultationForEdit` / `updateConsultation` accept.
+function isLive(status: ConsultationStatus): boolean {
+  return status === "scheduled" || status === "paid" || status === "rescheduled"
+}
+
+// Click-through detail for a booked consult — opens in place (no navigation). For a live consult it's also
+// the editor: date/time are live inline, type + attorney sit behind "Edit all fields". One view, not two.
 export function ConsultPreviewDialog({
   consult,
   open,
@@ -55,7 +63,11 @@ export function ConsultPreviewDialog({
   onOpenChange: (o: boolean) => void
   canManage: boolean
 }) {
+  const amountId = React.useId()
+  const paidId = React.useId()
+
   const [ready, setReady] = React.useState(false)
+  const [loadError, setLoadError] = React.useState<string | null>(null)
   const [attorneys, setAttorneys] = React.useState<Option[]>([])
   const [types, setTypes] = React.useState<ConsultationType[]>([])
   const [leadId, setLeadId] = React.useState("")
@@ -84,8 +96,10 @@ export function ConsultPreviewDialog({
   const initialFocusRef = React.useRef<HTMLButtonElement>(null)
   const [pending, startTransition] = React.useTransition()
 
-  // Seed time/type from the calendar consult during render (so editing is instant), keyed by the consult
-  // being shown — React-recommended adjust-on-change rather than a sync setState in an effect.
+  const editable = canManage && !!consult && isLive(consult.status)
+
+  // Seed time/type from the calendar consult during render for an instant read (the load below corrects to
+  // the canonical DB row). Keyed by the consult being shown — adjust-on-change, not a sync setState effect.
   const activeId = open && consult ? consult.id : null
   if (activeId !== seededId) {
     setSeededId(activeId)
@@ -97,42 +111,62 @@ export function ConsultPreviewDialog({
       setType(consult.type)
       setShowAll(false)
       setReady(false)
+      setLoadError(null)
     }
   }
 
-  // Load attorney / fee / paid + the picker lists (for "Edit all fields" and saving) in the background.
+  // Load the canonical row + picker lists (only for a live consult). Seed the editable fields AND the
+  // dirty-baseline from the freshly-loaded values, never the (possibly stale) calendar prop.
   React.useEffect(() => {
-    if (!open || !consult) return
+    if (!open || !consult || !editable) return
     let active = true
     loadConsultationForEdit(consult.id)
       .then((r) => {
-        if (!active || !r.ok) return
+        if (!active) return
+        if (!r.ok) {
+          setLoadError(r.error)
+          return
+        }
+        const c = r.consult
+        const when = splitWall(utcToZonedInput(c.startAtIso, c.timeZone))
+        const to = when.time ? addMinutesToTime(when.time, c.durationMin) : ""
         setAttorneys(r.attorneys)
         setTypes(r.consultationTypes)
-        setLeadId(r.consult.leadId)
-        setAttorney(r.consult.attorneyId ?? UNASSIGNED)
-        setAmount(r.consult.amount ?? 0)
-        setPaid(r.consult.paid)
-        setReady(true)
-        const seedWhen = splitWall(utcToZonedInput(consult.startAt, consult.timeZone))
+        setLeadId(c.leadId)
+        setDay(when.day)
+        setFromTime(when.time)
+        setToTime(to)
+        setType(c.type)
+        setAttorney(c.attorneyId ?? UNASSIGNED)
+        setAmount(c.amount ?? 0)
+        setPaid(c.paid)
         setOriginal({
-          date: seedWhen.day,
-          from: seedWhen.time,
-          to: seedWhen.time ? addMinutesToTime(seedWhen.time, consult.endMin - consult.startMin) : "",
-          type: consult.type,
-          attorney: r.consult.attorneyId ?? UNASSIGNED,
-          amount: r.consult.amount ?? 0,
-          paid: r.consult.paid,
+          date: when.day,
+          from: when.time,
+          to,
+          type: c.type,
+          attorney: c.attorneyId ?? UNASSIGNED,
+          amount: c.amount ?? 0,
+          paid: c.paid,
         })
+        setReady(true)
       })
-      .catch(() => {})
+      .catch(() => {
+        if (active) setLoadError("Couldn't load the consultation.")
+      })
     return () => {
       active = false
     }
-  }, [open, consult])
+  }, [open, consult, editable])
 
   const activeTypes = types.filter((t) => t.isActive)
   const selected = activeTypes.find((t) => t.name === type)
+  // Keep the consult's current type selectable even if it's since been deactivated.
+  const typeNames = new Set(activeTypes.map((t) => t.name))
+  const typeItems = [
+    ...activeTypes.map((t) => ({ value: t.name, label: t.name })),
+    ...(type && !typeNames.has(type) ? [{ value: type, label: `${type} (inactive)` }] : []),
+  ]
   const chargeable = (selected?.price ?? 0) > 0 || amount > 0
   const typeDuration = selected?.durationMin ?? 30
   const durationMin = fromTime && toTime ? minutesBetween(fromTime, toTime) : 0
@@ -201,7 +235,7 @@ export function ConsultPreviewDialog({
             <dl className="grid grid-cols-[5rem_1fr] items-center gap-x-4 gap-y-2.5 py-2 text-sm">
               <dt className="text-muted-foreground self-start pt-1">When</dt>
               <dd className="space-y-1">
-                {canManage ? (
+                {editable ? (
                   <>
                     <div>
                       <input type="date" value={day} onChange={(e) => setDay(e.target.value)} className={cn(INLINE)} aria-label="Date" />
@@ -230,7 +264,7 @@ export function ConsultPreviewDialog({
                     </div>
                   </>
                 ) : (
-                  <span>{`${day} · ${fromTime} – ${toTime}`}</span>
+                  <span>{formatConsultationWhen(consult.startAt, consult.timeZone)}</span>
                 )}
               </dd>
 
@@ -245,7 +279,9 @@ export function ConsultPreviewDialog({
               ) : null}
             </dl>
 
-            {canManage ? (
+            {editable && loadError ? <p className="text-destructive text-sm">{loadError}</p> : null}
+
+            {editable ? (
               <div className="border-t pt-3">
                 <button
                   type="button"
@@ -262,14 +298,14 @@ export function ConsultPreviewDialog({
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
                     <div className="grid gap-1.5">
                       <Label className="text-muted-foreground text-xs">Consultation type</Label>
-                      <Select value={type} onValueChange={(v) => onTypeChange(v ?? "")} items={activeTypes.map((t) => ({ value: t.name, label: t.name }))} disabled={!ready}>
+                      <Select value={type} onValueChange={(v) => onTypeChange(v ?? "")} items={typeItems} disabled={!ready}>
                         <SelectTrigger className="w-full">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {activeTypes.map((t) => (
-                            <SelectItem key={t.id} value={t.name}>
-                              {t.name}
+                          {typeItems.map((t) => (
+                            <SelectItem key={t.value} value={t.value}>
+                              {t.label}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -292,11 +328,19 @@ export function ConsultPreviewDialog({
                       </Select>
                     </div>
                     {chargeable ? (
-                      <div className="flex items-center gap-2 sm:col-span-2">
-                        <Checkbox id="preview-paid" checked={paid} onCheckedChange={(c) => setPaid(c === true)} disabled={!ready} />
-                        <Label htmlFor="preview-paid" className="text-sm font-normal">
-                          Already paid
-                        </Label>
+                      <div className="flex items-end gap-4 sm:col-span-2">
+                        <div className="grid gap-1.5">
+                          <Label htmlFor={amountId} className="text-muted-foreground text-xs">
+                            Fee ($)
+                          </Label>
+                          <Input id={amountId} type="number" min={0} step="0.01" className="w-32" value={amount} onChange={(e) => setAmount(Number(e.target.value) || 0)} disabled={!ready} />
+                        </div>
+                        <div className="flex h-9 items-center gap-2">
+                          <Checkbox id={paidId} checked={paid} onCheckedChange={(c) => setPaid(c === true)} disabled={!ready} />
+                          <Label htmlFor={paidId} className="text-sm font-normal">
+                            Already paid
+                          </Label>
+                        </div>
                       </div>
                     ) : null}
                   </div>
@@ -315,9 +359,11 @@ export function ConsultPreviewDialog({
               )}
               {canManage ? (
                 <div className="flex items-center gap-2">
-                  <Button size="sm" onClick={save} disabled={pending || !ready || !validTime || !dirty}>
-                    {pending ? "Saving…" : "Save changes"}
-                  </Button>
+                  {editable ? (
+                    <Button size="sm" onClick={save} disabled={pending || !ready || !validTime || !dirty}>
+                      {pending ? "Saving…" : "Save changes"}
+                    </Button>
+                  ) : null}
                   <ConsultationActions consultationId={consult.id} status={consult.status} outcome={consult.outcome} hideEdit compact />
                 </div>
               ) : null}

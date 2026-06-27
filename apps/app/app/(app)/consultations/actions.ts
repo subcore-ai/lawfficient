@@ -105,18 +105,13 @@ export async function loadConsultationForEdit(id: string): Promise<LoadConsultat
   if (!gate.ok) return { ok: false, error: gate.error }
 
   const supabase = await createClient()
-  const [consultRes, staffRes, typesRes] = await Promise.all([
-    supabase
-      .from("consultations")
-      .select("id, lead_id, attorney_id, type, start_at, duration_min, time_zone, amount, paid, status")
-      .eq("id", id)
-      .single(),
-    supabase.from("profiles").select("id, name").eq("status", "active").order("name"),
-    supabase.from("consultation_types").select("*").eq("is_active", true).order("position").order("created_at"),
-  ])
-
-  const c = consultRes.data
-  if (consultRes.error || !c) return { ok: false, error: "Couldn't load the consultation." }
+  // Load the consult first — we need its attorney_id to also fetch that attorney even if deactivated.
+  const { data: c, error: consultErr } = await supabase
+    .from("consultations")
+    .select("id, lead_id, attorney_id, type, start_at, duration_min, time_zone, amount, paid, status")
+    .eq("id", id)
+    .single()
+  if (consultErr || !c) return { ok: false, error: "Couldn't load the consultation." }
   if (c.status === "completed" || c.status === "canceled" || c.status === "no_show") {
     return { ok: false, error: "This consultation is finalized and can't be edited." }
   }
@@ -124,7 +119,14 @@ export async function loadConsultationForEdit(id: string): Promise<LoadConsultat
   // lead_id is nullable in the schema (a deleted lead orphans the consult); coerce so the form's leadId
   // stays a string. An empty leadId just yields no lead name — a rare orphaned-consult edge.
   const leadId = c.lead_id ?? ""
-  const { data: lead } = await supabase.from("leads").select("first_name, last_name").eq("id", leadId).maybeSingle()
+  // Include the consult's current attorney even if since deactivated, so the edit form keeps + displays it.
+  const profileFilter = c.attorney_id ? `status.eq.active,id.eq.${c.attorney_id}` : "status.eq.active"
+  const [staffRes, typesRes, leadRes] = await Promise.all([
+    supabase.from("profiles").select("id, name").or(profileFilter).order("name"),
+    supabase.from("consultation_types").select("*").eq("is_active", true).order("position").order("created_at"),
+    supabase.from("leads").select("first_name, last_name").eq("id", leadId).maybeSingle(),
+  ])
+  const lead = leadRes.data
 
   return {
     ok: true,
