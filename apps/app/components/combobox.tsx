@@ -60,7 +60,17 @@ export function Combobox({
         </span>
         <ChevronsUpDown className="size-4 shrink-0 opacity-50" />
       </PopoverTrigger>
-      <PopoverContent align="start" sideOffset={4} className="w-(--anchor-width) p-0">
+      <PopoverContent
+        align="start"
+        sideOffset={4}
+        className="w-(--anchor-width) p-0"
+        initialFocus={() => {
+          // Focus the search field WITHOUT scrolling: a positioned popup can otherwise focus before it's
+          // placed, jumping the page to the top. Returning false skips Base UI's own (scrolling) focus.
+          document.querySelector<HTMLInputElement>('[data-slot="command-input"]')?.focus({ preventScroll: true })
+          return false
+        }}
+      >
         <Command>
           <CommandInput placeholder={searchPlaceholder} />
           <CommandList>
