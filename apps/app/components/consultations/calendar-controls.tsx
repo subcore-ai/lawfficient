@@ -91,7 +91,7 @@ export function CalendarControls({
         <Button variant="outline" size="icon" onClick={() => go({ date: shift(-1) })} aria-label="Previous day">
           <ChevronLeft className="size-4" />
         </Button>
-        <Button variant="outline" size="sm" onClick={() => go({ date: today })} disabled={date === today}>
+        <Button variant="outline" size="default" onClick={() => go({ date: today })} disabled={date === today}>
           Today
         </Button>
         <Button variant="outline" size="icon" onClick={() => go({ date: shift(1) })} aria-label="Next day">
