@@ -50,7 +50,8 @@ async function load(): Promise<Loaded> {
   if (consultRes.error) throw consultRes.error
   if (leadsRes.error) throw leadsRes.error
   if (staffRes.error) throw staffRes.error
-  if (typesRes.error) throw typesRes.error
+  // Types are best-effort: the picker only renders for editors, so a types read failure must not break
+  // the page (or its list) for view-only users — it just falls back to an empty picker.
 
   const allLeads = leadsRes.data ?? []
   const allProfiles = staffRes.data ?? []
@@ -72,7 +73,7 @@ async function load(): Promise<Loaded> {
     past,
     leads: leadOptions,
     attorneys,
-    consultationTypes: (typesRes.data ?? []).map(mapConsultationTypeRow),
+    consultationTypes: typesRes.error ? [] : (typesRes.data ?? []).map(mapConsultationTypeRow),
     canManage: me?.permissions?.includes("consultations.edit") ?? false,
     // Best-effort: a firm-read failure just falls back to the dialog's own default zone.
     defaultTimeZone: firmRes.data?.timezone ?? null,

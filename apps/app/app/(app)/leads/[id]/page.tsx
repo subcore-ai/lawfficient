@@ -65,7 +65,8 @@ async function load(id: string): Promise<Loaded | null> {
   if (leadRes.error) throw leadRes.error
   if (notesRes.error) throw notesRes.error
   if (consultRes.error) throw consultRes.error
-  if (typesRes.error) throw typesRes.error
+  // Types are best-effort (the booking picker only shows for editors): a failure shouldn't break the
+  // lead page for viewers.
   if (!leadRes.data) return null
 
   const statuses = statusRows.map(mapLeadStatus)
@@ -98,7 +99,7 @@ async function load(id: string): Promise<Loaded | null> {
     canManageConsultations: me.permissions?.includes("consultations.edit") ?? false,
     // Best-effort: a firm-read failure just falls back to the dialog's own default zone.
     consultDefaultTimeZone: firmRes.data?.timezone ?? null,
-    consultationTypes: (typesRes.data ?? []).map(mapConsultationTypeRow),
+    consultationTypes: typesRes.error ? [] : (typesRes.data ?? []).map(mapConsultationTypeRow),
   }
 }
 

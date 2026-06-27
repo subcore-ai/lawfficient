@@ -249,7 +249,7 @@ export function BookConsultationDialog({
 
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
-            <Button type="submit" disabled={pending || !leadId || !type}>
+            <Button type="submit" disabled={pending || !leadId || !selected}>
               {pending ? "Booking…" : "Book consultation"}
             </Button>
           </DialogFooter>
