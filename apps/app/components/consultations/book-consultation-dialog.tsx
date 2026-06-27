@@ -135,9 +135,11 @@ export function BookConsultationDialog({
     fd.set("type", type)
     fd.set("durationMin", String(durationMin))
     fd.set("startAt", start)
-    // An unedited click-booked slot books its exact instant (avoids the DST-fallback wall ambiguity); a
-    // hand-edited "When" re-derives from wall + zone.
-    fd.set("startAtIso", prefillStartIso && start === (prefillStart ?? "") ? prefillStartIso : "")
+    // An unedited click-booked slot books its exact instant (avoids the DST-fallback wall ambiguity). Only
+    // when BOTH the time AND the zone are untouched — changing either means the user re-expressed the
+    // moment, so the server re-derives it from wall + zone.
+    const unchanged = prefillStartIso && start === (prefillStart ?? "") && zone === initialZone
+    fd.set("startAtIso", unchanged ? prefillStartIso : "")
     fd.set("timeZone", zone)
     // Fee + paid only apply to a chargeable type; a free booking carries no amount and is never "paid".
     fd.set("amount", chargeable ? String(amount) : "")
