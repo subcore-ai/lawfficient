@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 
-import { getCurrentUser, type CurrentUser } from "@/lib/auth/session"
+import { requirePermission } from "@/lib/auth/gate"
 import { ALL_PERMISSIONS, type AppPermission } from "@/lib/rbac/permissions"
 import { createClient } from "@/lib/supabase/server"
 
@@ -10,18 +10,10 @@ export type ActionResult = { ok: true } | { error: string }
 
 const ROLES_PATH = "/settings/roles"
 
-type AdminGate = { ok: true; user: CurrentUser } | { ok: false; error: string }
-
 // Every action funnels through this — signed-out callers and users without
 // settings.manage can't manage roles. RLS (authorize('settings.manage'), firm-scoped)
 // is the real enforcement; this gives a clean error first.
-async function requireAdmin(): Promise<AdminGate> {
-  const user = await getCurrentUser()
-  if (!user) return { ok: false, error: "You're not signed in." }
-  if (!(user.permissions?.includes("settings.manage") ?? false))
-    return { ok: false, error: "You don't have permission to manage roles." }
-  return { ok: true, user }
-}
+const requireAdmin = () => requirePermission("settings.manage", "roles")
 
 // Best-effort: a logging failure must never roll back the actual change, and
 // 'role' only becomes a valid audit_entity once migration 0010 is applied.

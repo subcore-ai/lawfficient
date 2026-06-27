@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 
-import { getCurrentUser, type CurrentUser } from "@/lib/auth/session"
+import { requirePermission } from "@/lib/auth/gate"
 import { formatConsultationWhen, zonedWallTimeToUtcISO } from "@/lib/consultations/time"
 import { parseConsultationInput, type ConsultationStatus } from "@/lib/consultations/validation"
 import { recordLeadEvent } from "@/lib/leads/events"
@@ -23,16 +23,9 @@ const STATUS_EVENT: Record<string, string> = {
   canceled: "Consultation canceled",
 }
 
-type Gate = { ok: true; user: CurrentUser } | { ok: false; error: string }
 type DbClient = Awaited<ReturnType<typeof createClient>>
 
-async function requireConsultEdit(): Promise<Gate> {
-  const user = await getCurrentUser()
-  if (!user) return { ok: false, error: "You're not signed in." }
-  if (!(user.permissions?.includes("consultations.edit") ?? false))
-    return { ok: false, error: "You don't have permission to manage consultations." }
-  return { ok: true, user }
-}
+const requireConsultEdit = () => requirePermission("consultations.edit", "consultations")
 
 async function audit(supabase: DbClient, byUserId: string, id: string, label: string, action: string) {
   try {

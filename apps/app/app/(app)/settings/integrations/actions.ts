@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache"
 
 import { API_SCOPES } from "@/lib/api/scopes"
-import { getCurrentUser, type CurrentUser } from "@/lib/auth/session"
+import { requirePermission } from "@/lib/auth/gate"
 import { generateKey } from "@/lib/ingest/keys"
 import { createClient } from "@/lib/supabase/server"
 
@@ -13,17 +13,10 @@ export type KeyResult = { ok: true; rawKey: string; sourceKey: string } | { erro
 
 const PATH = "/settings/integrations"
 
-type Gate = { ok: true; user: CurrentUser } | { ok: false; error: string }
 type DbClient = Awaited<ReturnType<typeof createClient>>
 
 // RLS (authorize('settings.manage'), firm-scoped) is the real gate; this returns a clean error first.
-async function requireAdmin(): Promise<Gate> {
-  const user = await getCurrentUser()
-  if (!user) return { ok: false, error: "You're not signed in." }
-  if (!(user.permissions?.includes("settings.manage") ?? false))
-    return { ok: false, error: "You don't have permission to manage integrations." }
-  return { ok: true, user }
-}
+const requireAdmin = () => requirePermission("settings.manage", "integrations")
 
 async function audit(supabase: DbClient, byUserId: string, sourceId: string, label: string, action: string) {
   try {

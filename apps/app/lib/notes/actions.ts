@@ -2,13 +2,13 @@
 
 import { revalidatePath } from "next/cache"
 
-import { getCurrentUser, type CurrentUser } from "@/lib/auth/session"
+import { requirePermission } from "@/lib/auth/gate"
+import { getCurrentUser } from "@/lib/auth/session"
 import type { NoteEntityType } from "@/lib/notes/queries"
 import { createClient } from "@/lib/supabase/server"
 
 export type ActionResult = { ok: true } | { error: string }
 
-type Gate = { ok: true; user: CurrentUser } | { ok: false; error: string }
 type NotesClient = Awaited<ReturnType<typeof createClient>>
 
 // Detail paths that render a given entity's notes — revalidated after a note mutation. Extend as
@@ -26,13 +26,7 @@ function revalidateEntity(entityType: string, entityId: string) {
 // Notes ride on the parent entity's permissions: writing requires that entity's edit permission.
 // v1 is leads-only, so this is leads.edit (extended per entity alongside the RLS policies). RLS is
 // the real enforcement; this returns a clean error first.
-async function requireNotesEdit(): Promise<Gate> {
-  const user = await getCurrentUser()
-  if (!user) return { ok: false, error: "You're not signed in." }
-  if (!(user.permissions?.includes("leads.edit") ?? false))
-    return { ok: false, error: "You don't have permission to manage notes." }
-  return { ok: true, user }
-}
+const requireNotesEdit = () => requirePermission("leads.edit", "notes")
 
 // Best-effort audit under the PARENT entity (entity='lead'), so a lead's history stays in one place.
 async function audit(

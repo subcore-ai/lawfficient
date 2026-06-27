@@ -2,7 +2,7 @@
 
 import { revalidatePath, revalidateTag } from "next/cache"
 
-import { getCurrentUser, type CurrentUser } from "@/lib/auth/session"
+import { requirePermission } from "@/lib/auth/gate"
 import { taxonomiesTag } from "@/lib/reference"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
@@ -23,17 +23,10 @@ function revalidateTaxonomyViews(firmId: string) {
   revalidatePath("/leads/[id]", "page") // lead detail (dynamic) — its edit dialog uses the vocab
 }
 
-type Gate = { ok: true; user: CurrentUser } | { ok: false; error: string }
 type DbClient = Awaited<ReturnType<typeof createClient>>
 
 // RLS (authorize('settings.manage'), firm-scoped) is the real gate; this returns a clean error first.
-async function requireAdmin(): Promise<Gate> {
-  const user = await getCurrentUser()
-  if (!user) return { ok: false, error: "You're not signed in." }
-  if (!(user.permissions?.includes("settings.manage") ?? false))
-    return { ok: false, error: "You don't have permission to manage taxonomies." }
-  return { ok: true, user }
-}
+const requireAdmin = () => requirePermission("settings.manage", "taxonomies")
 
 async function audit(supabase: DbClient, byUserId: string, id: string, label: string, action: string) {
   try {

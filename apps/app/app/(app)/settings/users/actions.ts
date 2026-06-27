@@ -3,7 +3,7 @@
 import { headers } from "next/headers"
 import { revalidatePath, revalidateTag } from "next/cache"
 
-import { getCurrentUser, type CurrentUser } from "@/lib/auth/session"
+import { requirePermission } from "@/lib/auth/gate"
 import { staffTag } from "@/lib/reference"
 import type { AppPermission } from "@/lib/rbac/permissions"
 import { createClient } from "@/lib/supabase/server"
@@ -14,20 +14,10 @@ export type ActionResult = { ok: true } | { error: string }
 
 const USERS_PATH = "/settings/users"
 
-type AdminGate = { ok: true; user: CurrentUser } | { ok: false; error: string }
-
 // Every action funnels through this — signed-out callers and non-admins can't
 // manage users. RLS is the real enforcement; this gives a clean error first.
-async function requireAdmin(
-  perm: AppPermission = "users.manage",
-  resource = "users",
-): Promise<AdminGate> {
-  const user = await getCurrentUser()
-  if (!user) return { ok: false, error: "You're not signed in." }
-  if (!(user.permissions?.includes(perm) ?? false))
-    return { ok: false, error: `You don't have permission to manage ${resource}.` }
-  return { ok: true, user }
-}
+const requireAdmin = (perm: AppPermission = "users.manage", resource = "users") =>
+  requirePermission(perm, resource)
 
 // A firm's *other* active admins, or null if the query fails. Callers only
 // hard-block on a definitive 0, so a transient query error can't produce a
