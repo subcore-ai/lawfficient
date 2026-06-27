@@ -57,7 +57,8 @@ export function ConsultPreviewDialog({
 
             <DialogFooter className="flex-row items-center sm:justify-between">
               {consult.leadId ? (
-                <Button variant="outline" size="sm" render={<Link href={`/leads/${consult.leadId}`} />}>
+                // render as a Link (an <a>), so tell Base UI it isn't a native <button>.
+                <Button variant="outline" size="sm" nativeButton={false} render={<Link href={`/leads/${consult.leadId}`} />}>
                   View full case <ArrowUpRight className="size-4" />
                 </Button>
               ) : (
