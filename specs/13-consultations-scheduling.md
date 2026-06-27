@@ -160,5 +160,9 @@ Resolved in [03-architecture-and-scope](03-architecture-and-scope.md):
   two-way sync remains fast-follow.
 - **Cancellation policy is per-tenant** (fee on/off & amount, rebooking/approval limits),
   configured in Settings; the 3-cancellation approval gate (UC12b) is the default behavior.
-- **Consultation types and prices are firm-configurable** (seeded defaults), set in Settings.
+- **Consultation types are firm-configurable** (name · duration · price; seeded defaults), set in
+  **Settings → Consultation types** (migration 0042). Booking picks a type → its duration + fee
+  auto-fill and the calendar offers slots of that length. Consults snapshot the chosen values, so
+  editing/deleting a type never changes past records. ("Chargeable" = price > 0; the consult's own
+  `paid` flag tracks payment status, a separate concept.)
 - Payments via Stripe (see [17-billing-payments](17-billing-payments.md)).

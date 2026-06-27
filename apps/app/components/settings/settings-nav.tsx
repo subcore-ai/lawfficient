@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation"
 import {
   Building2,
   CalendarClock,
+  ClipboardList,
   FileText,
   ListChecks,
   Plug,
@@ -21,7 +22,7 @@ import { type DataStatus } from "@/lib/dev/data-status"
 
 // `data` is the build-time wiring status (see lib/dev/data-status.ts) — flip to "live" as a tab is
 // wired. Templates + Packet pipeline are mock; Integrations is partial (lead sources live,
-// connected-systems cards mock); General, Team, Roles, Taxonomies, Office hours are live.
+// connected-systems cards mock); General, Team, Roles, Taxonomies, Office hours, Consult types are live.
 const ITEMS: {
   href: string
   label: string
@@ -33,6 +34,7 @@ const ITEMS: {
   { href: "/settings/roles", label: "Roles & permissions", icon: ShieldCheck, data: "live" },
   { href: "/settings/taxonomies", label: "Case taxonomies", icon: Tags, data: "live" },
   { href: "/settings/scheduling", label: "Office hours", icon: CalendarClock, data: "live" },
+  { href: "/settings/consultation-types", label: "Consultation types", icon: ClipboardList, data: "live" },
   { href: "/settings/templates", label: "Templates", icon: FileText, data: "mock" },
   { href: "/settings/pipeline", label: "Packet pipeline", icon: ListChecks, data: "mock" },
   { href: "/settings/integrations", label: "Integrations", icon: Plug, data: "partial" },

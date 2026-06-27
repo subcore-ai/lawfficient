@@ -328,6 +328,50 @@ export type Database = {
           },
         ]
       }
+      consultation_types: {
+        Row: {
+          created_at: string
+          data: Json
+          duration_min: number
+          firm_id: string
+          id: string
+          is_active: boolean
+          name: string
+          position: number
+          price: number
+        }
+        Insert: {
+          created_at?: string
+          data?: Json
+          duration_min: number
+          firm_id?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          position?: number
+          price?: number
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          duration_min?: number
+          firm_id?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          position?: number
+          price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "consultation_types_firm_id_fkey"
+            columns: ["firm_id"]
+            isOneToOne: false
+            referencedRelation: "firms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       consultations: {
         Row: {
           amount: number | null

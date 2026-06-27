@@ -27,6 +27,7 @@ import { LeadConsultations } from "@/components/leads/lead-consultations"
 import { NoteComposer } from "@/components/notes/note-composer"
 import { NotesTimeline } from "@/components/notes/notes-timeline"
 import { StatusPill } from "@/components/status-pill"
+import type { ConsultationType } from "@/lib/consultations/consultation-types"
 import type { ConsultationView } from "@/lib/consultations/queries"
 import { formatDate } from "@/lib/format"
 import type {
@@ -64,6 +65,7 @@ export function LeadDetail({
   canViewConsultations,
   canManageConsultations,
   consultDefaultTimeZone,
+  consultationTypes,
 }: {
   lead: LeadView
   statuses: LeadStatusView[]
@@ -79,6 +81,7 @@ export function LeadDetail({
   canViewConsultations: boolean
   canManageConsultations: boolean
   consultDefaultTimeZone: string | null
+  consultationTypes: ConsultationType[]
 }) {
   const [editOpen, setEditOpen] = React.useState(false)
   const [, startTransition] = React.useTransition()
@@ -348,6 +351,7 @@ export function LeadDetail({
           upcoming={upcomingConsultations}
           past={pastConsultations}
           attorneys={assignees}
+          consultationTypes={consultationTypes}
           defaultTimeZone={consultDefaultTimeZone}
           canManage={canManageConsultations}
         />

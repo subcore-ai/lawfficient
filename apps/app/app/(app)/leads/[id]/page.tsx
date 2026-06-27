@@ -10,6 +10,7 @@ import {
   type LeadView,
 } from "@/lib/leads/queries"
 import { mapNoteRow, type NoteView } from "@/lib/notes/queries"
+import { mapConsultationTypeRow, type ConsultationType } from "@/lib/consultations/consultation-types"
 import { mapConsultationRow, partitionConsultations, type ConsultationView } from "@/lib/consultations/queries"
 import {
   getFirmStaff,
@@ -34,6 +35,7 @@ type Loaded = {
   canViewConsultations: boolean
   canManageConsultations: boolean
   consultDefaultTimeZone: string | null
+  consultationTypes: ConsultationType[]
 }
 
 async function load(id: string): Promise<Loaded | null> {
@@ -42,7 +44,7 @@ async function load(id: string): Promise<Loaded | null> {
   const supabase = await createClient()
   // Lead + notes are per-record → RLS client. Statuses / taxonomies / staff are firm reference data
   // → per-firm cache (lib/reference.ts). All five still resolve in parallel.
-  const [leadRes, notesRes, consultRes, firmRes, statusRows, taxRows, staff] = await Promise.all([
+  const [leadRes, notesRes, consultRes, firmRes, statusRows, taxRows, staff, typesRes] = await Promise.all([
     supabase.from("leads").select("*").eq("id", id).maybeSingle(),
     supabase
       .from("notes")
@@ -58,10 +60,13 @@ async function load(id: string): Promise<Loaded | null> {
     getFirmStatusRows(me.firmId),
     getFirmTaxonomyRows(me.firmId),
     getFirmStaff(me.firmId),
+    supabase.from("consultation_types").select("*").eq("is_active", true).order("position").order("created_at"),
   ])
   if (leadRes.error) throw leadRes.error
   if (notesRes.error) throw notesRes.error
   if (consultRes.error) throw consultRes.error
+  // Types are best-effort (the booking picker only shows for editors): a failure shouldn't break the
+  // lead page for viewers.
   if (!leadRes.data) return null
 
   const statuses = statusRows.map(mapLeadStatus)
@@ -94,6 +99,7 @@ async function load(id: string): Promise<Loaded | null> {
     canManageConsultations: me.permissions?.includes("consultations.edit") ?? false,
     // Best-effort: a firm-read failure just falls back to the dialog's own default zone.
     consultDefaultTimeZone: firmRes.data?.timezone ?? null,
+    consultationTypes: typesRes.error ? [] : (typesRes.data ?? []).map(mapConsultationTypeRow),
   }
 }
 
@@ -117,6 +123,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       canViewConsultations={data.canViewConsultations}
       canManageConsultations={data.canManageConsultations}
       consultDefaultTimeZone={data.consultDefaultTimeZone}
+      consultationTypes={data.consultationTypes}
     />
   )
 }
