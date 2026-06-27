@@ -143,7 +143,7 @@ per-consult UTC instant + `timeZone` are stored as today.
 - Firm-single-tz for v1.
 - Slot duration from the consult type + a configurable interval.
 - Double-booking prevented by a DB exclusion constraint.
-- Office hours are **admin-managed** (`settings.manage`); read for booking on `consultations.view`.
+- Office hours are **admin-managed** (`settings.manage`, Settings → Office hours) **and self-service** — an attorney edits their own from their profile (RLS allows the owner, `attorney_id = auth.uid()`). Read on `consultations.view` / `settings.manage` / owner.
 - No public self-service booking page in v1 (the client portal stays deferred — [18-client-portal](18-client-portal.md)).
 
 ## Out of scope (v1) / future

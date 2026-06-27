@@ -1,7 +1,6 @@
 "use client"
 
 import * as React from "react"
-import { Plus, Trash2 } from "lucide-react"
 
 import { Button } from "@workspace/ui/components/button"
 import {
@@ -9,11 +8,9 @@ import {
   CardAction,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@workspace/ui/components/card"
-import { Input } from "@workspace/ui/components/input"
 import {
   Select,
   SelectContent,
@@ -24,10 +21,10 @@ import {
 import { toast } from "@workspace/ui/components/sonner"
 
 import { setAttorneyAvailability, setSchedulable } from "@/app/(app)/settings/scheduling/actions"
-import { WEEKDAYS, type AvailabilityWindow } from "@/lib/availability/queries"
+import { WeeklyHoursEditor } from "@/components/availability/weekly-hours-editor"
+import { type AvailabilityWindow } from "@/lib/availability/queries"
 
 type Attorney = { id: string; name: string; email: string; windows: AvailabilityWindow[] }
-type Draft = { weekday: number; startTime: string; endTime: string }
 
 export function OfficeHoursEditor({
   attorneys,
@@ -42,7 +39,8 @@ export function OfficeHoursEditor({
     <div className="flex flex-col gap-6">
       <p className="text-muted-foreground text-sm">
         Set each attorney&apos;s weekly office hours. Consultations can only be booked into free slots
-        inside these hours — the booking calendar uses them to offer available times.
+        inside these hours — the booking calendar uses them to offer available times. Attorneys can also
+        edit their own hours from their profile.
       </p>
 
       {canManage && addableStaff.length > 0 ? <AddAttorney staff={addableStaff} /> : null}
@@ -105,47 +103,8 @@ function AddAttorney({ staff }: { staff: { id: string; name: string }[] }) {
 }
 
 function AttorneyCard({ attorney, canManage }: { attorney: Attorney; canManage: boolean }) {
-  const [draft, setDraft] = React.useState<Draft[]>(() =>
-    attorney.windows.map((w) => ({ weekday: w.weekday, startTime: w.startTime, endTime: w.endTime }))
-  )
-  const [dirty, setDirty] = React.useState(false)
   const [pending, startTransition] = React.useTransition()
 
-  // Re-sync the draft when the server props change (a teammate's edit, another tab, or our own post-save
-  // revalidation) — but only when there are no unsaved edits, so in-progress changes are never clobbered.
-  // Adjusting state during render is React's documented pattern for "reset state on prop change" and
-  // avoids the extra render pass an effect would cost.
-  const serverKey = JSON.stringify(attorney.windows)
-  const [syncedKey, setSyncedKey] = React.useState(serverKey)
-  if (serverKey !== syncedKey && !dirty) {
-    setSyncedKey(serverKey)
-    setDraft(attorney.windows.map((w) => ({ weekday: w.weekday, startTime: w.startTime, endTime: w.endTime })))
-  }
-
-  function addWindow(weekday: number) {
-    setDraft((d) => [...d, { weekday, startTime: "09:00", endTime: "17:00" }])
-    setDirty(true)
-  }
-  function updateWindow(index: number, patch: Partial<Draft>) {
-    setDraft((d) => d.map((w, i) => (i === index ? { ...w, ...patch } : w)))
-    setDirty(true)
-  }
-  function removeWindow(index: number) {
-    setDraft((d) => d.filter((_, i) => i !== index))
-    setDirty(true)
-  }
-
-  function save() {
-    startTransition(async () => {
-      const res = await setAttorneyAvailability(attorney.id, draft)
-      if ("error" in res) {
-        toast.error(res.error)
-        return
-      }
-      toast.success("Office hours saved")
-      setDirty(false)
-    })
-  }
   function remove() {
     startTransition(async () => {
       const res = await setSchedulable(attorney.id, false)
@@ -166,75 +125,13 @@ function AttorneyCard({ attorney, canManage }: { attorney: Attorney; canManage: 
           </CardAction>
         ) : null}
       </CardHeader>
-      <CardContent className="flex flex-col gap-1">
-        {WEEKDAYS.map((day) => {
-          const entries = draft.map((w, i) => ({ w, i })).filter((e) => e.w.weekday === day.value)
-          return (
-            <div
-              key={day.value}
-              className="border-border flex items-start gap-4 border-b py-2.5 last:border-b-0"
-            >
-              <div className="text-muted-foreground w-24 shrink-0 pt-2 text-sm">{day.label}</div>
-              <div className="flex flex-1 flex-col gap-2">
-                {entries.length === 0 ? (
-                  <span className="text-muted-foreground pt-2 text-sm">Closed</span>
-                ) : (
-                  entries.map(({ w, i }) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <Input
-                        type="time"
-                        value={w.startTime}
-                        onChange={(e) => updateWindow(i, { startTime: e.target.value })}
-                        disabled={!canManage || pending}
-                        className="w-32"
-                        aria-label={`${day.label} start time`}
-                      />
-                      <span className="text-muted-foreground">–</span>
-                      <Input
-                        type="time"
-                        value={w.endTime}
-                        onChange={(e) => updateWindow(i, { endTime: e.target.value })}
-                        disabled={!canManage || pending}
-                        className="w-32"
-                        aria-label={`${day.label} end time`}
-                      />
-                      {canManage ? (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeWindow(i)}
-                          disabled={pending}
-                          aria-label={`Remove ${day.label} hours`}
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
-                      ) : null}
-                    </div>
-                  ))
-                )}
-                {canManage ? (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="self-start"
-                    onClick={() => addWindow(day.value)}
-                    disabled={pending}
-                  >
-                    <Plus className="size-4" /> Add hours
-                  </Button>
-                ) : null}
-              </div>
-            </div>
-          )
-        })}
+      <CardContent>
+        <WeeklyHoursEditor
+          windows={attorney.windows}
+          onSave={(w) => setAttorneyAvailability(attorney.id, w)}
+          canEdit={canManage}
+        />
       </CardContent>
-      {canManage ? (
-        <CardFooter>
-          <Button onClick={save} disabled={pending || !dirty}>
-            {pending ? "Saving…" : "Save office hours"}
-          </Button>
-        </CardFooter>
-      ) : null}
     </Card>
   )
 }

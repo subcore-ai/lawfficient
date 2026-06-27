@@ -1,7 +1,18 @@
 import { redirect } from "next/navigation"
 
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@workspace/ui/components/card"
+
+import { setMyAvailability } from "@/app/(app)/settings/scheduling/actions"
+import { WeeklyHoursEditor } from "@/components/availability/weekly-hours-editor"
 import { PageHeader } from "@/components/page-header"
 import { ProfileSettings } from "@/components/profile-form"
+import { mapAvailabilityRow, type AvailabilityWindow } from "@/lib/availability/queries"
 import { getCurrentUser } from "@/lib/auth/session"
 import { createClient } from "@/lib/supabase/server"
 import { isSupabaseConfigured } from "@/lib/supabase/env"
@@ -54,13 +65,51 @@ async function load(): Promise<ProfileView> {
   return { name: me.name, email: me.email, role: me.role, pod, editable: true, googleConnected, avatarUrl: me.avatarUrl }
 }
 
+// Only schedulable users (an admin marks who takes consultations) get the office-hours editor. Returns
+// null otherwise so the section is hidden entirely. Self-read is allowed by RLS (0041).
+async function loadMyOfficeHours(): Promise<{ windows: AvailabilityWindow[] } | null> {
+  if (!isSupabaseConfigured()) return null
+  const me = await getCurrentUser()
+  if (!me) return null
+
+  const supabase = await createClient()
+  const { data: prof } = await supabase
+    .from("profiles")
+    .select("schedulable")
+    .eq("id", me.id)
+    .maybeSingle()
+  if (!prof?.schedulable) return null
+
+  const { data: avail, error } = await supabase
+    .from("attorney_availability")
+    .select("*")
+    .eq("attorney_id", me.id)
+  if (error) throw error
+
+  return { windows: (avail ?? []).map(mapAvailabilityRow) }
+}
+
 export default async function ProfilePage() {
-  const view = await load()
+  const [view, officeHours] = await Promise.all([load(), loadMyOfficeHours()])
   return (
     <>
       <PageHeader title="My profile" description="Manage your display name and password." />
-      <div className="max-w-5xl">
+      <div className="flex max-w-5xl flex-col gap-6">
         <ProfileSettings {...view} />
+        {officeHours ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>My office hours</CardTitle>
+              <CardDescription>
+                Your weekly availability for consultations — you can only be booked into free slots
+                inside these hours.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <WeeklyHoursEditor windows={officeHours.windows} onSave={setMyAvailability} canEdit />
+            </CardContent>
+          </Card>
+        ) : null}
       </div>
     </>
   )
