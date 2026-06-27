@@ -58,7 +58,12 @@ export function CalendarColumn({
   // Slots: a faint solid hairline in the color (calmer than dashed), and text that's a shade of the same
   // color mixed toward the theme foreground — dark on the light tint, light on the dark tint (not gray).
   const slotTint = color
-    ? { borderColor: `${color.solid}40`, color: `color-mix(in oklab, ${color.solid} 45%, var(--foreground))` }
+    ? {
+        // Border = the color at `--cal-slot-alpha` opacity (25% light, 15% dark) — fainter on dark so it
+        // isn't bright. Text = a shade of the color toward the theme foreground (dark/light per mode).
+        borderColor: `color-mix(in srgb, ${color.solid} var(--cal-slot-alpha), transparent)`,
+        color: `color-mix(in oklab, ${color.solid} 45%, var(--foreground))`,
+      }
     : {}
   const consultTint = color ? { backgroundColor: color.solid, color: color.text } : {}
   // To collapse the shared border between back-to-back slots into a single hairline: a slot whose end is
