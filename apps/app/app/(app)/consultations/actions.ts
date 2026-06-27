@@ -98,6 +98,7 @@ export async function createConsultation(formData: FormData): Promise<ActionResu
     .select("id")
     .single()
   if (error?.code === "23503") return { error: "That lead or attorney isn't in your firm." }
+  if (error?.code === "23P01") return { error: "That attorney already has a consultation at that time." }
   if (error || !inserted) return { error: "Couldn't book the consultation." }
 
   await audit(supabase, gate.user.id, inserted.id, core.value.type, "created")
@@ -140,6 +141,7 @@ export async function updateConsultation(id: string, formData: FormData): Promis
     .select("id, lead_id")
     .maybeSingle()
   if (error?.code === "23503") return { error: "That attorney isn't in your firm." }
+  if (error?.code === "23P01") return { error: "That attorney already has a consultation at that time." }
   if (error) return { error: "Couldn't update the consultation." }
   if (!updated) return { error: "This consultation is finalized and can't be edited." }
 
@@ -178,6 +180,7 @@ export async function rescheduleConsultation(id: string, startAtWall: string): P
     .in("status", ["scheduled", "paid", "rescheduled"])
     .select("id")
     .maybeSingle()
+  if (error?.code === "23P01") return { error: "That attorney already has a consultation at that time." }
   if (error) return { error: "Couldn't reschedule the consultation." }
   if (!updated) return { error: "This consultation is finalized and can't be rescheduled." }
 

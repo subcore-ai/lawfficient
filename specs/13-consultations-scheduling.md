@@ -104,18 +104,22 @@ double-booked.
   `startTime`, `endTime`, `data jsonb`. Multiple rows per day (split shifts). Stored in the firm tz.
 - **AvailabilityException** *(Phase 5)* — time-off / holidays / one-off extra hours: `attorneyId`,
   `startAt`, `endAt`, `kind (block|extra)`, `reason`.
-- **No double-booking** — a Postgres exclusion constraint (`btree_gist`) on `consultations`: no two
-  non-canceled consults for the same attorney whose `[start, start+duration)` ranges overlap. Race-proof
+- **No double-booking** *(built, 0043)* — a `btree_gist` exclusion constraint on `consultations`: no two
+  active consults for the same attorney whose `[start, start+duration)` ranges overlap. The end is an
+  IMMUTABLE epoch helper (`start + interval` is only STABLE → rejected in an index expr). A sibling
+  exclusion guards overlapping `attorney_availability` windows (as an int4range of minutes). Race-proof
   at the DB, where an app-level check can't be.
 - Slot config (interval, buffer, min-notice, max-advance) is firm/attorney **config**; the slot duration
   comes from the consult type.
 
 ### Slot engine
 
-Pure, unit-tested `generateSlots({ windows, existingConsults, date, slotMinutes, buffer, now })`: expand
-the weekday's windows → drop slots overlapping a booked consult (+ buffer) → drop past/too-soon → the
-remainder is bookable. Booking goes through `createConsultation`, now validated server-side against
-availability + the overlap constraint.
+Pure, unit-tested **`generateSlots({ windows, booked, durationMs, stepMs?, nowMs })`**
+(`lib/availability/slots.ts`, **built**): works in UTC epoch-ms intervals (the caller converts firm-tz
+office hours on a date → UTC) → for each window, step slots of the type's duration → drop any
+overlapping a booked consult or starting in the past → the remainder is bookable. Booking
+(`createConsultation` / reschedule) surfaces the DB exclusion violation (`23P01`) as a clean "already
+booked" error. (Buffer / min-notice are Phase 5.)
 
 ### Calendar UI
 
