@@ -168,10 +168,24 @@ export function ConsultPreviewDialog({
                     <div>
                       <input type="date" value={day} onChange={(e) => setDay(e.target.value)} className={cn(INLINE)} aria-label="Date" />
                     </div>
-                    <div className="flex items-center gap-1">
-                      <input type="time" value={fromTime} onChange={(e) => onFromChange(e.target.value)} className={cn(INLINE)} aria-label="From" />
+                    <div className="flex items-center gap-1.5">
+                      {/* Hide the picker indicator on the time inputs so the box hugs the text and the dash
+                          sits an equal distance from each side. */}
+                      <input
+                        type="time"
+                        value={fromTime}
+                        onChange={(e) => onFromChange(e.target.value)}
+                        className={cn(INLINE, "[&::-webkit-calendar-picker-indicator]:hidden")}
+                        aria-label="From"
+                      />
                       <span className="text-muted-foreground">–</span>
-                      <input type="time" value={toTime} onChange={(e) => setToTime(e.target.value)} className={cn(INLINE)} aria-label="To" />
+                      <input
+                        type="time"
+                        value={toTime}
+                        onChange={(e) => setToTime(e.target.value)}
+                        className={cn(INLINE, "[&::-webkit-calendar-picker-indicator]:hidden")}
+                        aria-label="To"
+                      />
                     </div>
                   </>
                 ) : (
