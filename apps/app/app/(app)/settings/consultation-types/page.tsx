@@ -11,7 +11,11 @@ export default async function SettingsConsultationTypesPage() {
   const canManage = me?.permissions?.includes("settings.manage") ?? false
 
   // RLS scopes to the firm; include inactive rows so the editor can show + reactivate them.
-  const { data, error } = await supabase.from("consultation_types").select("*").order("position")
+  const { data, error } = await supabase
+    .from("consultation_types")
+    .select("*")
+    .order("position")
+    .order("created_at")
   if (error) throw error
 
   const types = (data ?? []).map(mapConsultationTypeRow)

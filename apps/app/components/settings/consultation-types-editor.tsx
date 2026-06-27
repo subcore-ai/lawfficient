@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { ChevronDown, ChevronUp, Pencil, Plus, Trash2 } from "lucide-react"
+import { Pencil, Plus, Trash2 } from "lucide-react"
 
 import { Button } from "@workspace/ui/components/button"
 import {
@@ -29,12 +29,13 @@ import {
   createConsultationType,
   deleteConsultationType,
   editConsultationType,
-  reorderConsultationType,
   setConsultationTypeActive,
 } from "@/app/(app)/settings/consultation-types/actions"
 import { Field } from "@/components/form-field"
 import { StatusPill } from "@/components/status-pill"
 import type { ConsultationType } from "@/lib/consultations/consultation-types"
+
+const GENERIC_ERROR = "Something went wrong. Please try again."
 
 function summarize(type: ConsultationType): string {
   return `${type.durationMin} min · ${type.price > 0 ? `$${type.price}` : "Free"}`
@@ -48,14 +49,7 @@ function TypeFields({ type }: { type?: ConsultationType }) {
       </Field>
       <div className="grid grid-cols-2 gap-4">
         <Field label="Duration (minutes)">
-          <Input
-            name="durationMin"
-            type="number"
-            min={5}
-            step={5}
-            required
-            defaultValue={type?.durationMin ?? 30}
-          />
+          <Input name="durationMin" type="number" min={5} step={5} required defaultValue={type?.durationMin ?? 30} />
         </Field>
         <Field label="Price (0 = free)">
           <Input name="price" type="number" min={0} step="0.01" defaultValue={type?.price ?? 0} />
@@ -73,13 +67,17 @@ function CreateTypeDialog() {
     e.preventDefault()
     const fd = new FormData(e.currentTarget)
     startTransition(async () => {
-      const res = await createConsultationType(fd)
-      if ("error" in res) {
-        toast.error(res.error)
-        return
+      try {
+        const res = await createConsultationType(fd)
+        if ("error" in res) {
+          toast.error(res.error)
+          return
+        }
+        toast.success("Type added")
+        setOpen(false)
+      } catch {
+        toast.error(GENERIC_ERROR)
       }
-      toast.success("Type added")
-      setOpen(false)
     })
   }
 
@@ -89,19 +87,22 @@ function CreateTypeDialog() {
         <Plus className="size-4" /> New type
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
-        <form onSubmit={onSubmit}>
-          <DialogHeader>
-            <DialogTitle>New consultation type</DialogTitle>
-            <DialogDescription>Booking offers calendar slots of the type&apos;s length.</DialogDescription>
-          </DialogHeader>
-          <TypeFields />
-          <DialogFooter>
-            <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
-            <Button type="submit" disabled={pending}>
-              {pending ? "Adding…" : "Add"}
-            </Button>
-          </DialogFooter>
-        </form>
+        {/* Remount the form per open so the uncontrolled fields reset to fresh defaults each time. */}
+        {open ? (
+          <form onSubmit={onSubmit}>
+            <DialogHeader>
+              <DialogTitle>New consultation type</DialogTitle>
+              <DialogDescription>Booking offers calendar slots of the type&apos;s length.</DialogDescription>
+            </DialogHeader>
+            <TypeFields />
+            <DialogFooter>
+              <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
+              <Button type="submit" disabled={pending}>
+                {pending ? "Adding…" : "Add"}
+              </Button>
+            </DialogFooter>
+          </form>
+        ) : null}
       </DialogContent>
     </Dialog>
   )
@@ -115,13 +116,17 @@ function EditTypeDialog({ type }: { type: ConsultationType }) {
     e.preventDefault()
     const fd = new FormData(e.currentTarget)
     startTransition(async () => {
-      const res = await editConsultationType(type.id, fd)
-      if ("error" in res) {
-        toast.error(res.error)
-        return
+      try {
+        const res = await editConsultationType(type.id, fd)
+        if ("error" in res) {
+          toast.error(res.error)
+          return
+        }
+        toast.success("Saved")
+        setOpen(false)
+      } catch {
+        toast.error(GENERIC_ERROR)
       }
-      toast.success("Saved")
-      setOpen(false)
     })
   }
 
@@ -157,13 +162,17 @@ function DeleteTypeButton({ type }: { type: ConsultationType }) {
   const [pending, startTransition] = React.useTransition()
   function onDelete() {
     startTransition(async () => {
-      const res = await deleteConsultationType(type.id)
-      if ("error" in res) {
-        toast.error(res.error)
-        return
+      try {
+        const res = await deleteConsultationType(type.id)
+        if ("error" in res) {
+          toast.error(res.error)
+          return
+        }
+        toast.success("Deleted")
+        setOpen(false)
+      } catch {
+        toast.error(GENERIC_ERROR)
       }
-      toast.success("Deleted")
-      setOpen(false)
     })
   }
   return (
@@ -190,64 +199,28 @@ function DeleteTypeButton({ type }: { type: ConsultationType }) {
   )
 }
 
-function TypeRow({
-  type,
-  canManage,
-  isFirst,
-  isLast,
-}: {
-  type: ConsultationType
-  canManage: boolean
-  isFirst: boolean
-  isLast: boolean
-}) {
+function TypeRow({ type, canManage }: { type: ConsultationType; canManage: boolean }) {
   const [pending, startTransition] = React.useTransition()
-  function reorder(direction: "up" | "down") {
-    startTransition(async () => {
-      const res = await reorderConsultationType(type.id, direction)
-      if ("error" in res) toast.error(res.error)
-    })
-  }
   function toggleActive() {
     startTransition(async () => {
-      const res = await setConsultationTypeActive(type.id, !type.isActive)
-      if ("error" in res) toast.error(res.error)
+      try {
+        const res = await setConsultationTypeActive(type.id, !type.isActive)
+        if ("error" in res) toast.error(res.error)
+      } catch {
+        toast.error(GENERIC_ERROR)
+      }
     })
   }
   return (
     <div className="border-border flex items-center justify-between gap-3 border-b py-2.5 first:pt-0 last:border-b-0">
-      <div className="flex min-w-0 items-center gap-2">
-        {canManage ? (
-          <div className="flex flex-col">
-            <button
-              type="button"
-              aria-label="Move up"
-              disabled={isFirst || pending}
-              onClick={() => reorder("up")}
-              className="text-muted-foreground hover:text-foreground disabled:opacity-30"
-            >
-              <ChevronUp className="size-3.5" />
-            </button>
-            <button
-              type="button"
-              aria-label="Move down"
-              disabled={isLast || pending}
-              onClick={() => reorder("down")}
-              className="text-muted-foreground hover:text-foreground disabled:opacity-30"
-            >
-              <ChevronDown className="size-3.5" />
-            </button>
-          </div>
-        ) : null}
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <p className={`truncate text-sm ${type.isActive ? "" : "text-muted-foreground line-through"}`}>
-              {type.name}
-            </p>
-            {!type.isActive ? <StatusPill label="Inactive" tone="warning" /> : null}
-          </div>
-          <p className="text-muted-foreground text-xs">{summarize(type)}</p>
+      <div className="min-w-0">
+        <div className="flex items-center gap-2">
+          <p className={`truncate text-sm ${type.isActive ? "" : "text-muted-foreground line-through"}`}>
+            {type.name}
+          </p>
+          {!type.isActive ? <StatusPill label="Inactive" tone="warning" /> : null}
         </div>
+        <p className="text-muted-foreground text-xs">{summarize(type)}</p>
       </div>
       {canManage ? (
         <div className="flex shrink-0 items-center gap-1">
@@ -289,15 +262,7 @@ export function ConsultationTypesEditor({
             No consultation types yet.
           </p>
         ) : (
-          types.map((t, i) => (
-            <TypeRow
-              key={t.id}
-              type={t}
-              canManage={canManage}
-              isFirst={i === 0}
-              isLast={i === types.length - 1}
-            />
-          ))
+          types.map((t) => <TypeRow key={t.id} type={t} canManage={canManage} />)
         )}
       </CardContent>
     </Card>

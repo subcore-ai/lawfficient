@@ -43,7 +43,7 @@ async function load(): Promise<Loaded> {
     supabase.from("leads").select("id, first_name, last_name, archived").order("created_at", { ascending: false }),
     supabase.from("profiles").select("id, name, status").order("name"),
     supabase.from("firms").select("timezone").single(),
-    supabase.from("consultation_types").select("*").eq("is_active", true).order("position"),
+    supabase.from("consultation_types").select("*").eq("is_active", true).order("position").order("created_at"),
   ])
   // Fail fast on any read — a swallowed leads/profiles error would render with empty name maps
   // ("Unknown lead", blank attorneys) and unusable pickers instead of surfacing the failure.

@@ -108,7 +108,8 @@ export function BookConsultationDialog({
 
   function onOpenChange(next: boolean) {
     setOpen(next)
-    if (!next) reset()
+    // Re-seed from the latest props on open (types may have changed in Settings) and clear on close.
+    reset()
   }
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {

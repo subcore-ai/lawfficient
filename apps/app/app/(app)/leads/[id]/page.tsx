@@ -60,7 +60,7 @@ async function load(id: string): Promise<Loaded | null> {
     getFirmStatusRows(me.firmId),
     getFirmTaxonomyRows(me.firmId),
     getFirmStaff(me.firmId),
-    supabase.from("consultation_types").select("*").eq("is_active", true).order("position"),
+    supabase.from("consultation_types").select("*").eq("is_active", true).order("position").order("created_at"),
   ])
   if (leadRes.error) throw leadRes.error
   if (notesRes.error) throw notesRes.error
