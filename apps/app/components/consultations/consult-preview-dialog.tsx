@@ -35,6 +35,13 @@ const UNASSIGNED = "__none__"
 const INLINE =
   "border-input/0 hover:border-input focus:border-input focus:bg-muted/40 -mx-1 rounded border bg-transparent px-1 py-0.5 transition-colors outline-none [&::-webkit-calendar-picker-indicator]:opacity-0 hover:[&::-webkit-calendar-picker-indicator]:opacity-60 focus:[&::-webkit-calendar-picker-indicator]:opacity-60"
 
+// Compact human duration, e.g. 85 → "1h 25m", 30 → "30m", 60 → "1h".
+function formatDuration(min: number): string {
+  const h = Math.floor(min / 60)
+  const m = min % 60
+  return [h ? `${h}h` : "", m ? `${m}m` : ""].filter(Boolean).join(" ") || "0m"
+}
+
 // Click-through detail for a booked consult — opens in place (no navigation) and is editable inline:
 // date/time are live immediately, type + attorney sit behind "Edit all fields". One view, not two.
 export function ConsultPreviewDialog({
@@ -217,6 +224,9 @@ export function ConsultPreviewDialog({
                         className={cn(INLINE, "[&::-webkit-calendar-picker-indicator]:hidden")}
                         aria-label="To"
                       />
+                      {validTime ? (
+                        <span className="text-muted-foreground ml-2 text-xs">{formatDuration(durationMin)}</span>
+                      ) : null}
                     </div>
                   </>
                 ) : (
