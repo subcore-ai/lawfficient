@@ -123,9 +123,14 @@ booked" error. (Buffer / min-notice are Phase 5.)
 
 ### Calendar UI
 
-- `/consultations`: a **Calendar / List** toggle (List = the shipped status board).
-- **Day, multi-attorney columns** — pick 1–N schedulable attorneys (default ~3), each a column; office
-  hours shaded, booked consults as blocks, free slots click-to-book (pre-fills attorney + start + duration).
+- `/consultations`: a **List / Calendar** toggle (`view` searchParam; List = the shipped status board).
+- **Day, single attorney — built.** Pick a schedulable attorney + date + consultation type; office hours
+  shaded, booked consults as blocks, free slots **click-to-book** (opens the booking dialog pre-filled
+  with attorney + start + type). Server-driven: the day's windows / consults / free-slots are computed in
+  `lib/scheduling/day-calendar.ts` (`buildDayCalendar` — positions everything by firm-tz minutes-of-day,
+  via `generateSlots`), re-loaded from `?attorney=&date=&type=`. The grid (`day-calendar-grid.tsx`) is a
+  reusable single column.
+- **Day, multi-attorney columns** — N columns of the same grid (default ~3). _Next._
 - **Week** — single attorney, 7-day grid. Reschedule reuses the slot picker.
 
 ### Timezone
@@ -135,9 +140,9 @@ per-consult UTC instant + `timeZone` are stored as today.
 
 ### Phasing
 
-1. Availability model + Settings "Office hours" editor (per attorney). **← this PR**
-2. Slot engine + the exclusion-constraint guard + server-side booking validation.
-3. Calendar UI — single attorney.
+1. Availability model + Settings "Office hours" editor (per attorney). **Done.**
+2. Slot engine + the exclusion-constraint guard + server-side booking validation. **Done.**
+3. Calendar UI — single attorney. **← this PR**
 4. Multi-attorney day view.
 5. Exceptions + booking rules (buffer / min-notice / max-advance).
 

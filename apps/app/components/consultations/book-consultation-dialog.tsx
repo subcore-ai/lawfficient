@@ -43,6 +43,10 @@ export function BookConsultationDialog({
   triggerLeadId,
   label = "Book consultation",
   defaultTimeZone,
+  prefillStart,
+  prefillAttorneyId,
+  prefillType,
+  trigger,
 }: {
   leads: Option[]
   attorneys: Option[]
@@ -53,6 +57,12 @@ export function BookConsultationDialog({
   label?: string
   // The firm's configured zone, used as the picker's default.
   defaultTimeZone?: string | null
+  // Calendar click-to-book: pre-fill the slot's start (datetime-local wall string), attorney, and type.
+  prefillStart?: string
+  prefillAttorneyId?: string
+  prefillType?: string
+  // Custom trigger element (e.g. a calendar slot button); falls back to the default "Book" button.
+  trigger?: React.ReactElement
 }) {
   const startAtId = React.useId()
   const durationId = React.useId()
@@ -63,7 +73,7 @@ export function BookConsultationDialog({
   const zoneSelectId = React.useId()
 
   const activeTypes = consultationTypes.filter((t) => t.isActive)
-  const firstType = activeTypes[0]
+  const firstType = activeTypes.find((t) => t.name === prefillType) ?? activeTypes[0]
 
   // Seed the picker with the firm's configured zone so a non-Eastern firm doesn't silently book in
   // Eastern; fall back to DEFAULT_TZ when it's unset or not one of the offered zones.
@@ -73,10 +83,11 @@ export function BookConsultationDialog({
   // No global preselect: an unset lead forces an explicit choice so a missed selection can't silently
   // book onto whichever lead loaded first.
   const [leadId, setLeadId] = React.useState(triggerLeadId ?? "")
-  const [attorney, setAttorney] = React.useState(UNASSIGNED)
+  const [attorney, setAttorney] = React.useState(prefillAttorneyId ?? UNASSIGNED)
   const [type, setType] = React.useState(firstType?.name ?? "")
   const [durationMin, setDurationMin] = React.useState(firstType?.durationMin ?? 30)
   const [amount, setAmount] = React.useState(firstType?.price ?? 0)
+  const [start, setStart] = React.useState(prefillStart ?? "")
   const [zone, setZone] = React.useState(initialZone)
   const [paid, setPaid] = React.useState(false)
   const [pending, startTransition] = React.useTransition()
@@ -98,10 +109,11 @@ export function BookConsultationDialog({
 
   function reset() {
     setLeadId(triggerLeadId ?? "")
-    setAttorney(UNASSIGNED)
+    setAttorney(prefillAttorneyId ?? UNASSIGNED)
     setType(firstType?.name ?? "")
     setDurationMin(firstType?.durationMin ?? 30)
     setAmount(firstType?.price ?? 0)
+    setStart(prefillStart ?? "")
     setZone(initialZone)
     setPaid(false)
   }
@@ -119,6 +131,7 @@ export function BookConsultationDialog({
     fd.set("attorneyId", attorney === UNASSIGNED ? "" : attorney)
     fd.set("type", type)
     fd.set("durationMin", String(durationMin))
+    fd.set("startAt", start)
     fd.set("timeZone", zone)
     // Fee + paid only apply to a chargeable type; a free booking carries no amount and is never "paid".
     fd.set("amount", chargeable ? String(amount) : "")
@@ -140,9 +153,13 @@ export function BookConsultationDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogTrigger render={<Button size="sm" />}>
-        <Plus className="size-4" /> {label}
-      </DialogTrigger>
+      {trigger ? (
+        <DialogTrigger render={trigger} />
+      ) : (
+        <DialogTrigger render={<Button size="sm" />}>
+          <Plus className="size-4" /> {label}
+        </DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-lg">
         <form onSubmit={onSubmit}>
           <DialogHeader>
@@ -197,7 +214,7 @@ export function BookConsultationDialog({
               </Select>
             </Field>
             <Field label="When" htmlFor={startAtId}>
-              <Input id={startAtId} name="startAt" type="datetime-local" required />
+              <Input id={startAtId} type="datetime-local" required value={start} onChange={(e) => setStart(e.target.value)} />
             </Field>
             <Field label="Duration (min)" htmlFor={durationId}>
               <Input
