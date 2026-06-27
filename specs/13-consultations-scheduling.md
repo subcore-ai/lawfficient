@@ -134,6 +134,10 @@ booked" error. (Buffer / min-notice are Phase 5.)
   capped at 6); each is a column of the same grid, all sharing one hour gutter + a common time range, free
   slots click-to-book per column. `?attorneys=a,b,c`. The grid is a shared gutter + a `CalendarColumn` per
   attorney (`day-calendar-grid.tsx` composes `calendar-column.tsx`).
+- **Time off — built.** Per-attorney full-day exceptions (`availability_exceptions`, migration 0044): a
+  date in any of an attorney's ranges removes their whole day from the calendar (no slots; the column shows
+  a "Time off" marker). Managed self-service on the profile + by admins in Settings → Office hours
+  (`components/availability/time-off-manager.tsx`). Firm-wide holidays + partial-day overrides → fast-follow.
 - **Week** — single attorney, 7-day grid. Reschedule reuses the slot picker.
 
 ### Timezone
@@ -146,8 +150,8 @@ per-consult UTC instant + `timeZone` are stored as today.
 1. Availability model + Settings "Office hours" editor (per attorney). **Done.**
 2. Slot engine + the exclusion-constraint guard + server-side booking validation. **Done.**
 3. Calendar UI — single attorney. **Done.**
-4. Multi-attorney day view. **← this PR**
-5. Exceptions + booking rules (buffer / min-notice / max-advance).
+4. Multi-attorney day view. **Done.**
+5. Time off / exceptions. **← this PR.** (Booking rules — buffer / min-notice / max-advance — stay deferred; see `specs/_backlog.md`.)
 
 ### Locked decisions
 

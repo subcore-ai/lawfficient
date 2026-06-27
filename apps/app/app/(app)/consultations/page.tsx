@@ -162,8 +162,9 @@ async function renderCalendar({
   // still subtracted from today's slots. buildDayCalendar shows only same-day-start consults but blocks on
   // all of them; 0043's exclusion constraint is the hard backstop regardless.
   const loadFrom = zonedWallTimeToUtcISO(`${addDay(date, -1)}T00:00`, zone)
-  // One batched read per table across all selected attorneys, grouped by attorney below.
-  const [availRes, dayConsultRes] = await Promise.all([
+  // One batched read per table across all selected attorneys, grouped by attorney below. The exceptions
+  // read returns only those whose range COVERS this date (start_date <= date <= end_date).
+  const [availRes, dayConsultRes, offRes] = await Promise.all([
     supabase
       .from("attorney_availability")
       .select("attorney_id, start_time, end_time")
@@ -180,16 +181,29 @@ async function renderCalendar({
           .lt("start_at", dayEnd)
           .not("status", "in", "(canceled,no_show)")
       : Promise.resolve({ data: [], error: null }),
+    supabase
+      .from("availability_exceptions")
+      .select("attorney_id")
+      .in("attorney_id", selectedIds)
+      .lte("start_date", date)
+      .gte("end_date", date),
   ])
   // Fail loud: a swallowed error would render as "No office hours" or an empty/wrong slot grid.
   if (availRes.error) throw availRes.error
   if (dayConsultRes.error) throw dayConsultRes.error
+  if (offRes.error) throw offRes.error
+  const offIds = new Set((offRes.data ?? []).map((e) => e.attorney_id))
 
   const nowMs = Date.now()
   const columns = selectedIds.map((id) => {
-    const windows = (availRes.data ?? [])
-      .filter((w) => w.attorney_id === id)
-      .map((w) => ({ startTime: toHm(w.start_time), endTime: toHm(w.end_time) }))
+    const off = offIds.has(id)
+    // Time off removes the whole day: drop the office hours so no slots generate. Existing consults still
+    // show (they were booked before the time off, or by an admin), and the column is flagged "off".
+    const windows = off
+      ? []
+      : (availRes.data ?? [])
+          .filter((w) => w.attorney_id === id)
+          .map((w) => ({ startTime: toHm(w.start_time), endTime: toHm(w.end_time) }))
     const consults = (dayConsultRes.data ?? [])
       .filter((c) => c.attorney_id === id)
       .map((c) => ({
@@ -201,10 +215,10 @@ async function renderCalendar({
         status: c.status ?? "",
       }))
     const cal = buildDayCalendar({ date, tz: zone, windows, consults, durationMin: selectedType.durationMin, nowMs })
-    return { attorney: schedulable.find((a) => a.id === id)!, cal }
+    return { attorney: schedulable.find((a) => a.id === id)!, cal, off }
   })
 
-  const anyHours = columns.some((c) => c.cal.windows.length > 0)
+  const hasContent = columns.some((c) => c.off || c.cal.windows.length > 0 || c.cal.consults.length > 0)
 
   return (
     <div className="space-y-4">
@@ -217,7 +231,7 @@ async function renderCalendar({
         typeName={selectedType.name}
       />
       <div className="rounded-lg border p-4">
-        {!anyHours ? (
+        {!hasContent ? (
           <p className="text-muted-foreground py-8 text-center text-sm">
             No office hours set for the selected {columns.length > 1 ? "attorneys" : "attorney"} on this day.
           </p>

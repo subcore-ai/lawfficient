@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 
 import { getCurrentUser, type CurrentUser } from "@/lib/auth/session"
+import { parseTimeOffInput } from "@/lib/availability/exceptions"
 import { validateWindows, type WindowInput } from "@/lib/availability/validation"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
@@ -11,6 +12,8 @@ export type ActionResult = { ok: true } | { error: string }
 
 const PATH = "/settings/scheduling"
 const MY_PATH = "/profile/office-hours"
+// The calendar subtracts time off, so a change there must invalidate it too.
+const CALENDAR_PATH = "/consultations"
 
 type Gate = { ok: true; user: CurrentUser } | { ok: false; error: string }
 
@@ -125,5 +128,64 @@ export async function setMyAvailability(windows: WindowInput[]): Promise<ActionR
 
   revalidatePath(MY_PATH)
   revalidatePath(PATH) // the admin Settings → Office hours editor shows the same hours
+  return { ok: true }
+}
+
+// Add a time-off range for an attorney. Works for both the admin (any attorney, settings.manage) and the
+// self path (own id) — the friendly check below is the first gate; RLS (0044) is the real one: it allows
+// settings.manage OR (own row + schedulable), and the composite FK + firm_id default keep it firm-scoped.
+export async function addTimeOff(attorneyId: string, formData: FormData): Promise<ActionResult> {
+  const me = await getCurrentUser()
+  if (!me) return { error: "You're not signed in." }
+  const isAdmin = me.permissions?.includes("settings.manage") ?? false
+  if (!isAdmin && attorneyId !== me.id) return { error: "You can only manage your own time off." }
+
+  const parsed = parseTimeOffInput({
+    startDate: formData.get("startDate"),
+    endDate: formData.get("endDate"),
+    note: formData.get("note"),
+  })
+  if (!parsed.ok) return { error: parsed.error }
+
+  const supabase = await createClient()
+  // firm_id defaults to current_firm_id(); .select().single() turns an RLS denial into a real error.
+  const { error } = await supabase
+    .from("availability_exceptions")
+    .insert({
+      attorney_id: attorneyId,
+      start_date: parsed.value.startDate,
+      end_date: parsed.value.endDate,
+      note: parsed.value.note,
+    })
+    .select("id")
+    .single()
+  if (error) return { error: "Couldn't add the time off." }
+
+  revalidatePath(PATH)
+  revalidatePath(MY_PATH)
+  revalidatePath(CALENDAR_PATH)
+  return { ok: true }
+}
+
+// Remove a time-off range. RLS (0044) restricts deletes to settings.manage OR the owner; a 0-row delete
+// (someone else's row / wrong id) surfaces as a clean error.
+export async function removeTimeOff(id: string): Promise<ActionResult> {
+  const me = await getCurrentUser()
+  if (!me) return { error: "You're not signed in." }
+  if (typeof id !== "string" || !id) return { error: "Missing time-off id." }
+
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from("availability_exceptions")
+    .delete()
+    .eq("id", id)
+    .select("id")
+    .maybeSingle()
+  if (error) return { error: "Couldn't remove the time off." }
+  if (!data) return { error: "That time off no longer exists, or you can't remove it." }
+
+  revalidatePath(PATH)
+  revalidatePath(MY_PATH)
+  revalidatePath(CALENDAR_PATH)
   return { ok: true }
 }

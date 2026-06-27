@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 
 import { OfficeHoursEditor } from "@/components/settings/office-hours-editor"
+import { mapExceptionRow } from "@/lib/availability/exceptions"
 import { mapAvailabilityRow } from "@/lib/availability/queries"
 import { getCurrentUser } from "@/lib/auth/session"
 import { createClient } from "@/lib/supabase/server"
@@ -18,19 +19,23 @@ export default async function SettingsSchedulingPage() {
 
   const supabase = await createClient()
 
-  // RLS scopes both to the firm. Pull all staff (to list schedulable ones + offer the rest) and every
-  // availability row, then fan the windows out per attorney.
-  const [staffRes, availRes] = await Promise.all([
+  // RLS scopes all to the firm. Pull all staff (to list schedulable ones + offer the rest), every
+  // availability row, and upcoming time off, then fan them out per attorney.
+  const today = new Date().toISOString().slice(0, 10)
+  const [staffRes, availRes, offRes] = await Promise.all([
     supabase.from("profiles").select("id, name, email, schedulable, status").order("name"),
     supabase.from("attorney_availability").select("*").order("weekday").order("start_time"),
+    supabase.from("availability_exceptions").select("*").gte("end_date", today).order("start_date"),
   ])
   // Surface a load failure instead of silently rendering an empty editor (which a save could persist).
   if (staffRes.error) throw staffRes.error
   if (availRes.error) throw availRes.error
+  if (offRes.error) throw offRes.error
   const staff = staffRes.data
   const avail = availRes.data
 
   const windows = (avail ?? []).map(mapAvailabilityRow)
+  const timeOff = (offRes.data ?? []).map(mapExceptionRow)
   const attorneys = (staff ?? [])
     .filter((s) => s.schedulable)
     .map((s) => ({
@@ -38,6 +43,7 @@ export default async function SettingsSchedulingPage() {
       name: s.name,
       email: s.email,
       windows: windows.filter((w) => w.attorneyId === s.id),
+      timeOff: timeOff.filter((t) => t.attorneyId === s.id),
     }))
   const addableStaff = (staff ?? [])
     .filter((s) => !s.schedulable && s.status === "active")
