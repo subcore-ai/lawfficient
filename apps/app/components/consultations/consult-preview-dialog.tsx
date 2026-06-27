@@ -162,13 +162,17 @@ export function ConsultPreviewDialog({
 
             <dl className="grid grid-cols-[5rem_1fr] items-center gap-x-4 gap-y-2.5 py-2 text-sm">
               <dt className="text-muted-foreground self-start pt-1">When</dt>
-              <dd className="flex flex-wrap items-center gap-x-1 gap-y-1">
+              <dd className="space-y-1">
                 {canManage ? (
                   <>
-                    <input type="date" value={day} onChange={(e) => setDay(e.target.value)} className={cn(INLINE)} aria-label="Date" />
-                    <input type="time" value={fromTime} onChange={(e) => onFromChange(e.target.value)} className={cn(INLINE)} aria-label="From" />
-                    <span className="text-muted-foreground">–</span>
-                    <input type="time" value={toTime} onChange={(e) => setToTime(e.target.value)} className={cn(INLINE)} aria-label="To" />
+                    <div>
+                      <input type="date" value={day} onChange={(e) => setDay(e.target.value)} className={cn(INLINE)} aria-label="Date" />
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <input type="time" value={fromTime} onChange={(e) => onFromChange(e.target.value)} className={cn(INLINE)} aria-label="From" />
+                      <span className="text-muted-foreground">–</span>
+                      <input type="time" value={toTime} onChange={(e) => setToTime(e.target.value)} className={cn(INLINE)} aria-label="To" />
+                    </div>
                   </>
                 ) : (
                   <span>{`${day} · ${fromTime} – ${toTime}`}</span>
