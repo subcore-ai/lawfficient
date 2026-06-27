@@ -2,6 +2,7 @@ import { BookConsultationDialog } from "@/components/consultations/book-consulta
 import { ConsultationsBoard } from "@/components/consultations/consultations-board"
 import { PageHeader } from "@/components/page-header"
 import { getCurrentUser } from "@/lib/auth/session"
+import { mapConsultationTypeRow, type ConsultationType } from "@/lib/consultations/consultation-types"
 import { mapConsultationRow, partitionConsultations, type ConsultationView } from "@/lib/consultations/queries"
 import { isSupabaseConfigured } from "@/lib/supabase/env"
 import { createClient } from "@/lib/supabase/server"
@@ -14,6 +15,7 @@ type Loaded = {
   past: ConsultationView[]
   leads: Option[]
   attorneys: Option[]
+  consultationTypes: ConsultationType[]
   canManage: boolean
   // The firm's configured zone, used as the booking picker's default (null → the dialog's own fallback).
   defaultTimeZone: string | null
@@ -21,23 +23,34 @@ type Loaded = {
 
 async function load(): Promise<Loaded> {
   if (!isSupabaseConfigured()) {
-    return { upcoming: [], past: [], leads: [], attorneys: [], canManage: false, defaultTimeZone: null }
+    return {
+      upcoming: [],
+      past: [],
+      leads: [],
+      attorneys: [],
+      consultationTypes: [],
+      canManage: false,
+      defaultTimeZone: null,
+    }
   }
   const me = await getCurrentUser()
   const supabase = await createClient()
   // Consultations are per-record (RLS client). Leads (for the picker + name map) and active staff (for
-  // the attorney picker + name map) are firm reference data; the firm's timezone seeds the booking picker.
-  const [consultRes, leadsRes, staffRes, firmRes] = await Promise.all([
+  // the attorney picker + name map) are firm reference data; the firm's timezone seeds the booking
+  // picker; active consultation types drive the booking type picker.
+  const [consultRes, leadsRes, staffRes, firmRes, typesRes] = await Promise.all([
     supabase.from("consultations").select("*").eq("archived", false).order("start_at", { ascending: false }),
     supabase.from("leads").select("id, first_name, last_name, archived").order("created_at", { ascending: false }),
     supabase.from("profiles").select("id, name, status").order("name"),
     supabase.from("firms").select("timezone").single(),
+    supabase.from("consultation_types").select("*").eq("is_active", true).order("position"),
   ])
   // Fail fast on any read — a swallowed leads/profiles error would render with empty name maps
   // ("Unknown lead", blank attorneys) and unusable pickers instead of surfacing the failure.
   if (consultRes.error) throw consultRes.error
   if (leadsRes.error) throw leadsRes.error
   if (staffRes.error) throw staffRes.error
+  if (typesRes.error) throw typesRes.error
 
   const allLeads = leadsRes.data ?? []
   const allProfiles = staffRes.data ?? []
@@ -59,6 +72,7 @@ async function load(): Promise<Loaded> {
     past,
     leads: leadOptions,
     attorneys,
+    consultationTypes: (typesRes.data ?? []).map(mapConsultationTypeRow),
     canManage: me?.permissions?.includes("consultations.edit") ?? false,
     // Best-effort: a firm-read failure just falls back to the dialog's own default zone.
     defaultTimeZone: firmRes.data?.timezone ?? null,
@@ -66,11 +80,18 @@ async function load(): Promise<Loaded> {
 }
 
 export default async function ConsultationsPage() {
-  const { upcoming, past, leads, attorneys, canManage, defaultTimeZone } = await load()
+  const { upcoming, past, leads, attorneys, consultationTypes, canManage, defaultTimeZone } = await load()
   return (
     <>
       <PageHeader title="Consultations" description="Book and manage consultations across attorney calendars.">
-        {canManage ? <BookConsultationDialog leads={leads} attorneys={attorneys} defaultTimeZone={defaultTimeZone} /> : null}
+        {canManage ? (
+          <BookConsultationDialog
+            leads={leads}
+            attorneys={attorneys}
+            consultationTypes={consultationTypes}
+            defaultTimeZone={defaultTimeZone}
+          />
+        ) : null}
       </PageHeader>
       <ConsultationsBoard upcoming={upcoming} past={past} canManage={canManage} />
     </>

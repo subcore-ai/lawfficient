@@ -15,6 +15,7 @@ import {
 import { BookConsultationDialog } from "@/components/consultations/book-consultation-dialog"
 import { ConsultationActions } from "@/components/consultations/consultation-actions"
 import { StatusPill } from "@/components/status-pill"
+import { type ConsultationType } from "@/lib/consultations/consultation-types"
 import { consultationStatusMeta, type ConsultationView } from "@/lib/consultations/queries"
 import { formatConsultationWhen } from "@/lib/consultations/time"
 import { formatCurrency } from "@/lib/format"
@@ -42,6 +43,7 @@ export function LeadConsultations({
   upcoming,
   past,
   attorneys,
+  consultationTypes,
   defaultTimeZone,
   canManage,
 }: {
@@ -49,6 +51,7 @@ export function LeadConsultations({
   upcoming: ConsultationView[]
   past: ConsultationView[]
   attorneys: Attorney[]
+  consultationTypes: ConsultationType[]
   defaultTimeZone: string | null
   canManage: boolean
 }) {
@@ -85,6 +88,7 @@ export function LeadConsultations({
             <BookConsultationDialog
               leads={[]}
               attorneys={attorneys}
+              consultationTypes={consultationTypes}
               triggerLeadId={leadId}
               defaultTimeZone={defaultTimeZone}
               label="Book"

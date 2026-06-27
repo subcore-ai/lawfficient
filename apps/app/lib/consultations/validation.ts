@@ -15,10 +15,6 @@ export const CONSULTATION_STATUSES: ConsultationStatus[] = [
   "no_show",
 ]
 
-// Default picker for the booking form until a firm defines its own consultation types. Free text in
-// the DB, so a firm can use anything; these are just sensible, practice-agnostic defaults.
-export const DEFAULT_CONSULTATION_TYPES = ["Initial consultation", "Case review", "Follow-up"]
-
 export type ConsultationCoreInput = {
   leadId: string
   attorneyId: string | null
