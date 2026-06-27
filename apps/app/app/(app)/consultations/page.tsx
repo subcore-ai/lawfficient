@@ -151,7 +151,8 @@ async function renderCalendar({
   // Selected attorneys: ?attorneys=id1,id2,… → valid + schedulable, capped; default the first few.
   const requested =
     typeof sp.attorneys === "string" ? sp.attorneys.split(",") : Array.isArray(sp.attorneys) ? sp.attorneys : []
-  const valid = requested.filter((id) => schedulable.some((a) => a.id === id))
+  // Dedupe so a repeated ?attorneys= value can't create duplicate columns / React keys.
+  const valid = Array.from(new Set(requested)).filter((id) => schedulable.some((a) => a.id === id))
   const selectedIds = (valid.length ? valid : schedulable.slice(0, 3).map((a) => a.id)).slice(0, MAX_COLUMNS)
   const date = typeof sp.date === "string" && isValidYmd(sp.date) ? sp.date : firmToday(zone)
   const selectedType = types.find((t) => t.name === sp.type) ?? types[0]!

@@ -38,16 +38,14 @@ export function DayCalendar({
 
   return (
     <div>
-      {/* Per-attorney headers (only when more than one). */}
-      {columns.length > 1 ? (
-        <div className="mb-2 flex pl-12">
-          {columns.map((c) => (
-            <div key={c.attorney.id} className="text-foreground flex-1 truncate px-1 text-center text-sm font-medium">
-              {c.attorney.name}
-            </div>
-          ))}
-        </div>
-      ) : null}
+      {/* Per-attorney headers — shown for a single column too, so it's always clear whose calendar this is. */}
+      <div className="mb-2 flex pl-12">
+        {columns.map((c) => (
+          <div key={c.attorney.id} className="text-foreground flex-1 truncate px-1 text-center text-sm font-medium">
+            {c.attorney.name}
+          </div>
+        ))}
+      </div>
 
       <div className="relative" style={{ height: gridHeight }}>
         {/* Hour lines span the full width; labels sit in the left gutter. */}
