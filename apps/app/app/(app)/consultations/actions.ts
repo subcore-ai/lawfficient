@@ -126,6 +126,8 @@ export async function loadConsultationForEdit(id: string): Promise<LoadConsultat
     supabase.from("consultation_types").select("*").eq("is_active", true).order("position").order("created_at"),
     supabase.from("leads").select("first_name, last_name").eq("id", leadId).maybeSingle(),
   ])
+  // Don't mask a failed picker-list load as empty options — surface it so the edit UI isn't silently broken.
+  if (staffRes.error || typesRes.error) return { ok: false, error: "Couldn't load the consultation." }
   const lead = leadRes.data
 
   return {
