@@ -104,6 +104,7 @@ function AddAttorney({ staff }: { staff: { id: string; name: string }[] }) {
 
 function AttorneyCard({ attorney, canManage }: { attorney: Attorney; canManage: boolean }) {
   const [pending, startTransition] = React.useTransition()
+  const [saving, setSaving] = React.useState(false)
 
   function remove() {
     startTransition(async () => {
@@ -119,7 +120,7 @@ function AttorneyCard({ attorney, canManage }: { attorney: Attorney; canManage: 
         <CardDescription>{attorney.email}</CardDescription>
         {canManage ? (
           <CardAction>
-            <Button variant="ghost" size="sm" onClick={remove} disabled={pending}>
+            <Button variant="ghost" size="sm" onClick={remove} disabled={pending || saving}>
               Remove
             </Button>
           </CardAction>
@@ -130,6 +131,8 @@ function AttorneyCard({ attorney, canManage }: { attorney: Attorney; canManage: 
           windows={attorney.windows}
           onSave={(w) => setAttorneyAvailability(attorney.id, w)}
           canEdit={canManage}
+          disabled={pending}
+          onBusyChange={setSaving}
         />
       </CardContent>
     </Card>

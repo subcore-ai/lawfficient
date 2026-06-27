@@ -10,7 +10,7 @@ import { createClient } from "@/lib/supabase/server"
 export type ActionResult = { ok: true } | { error: string }
 
 const PATH = "/settings/scheduling"
-const MY_PATH = "/profile"
+const MY_PATH = "/profile/office-hours"
 
 type Gate = { ok: true; user: CurrentUser } | { ok: false; error: string }
 

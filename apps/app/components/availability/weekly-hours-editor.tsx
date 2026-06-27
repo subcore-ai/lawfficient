@@ -29,21 +29,30 @@ function snapshot(windows: AvailabilityWindow[]): string {
 // Shared weekly office-hours grid: a draft of time windows per weekday with add/remove/edit + a Save.
 // Used by the admin Settings editor (one card per attorney) and the self-service profile section — the
 // only difference is the `onSave` it's handed (replace this attorney's week vs. replace my own).
+//
+// `disabled` lets a parent freeze the grid while it runs a sibling action (the admin card disables it
+// during a Remove), and `onBusyChange` reports the in-flight save back so the parent can freeze that
+// sibling in turn — restoring the single shared-pending behaviour the inline editor used to have.
 export function WeeklyHoursEditor({
   windows,
   onSave,
   canEdit,
   saveLabel = "Save office hours",
+  disabled = false,
+  onBusyChange,
 }: {
   windows: AvailabilityWindow[]
   onSave: (windows: WindowInput[]) => Promise<SaveResult>
   canEdit: boolean
   saveLabel?: string
+  disabled?: boolean
+  onBusyChange?: (busy: boolean) => void
 }) {
   const [draft, setDraft] = React.useState<Draft[]>(() => toDraft(windows))
   const [dirty, setDirty] = React.useState(false)
   const [pending, startTransition] = React.useTransition()
   const tmpId = React.useRef(0)
+  const isBusy = pending || disabled
 
   // Re-sync from server props (a teammate's edit, another tab, our own post-save revalidation) when
   // there are no unsaved edits — adjusting state during render avoids the extra render an effect costs.
@@ -68,6 +77,7 @@ export function WeeklyHoursEditor({
   }
   function save() {
     startTransition(async () => {
+      onBusyChange?.(true)
       try {
         const res = await onSave(
           draft.map((w) => ({ weekday: w.weekday, startTime: w.startTime, endTime: w.endTime }))
@@ -80,6 +90,8 @@ export function WeeklyHoursEditor({
         setDirty(false)
       } catch {
         toast.error("Couldn't save office hours. Try again.")
+      } finally {
+        onBusyChange?.(false)
       }
     })
   }
@@ -104,7 +116,7 @@ export function WeeklyHoursEditor({
                       type="time"
                       value={w.startTime}
                       onChange={(e) => updateWindow(w.id, { startTime: e.target.value })}
-                      disabled={!canEdit || pending}
+                      disabled={!canEdit || isBusy}
                       className="w-32"
                       aria-label={`${day.label} start time`}
                     />
@@ -113,7 +125,7 @@ export function WeeklyHoursEditor({
                       type="time"
                       value={w.endTime}
                       onChange={(e) => updateWindow(w.id, { endTime: e.target.value })}
-                      disabled={!canEdit || pending}
+                      disabled={!canEdit || isBusy}
                       className="w-32"
                       aria-label={`${day.label} end time`}
                     />
@@ -122,7 +134,7 @@ export function WeeklyHoursEditor({
                         variant="ghost"
                         size="sm"
                         onClick={() => removeWindow(w.id)}
-                        disabled={pending}
+                        disabled={isBusy}
                         aria-label={`Remove ${day.label} hours`}
                       >
                         <Trash2 className="size-4" />
@@ -137,7 +149,7 @@ export function WeeklyHoursEditor({
                   size="sm"
                   className="self-start"
                   onClick={() => addWindow(day.value)}
-                  disabled={pending}
+                  disabled={isBusy}
                 >
                   <Plus className="size-4" /> Add hours
                 </Button>
@@ -147,7 +159,7 @@ export function WeeklyHoursEditor({
         )
       })}
       {canEdit ? (
-        <Button onClick={save} disabled={pending || !dirty} className="mt-4 self-start">
+        <Button onClick={save} disabled={isBusy || !dirty} className="mt-4 self-start">
           {pending ? "Saving…" : saveLabel}
         </Button>
       ) : null}
