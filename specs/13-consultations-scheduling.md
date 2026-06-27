@@ -90,18 +90,101 @@ consultation notes that drive qualification and retention.
 - [ ] A 3rd cancellation blocks re-booking pending admin approval.
 - [ ] Attorney notes capture qualification, case type, and follow-up assignee; assignee is notified.
 
+## Availability & calendar (scheduling — promoted from fast-follow)
+
+The shipped v1 books a manual date/time. This adds per-attorney **office hours** (Calendly-style) and a
+**calendar**, so a consult is booked into a free slot inside an attorney's availability and never
+double-booked.
+
+### Data model
+
+- **`profiles.schedulable`** (`boolean`) — who takes consultations (seeded `true` for `role='attorney'`;
+  a firm may mark any staff schedulable, keeping it multi-practice).
+- **AttorneyAvailability** — recurring weekly office hours: `firmId`, `attorneyId`, `weekday` (0–6),
+  `startTime`, `endTime`, `data jsonb`. Multiple rows per day (split shifts). Stored in the firm tz.
+- **AvailabilityException** *(Phase 5 — shipped, migration 0044)* — per-attorney **full-day** time off
+  (vacation / holidays): `firmId`, `attorneyId`, `startDate`, `endDate` (inclusive). A date in any of an
+  attorney's ranges removes their whole day from the calendar. Partial-day / one-off extra hours + firm-wide
+  holidays + a private label are fast-follows (`specs/_backlog.md`).
+- **No double-booking** *(built, 0043)* — a `btree_gist` exclusion constraint on `consultations`: no two
+  active consults for the same attorney whose `[start, start+duration)` ranges overlap. The end is an
+  IMMUTABLE epoch helper (`start + interval` is only STABLE → rejected in an index expr). A sibling
+  exclusion guards overlapping `attorney_availability` windows (as an int4range of minutes). Race-proof
+  at the DB, where an app-level check can't be.
+- Slot config (interval, buffer, min-notice, max-advance) is firm/attorney **config**; the slot duration
+  comes from the consult type.
+
+### Slot engine
+
+Pure, unit-tested **`generateSlots({ windows, booked, durationMs, stepMs?, nowMs })`**
+(`lib/availability/slots.ts`, **built**): works in UTC epoch-ms intervals (the caller converts firm-tz
+office hours on a date → UTC) → for each window, step slots of the type's duration → drop any
+overlapping a booked consult or starting in the past → the remainder is bookable. Booking
+(`createConsultation` / reschedule) surfaces the DB exclusion violation (`23P01`) as a clean "already
+booked" error. (Buffer / min-notice are Phase 5.)
+
+### Calendar UI
+
+- `/consultations`: a **List / Calendar** toggle (`view` searchParam; List = the shipped status board).
+- **Day, single attorney — built.** Pick a schedulable attorney + date + consultation type; office hours
+  shaded, booked consults as blocks, free slots **click-to-book** (opens the booking dialog pre-filled
+  with attorney + start + type). Server-driven: the day's windows / consults / free-slots are computed in
+  `lib/scheduling/day-calendar.ts` (`buildDayCalendar` — positions everything by firm-tz minutes-of-day,
+  via `generateSlots`), re-loaded from `?attorney=&date=&type=`. The grid (`day-calendar-grid.tsx`) is a
+  reusable single column.
+- **Day, multi-attorney columns — built.** Toggle 1–N schedulable attorneys (chips; default the first 3,
+  capped at 6); each is a column of the same grid, all sharing one hour gutter + a common time range, free
+  slots click-to-book per column. `?attorneys=a,b,c`. The grid is a shared gutter + a `CalendarColumn` per
+  attorney (`day-calendar-grid.tsx` composes `calendar-column.tsx`).
+- **Time off — built.** Per-attorney full-day exceptions (`availability_exceptions`, migration 0044): a
+  date in any of an attorney's ranges removes their whole day from the calendar (no slots; the column shows
+  a "Time off" marker). Managed self-service on the profile + by admins in Settings → Office hours
+  (`components/availability/time-off-manager.tsx`). Firm-wide holidays + partial-day overrides → fast-follow.
+- **Calendar colors — built.** Each attorney can carry a pastel from a fixed 15-color palette
+  (`profiles.calendar_color`, migration 0045; `lib/scheduling/calendar-colors.ts`) that tints their column
+  (office hours + consults + slots) so they're distinguishable when several show together. Picked
+  self-service on the profile + by admins in Settings → Office hours (`calendar-color-picker.tsx`).
+- **Week** — single attorney, 7-day grid. Reschedule reuses the slot picker.
+
+### Timezone
+
+v1 renders in the **firm timezone** (`firms.timezone`); cross-tz / remote attorneys are later. The
+per-consult UTC instant + `timeZone` are stored as today.
+
+### Phasing
+
+1. Availability model + Settings "Office hours" editor (per attorney). **Done.**
+2. Slot engine + the exclusion-constraint guard + server-side booking validation. **Done.**
+3. Calendar UI — single attorney. **Done.**
+4. Multi-attorney day view. **Done.**
+5. Time off / exceptions. **← this PR.** (Booking rules — buffer / min-notice / max-advance — stay deferred; see `specs/_backlog.md`.)
+
+### Locked decisions
+
+- Bookable = `schedulable` flag, seeded from `role='attorney'`.
+- Firm-single-tz for v1.
+- Slot duration from the consult type + a configurable interval.
+- Double-booking prevented by a DB exclusion constraint.
+- Office hours are **admin-managed** (`settings.manage`, Settings → Office hours) **and self-service** — an attorney edits their own from their profile (RLS allows the owner, `attorney_id = auth.uid()`). Read on `consultations.view` / `settings.manage` / owner.
+- No public self-service booking page in v1 (the client portal stays deferred — [18-client-portal](18-client-portal.md)).
+
 ## Out of scope (v1) / future
 
 - Public self-service client booking page.
-- Round-the-clock availability sync to external calendars.
+- Round-the-clock availability sync to external calendars (Google/Outlook two-way).
 
 ## Decisions (v1)
 
 Resolved in [03-architecture-and-scope](03-architecture-and-scope.md):
 
-- **Scheduling:** manual date/time booking with time zone in v1. Per-attorney availability rules
-  and Google/Outlook two-way sync are fast-follow.
+- **Scheduling:** manual date/time booking with time zone shipped in v1. Per-attorney availability
+  rules + the calendar are now being built (see "Availability & calendar" above); Google/Outlook
+  two-way sync remains fast-follow.
 - **Cancellation policy is per-tenant** (fee on/off & amount, rebooking/approval limits),
   configured in Settings; the 3-cancellation approval gate (UC12b) is the default behavior.
-- **Consultation types and prices are firm-configurable** (seeded defaults), set in Settings.
+- **Consultation types are firm-configurable** (name · duration · price; seeded defaults), set in
+  **Settings → Consultation types** (migration 0042). Booking picks a type → its duration + fee
+  auto-fill and the calendar offers slots of that length. Consults snapshot the chosen values, so
+  editing/deleting a type never changes past records. ("Chargeable" = price > 0; the consult's own
+  `paid` flag tracks payment status, a separate concept.)
 - Payments via Stripe (see [17-billing-payments](17-billing-payments.md)).

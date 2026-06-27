@@ -124,3 +124,39 @@ export function isValidTimeZone(value: string): boolean {
     return false
   }
 }
+
+// Split a naive "YYYY-MM-DDTHH:mm" wall string into separate date + time parts, for distinct day / time
+// inputs. Returns empty strings when the input is malformed (so the inputs render empty).
+export function splitWall(wall: string): { day: string; time: string } {
+  const m = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})$/.exec(wall)
+  return m ? { day: m[1]!, time: m[2]! } : { day: "", time: "" }
+}
+
+// "HH:mm" shifted by `minutes`, clamped to the same day [00:00, 23:59]. "" when the time is malformed.
+// Used to derive the "to" time from the "from" time + a consultation type's default length.
+export function addMinutesToTime(time: string, minutes: number): string {
+  const m = /^(\d{2}):(\d{2})$/.exec(time)
+  if (!m) return ""
+  const total = Math.max(0, Math.min(23 * 60 + 59, Number(m[1]) * 60 + Number(m[2]) + minutes))
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`
+}
+
+// Minutes from `from` to `to` ("HH:mm" each). Negative or 0 when `to` isn't after `from`; NaN if malformed.
+// The booking form derives the duration from the from/to selection instead of a manual field.
+export function minutesBetween(from: string, to: string): number {
+  const a = /^(\d{2}):(\d{2})$/.exec(from)
+  const b = /^(\d{2}):(\d{2})$/.exec(to)
+  if (!a || !b) return NaN
+  return Number(b[1]) * 60 + Number(b[2]) - (Number(a[1]) * 60 + Number(a[2]))
+}
+
+// Today's calendar date (YYYY-MM-DD) in `timeZone` — for comparing against firm-calendar `date` columns
+// (e.g. the time-off cutoff). en-CA renders ISO-style; falls back to UTC on a bad zone.
+export function currentDateInZone(timeZone: string): string {
+  const opts = { year: "numeric", month: "2-digit", day: "2-digit" } as const
+  try {
+    return new Intl.DateTimeFormat("en-CA", { timeZone, ...opts }).format(new Date())
+  } catch {
+    return new Intl.DateTimeFormat("en-CA", { timeZone: "UTC", ...opts }).format(new Date())
+  }
+}

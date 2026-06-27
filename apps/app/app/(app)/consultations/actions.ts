@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 
 import { requirePermission } from "@/lib/auth/gate"
+import { mapConsultationTypeRow, type ConsultationType } from "@/lib/consultations/consultation-types"
 import { formatConsultationWhen, zonedWallTimeToUtcISO } from "@/lib/consultations/time"
 import { parseConsultationInput, type ConsultationStatus } from "@/lib/consultations/validation"
 import { recordLeadEvent } from "@/lib/leads/events"
@@ -59,6 +60,88 @@ function readInput(formData: FormData) {
   })
 }
 
+// A click-booked calendar slot carries its exact UTC instant (`startAtIso`) — prefer it over re-deriving
+// from the naive wall string, which is ambiguous on the DST fall-back hour (one wall time maps to two
+// instants). A hand-typed/edited time sends no `startAtIso` and falls back to wall + zone.
+function resolveStartAt(formData: FormData, wall: string, timeZone: string): string | null {
+  const iso = formData.get("startAtIso")
+  if (typeof iso === "string" && iso !== "") {
+    const ms = Date.parse(iso)
+    if (Number.isFinite(ms)) return new Date(ms).toISOString()
+  }
+  return zonedWallTimeToUtcISO(wall, timeZone)
+}
+
+// The current values of an editable consult, plus the lead's name for display (the lead itself is fixed).
+export type ConsultationEditData = {
+  id: string
+  leadId: string
+  leadName: string
+  type: string
+  attorneyId: string | null
+  startAtIso: string
+  durationMin: number
+  timeZone: string
+  amount: number | null
+  paid: boolean
+}
+
+export type LoadConsultationForEdit =
+  | { ok: true; consult: ConsultationEditData; attorneys: { id: string; name: string }[]; consultationTypes: ConsultationType[] }
+  | { ok: false; error: string }
+
+// Everything the edit dialog needs in one round-trip, so it can be opened from anywhere (calendar, board,
+// lead page) with just the consult id — no threading the attorney/type lists or the consult's fields
+// through every view. RLS scopes all reads to the firm. A finalized consult can't be edited.
+export async function loadConsultationForEdit(id: string): Promise<LoadConsultationForEdit> {
+  const gate = await requireConsultEdit()
+  if (!gate.ok) return { ok: false, error: gate.error }
+
+  const supabase = await createClient()
+  // Load the consult first — we need its attorney_id to also fetch that attorney even if deactivated.
+  const { data: c, error: consultErr } = await supabase
+    .from("consultations")
+    .select("id, lead_id, attorney_id, type, start_at, duration_min, time_zone, amount, paid, status")
+    .eq("id", id)
+    .single()
+  if (consultErr || !c) return { ok: false, error: "Couldn't load the consultation." }
+  if (c.status === "completed" || c.status === "canceled" || c.status === "no_show") {
+    return { ok: false, error: "This consultation is finalized and can't be edited." }
+  }
+
+  // lead_id is nullable in the schema (a deleted lead orphans the consult); coerce so the form's leadId
+  // stays a string. An empty leadId just yields no lead name — a rare orphaned-consult edge.
+  const leadId = c.lead_id ?? ""
+  // Include the consult's current attorney even if since deactivated, so the edit form keeps + displays it.
+  const profileFilter = c.attorney_id ? `status.eq.active,id.eq.${c.attorney_id}` : "status.eq.active"
+  const [staffRes, typesRes, leadRes] = await Promise.all([
+    supabase.from("profiles").select("id, name").or(profileFilter).order("name"),
+    supabase.from("consultation_types").select("*").eq("is_active", true).order("position").order("created_at"),
+    supabase.from("leads").select("first_name, last_name").eq("id", leadId).maybeSingle(),
+  ])
+  // Don't mask a failed picker-list load as empty options — surface it so the edit UI isn't silently broken.
+  if (staffRes.error || typesRes.error) return { ok: false, error: "Couldn't load the consultation." }
+  const lead = leadRes.data
+
+  return {
+    ok: true,
+    consult: {
+      id: c.id,
+      leadId,
+      leadName: lead ? `${lead.first_name} ${lead.last_name}`.trim() : "—",
+      type: c.type,
+      attorneyId: c.attorney_id,
+      startAtIso: c.start_at,
+      durationMin: c.duration_min,
+      timeZone: c.time_zone,
+      amount: c.amount,
+      paid: c.paid,
+    },
+    attorneys: (staffRes.data ?? []).map((p) => ({ id: p.id, name: p.name })),
+    consultationTypes: typesRes.error ? [] : (typesRes.data ?? []).map(mapConsultationTypeRow),
+  }
+}
+
 export async function createConsultation(formData: FormData): Promise<ActionResult> {
   const gate = await requireConsultEdit()
   if (!gate.ok) return { error: gate.error }
@@ -66,8 +149,7 @@ export async function createConsultation(formData: FormData): Promise<ActionResu
   const core = readInput(formData)
   if (!core.ok) return { error: core.error }
 
-  // The form sends a naive wall time + the chosen zone; store the true UTC instant.
-  const startAt = zonedWallTimeToUtcISO(core.value.startAt, core.value.timeZone)
+  const startAt = resolveStartAt(formData, core.value.startAt, core.value.timeZone)
   if (!startAt) return { error: "Couldn't read the date/time for that time zone." }
 
   const supabase = await createClient()
@@ -91,6 +173,7 @@ export async function createConsultation(formData: FormData): Promise<ActionResu
     .select("id")
     .single()
   if (error?.code === "23503") return { error: "That lead or attorney isn't in your firm." }
+  if (error?.code === "23P01") return { error: "That attorney already has a consultation at that time." }
   if (error || !inserted) return { error: "Couldn't book the consultation." }
 
   await audit(supabase, gate.user.id, inserted.id, core.value.type, "created")
@@ -133,53 +216,13 @@ export async function updateConsultation(id: string, formData: FormData): Promis
     .select("id, lead_id")
     .maybeSingle()
   if (error?.code === "23503") return { error: "That attorney isn't in your firm." }
+  if (error?.code === "23P01") return { error: "That attorney already has a consultation at that time." }
   if (error) return { error: "Couldn't update the consultation." }
   if (!updated) return { error: "This consultation is finalized and can't be edited." }
 
   await audit(supabase, gate.user.id, id, core.value.type, "updated")
   await recordLeadEvent(updated.lead_id, `Consultation updated — ${core.value.type}`)
   revalidate(updated.lead_id)
-  return { ok: true }
-}
-
-// Move the start time + flag the consult as rescheduled. `startAtWall` is a naive wall time; it's
-// interpreted in the consult's stored time zone.
-export async function rescheduleConsultation(id: string, startAtWall: string): Promise<ActionResult> {
-  const gate = await requireConsultEdit()
-  if (!gate.ok) return { error: gate.error }
-
-  const supabase = await createClient()
-  const { data: current, error: readErr } = await supabase
-    .from("consultations")
-    .select("time_zone, status, lead_id")
-    .eq("id", id)
-    .single()
-  if (readErr || !current) return { error: "Couldn't reschedule the consultation." }
-  if (current.status === "completed" || current.status === "canceled" || current.status === "no_show") {
-    return { error: "This consultation is finalized and can't be rescheduled." }
-  }
-
-  const startAt = zonedWallTimeToUtcISO(startAtWall, current.time_zone)
-  if (!startAt) return { error: "Choose a valid date and time." }
-
-  // The `.in()` filter makes the move atomic — a consult that became terminal between the read and the
-  // write is excluded (0 rows), so we never reschedule a finalized one.
-  const { data: updated, error } = await supabase
-    .from("consultations")
-    .update({ start_at: startAt, status: "rescheduled", last_activity: new Date().toISOString() })
-    .eq("id", id)
-    .in("status", ["scheduled", "paid", "rescheduled"])
-    .select("id")
-    .maybeSingle()
-  if (error) return { error: "Couldn't reschedule the consultation." }
-  if (!updated) return { error: "This consultation is finalized and can't be rescheduled." }
-
-  await audit(supabase, gate.user.id, id, "", "rescheduled")
-  await recordLeadEvent(
-    current.lead_id,
-    `Consultation rescheduled to ${formatConsultationWhen(startAt, current.time_zone)}`,
-  )
-  revalidate(current.lead_id)
   return { ok: true }
 }
 

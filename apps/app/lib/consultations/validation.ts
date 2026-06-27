@@ -15,10 +15,6 @@ export const CONSULTATION_STATUSES: ConsultationStatus[] = [
   "no_show",
 ]
 
-// Default picker for the booking form until a firm defines its own consultation types. Free text in
-// the DB, so a firm can use anything; these are just sensible, practice-agnostic defaults.
-export const DEFAULT_CONSULTATION_TYPES = ["Initial consultation", "Case review", "Follow-up"]
-
 export type ConsultationCoreInput = {
   leadId: string
   attorneyId: string | null
@@ -64,8 +60,8 @@ export function parseConsultationInput(raw: {
   if (!startAt || Number.isNaN(Date.parse(startAt))) return { ok: false, error: "Choose a valid date and time." }
 
   const durationMin = typeof raw.durationMin === "number" ? raw.durationMin : Number(str(raw.durationMin))
-  if (!Number.isInteger(durationMin) || durationMin <= 0) {
-    return { ok: false, error: "Duration must be a positive number of minutes." }
+  if (!Number.isInteger(durationMin) || durationMin < 5 || durationMin > 1440) {
+    return { ok: false, error: "Duration must be 5–1440 minutes." }
   }
 
   // assignee/attorney: a non-string (e.g. a number) would str()→"" and silently drop — reject it.
@@ -116,7 +112,7 @@ export function parseConsultationPatch(
   }
   if (has("durationMin")) {
     const v = typeof raw.durationMin === "number" ? raw.durationMin : Number(str(raw.durationMin))
-    if (!Number.isInteger(v) || v <= 0) return { ok: false, error: "Duration must be a positive number of minutes." }
+    if (!Number.isInteger(v) || v < 5 || v > 1440) return { ok: false, error: "Duration must be 5–1440 minutes." }
     patch.durationMin = v
   }
   if (has("timeZone")) {
