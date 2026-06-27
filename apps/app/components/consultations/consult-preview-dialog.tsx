@@ -209,7 +209,9 @@ export function ConsultPreviewDialog({
                         onClick={(e) => {
                           try {
                             e.currentTarget.showPicker()
-                          } catch {}
+                          } catch {
+                            // showPicker() may be unsupported or blocked by the browser — ignore.
+                          }
                         }}
                         className={cn(INLINE, "[&::-webkit-calendar-picker-indicator]:hidden")}
                         aria-label="From"
@@ -222,7 +224,9 @@ export function ConsultPreviewDialog({
                         onClick={(e) => {
                           try {
                             e.currentTarget.showPicker()
-                          } catch {}
+                          } catch {
+                            // showPicker() may be unsupported or blocked by the browser — ignore.
+                          }
                         }}
                         className={cn(INLINE, "[&::-webkit-calendar-picker-indicator]:hidden")}
                         aria-label="To"
