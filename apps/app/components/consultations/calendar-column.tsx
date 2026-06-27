@@ -50,11 +50,13 @@ export function CalendarColumn({
   // Office hours mix the color with the THEME background, so the shading is a light tint in light mode and a
   // dark tint in dark mode (a fixed pastel looked washed-out on dark). Slot text stays theme-aware; the
   // consult block is the opaque color with its own readable text (mode-independent).
-  const officeTint = color ? { backgroundColor: `color-mix(in oklab, ${color.solid} 30%, var(--background))` } : {}
-  // Slot text is a shade of the SAME color, mixed toward the theme foreground — so it lands dark on the
-  // light tint (light mode) and light on the dark tint (dark mode), and reads as the column's color, not gray.
+  // Office-hours shading mixes the color with the theme bg; `--cal-office-tint` is the strength (30% light,
+  // weaker in dark mode so the column stays dim).
+  const officeTint = color ? { backgroundColor: `color-mix(in oklab, ${color.solid} var(--cal-office-tint), var(--background))` } : {}
+  // Slots: a faint solid hairline in the color (calmer than dashed), and text that's a shade of the same
+  // color mixed toward the theme foreground — dark on the light tint, light on the dark tint (not gray).
   const slotTint = color
-    ? { borderColor: color.solid, color: `color-mix(in oklab, ${color.solid} 45%, var(--foreground))` }
+    ? { borderColor: `${color.solid}59`, color: `color-mix(in oklab, ${color.solid} 45%, var(--foreground))` }
     : {}
   const consultTint = color ? { backgroundColor: color.solid, color: color.text } : {}
 
@@ -83,7 +85,7 @@ export function CalendarColumn({
           return (
             <div
               key={s.startMs}
-              className="border-primary/40 text-primary/70 absolute inset-x-0.5 overflow-hidden rounded border border-dashed px-1.5 text-[11px] leading-tight"
+              className="border-primary/30 text-primary/70 absolute inset-x-0.5 overflow-hidden rounded border px-1.5 text-[11px] leading-tight"
               style={style}
             >
               {label}
@@ -105,7 +107,7 @@ export function CalendarColumn({
               <button
                 type="button"
                 aria-label={`Book ${label}`}
-                className="border-primary/40 text-primary hover:bg-primary/10 absolute inset-x-0.5 cursor-pointer overflow-hidden rounded border border-dashed px-1.5 text-left text-[11px] leading-tight transition-colors"
+                className="border-primary/30 text-primary hover:bg-foreground/5 absolute inset-x-0.5 cursor-pointer overflow-hidden rounded border px-1.5 text-left text-[11px] leading-tight transition-colors"
                 style={style}
               >
                 {label}
