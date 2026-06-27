@@ -103,6 +103,7 @@ export function DayCalendarGrid({
               consultationTypes={consultationTypes}
               defaultTimeZone={defaultTimeZone}
               prefillStart={s.startInput}
+              prefillStartIso={new Date(s.startMs).toISOString()}
               prefillAttorneyId={attorneyId}
               prefillType={typeName}
               trigger={

@@ -44,6 +44,7 @@ export function BookConsultationDialog({
   label = "Book consultation",
   defaultTimeZone,
   prefillStart,
+  prefillStartIso,
   prefillAttorneyId,
   prefillType,
   trigger,
@@ -59,6 +60,8 @@ export function BookConsultationDialog({
   defaultTimeZone?: string | null
   // Calendar click-to-book: pre-fill the slot's start (datetime-local wall string), attorney, and type.
   prefillStart?: string
+  // The slot's exact UTC instant — booked directly when "When" is left unedited (DST-fallback-safe).
+  prefillStartIso?: string
   prefillAttorneyId?: string
   prefillType?: string
   // Custom trigger element (e.g. a calendar slot button); falls back to the default "Book" button.
@@ -132,6 +135,9 @@ export function BookConsultationDialog({
     fd.set("type", type)
     fd.set("durationMin", String(durationMin))
     fd.set("startAt", start)
+    // An unedited click-booked slot books its exact instant (avoids the DST-fallback wall ambiguity); a
+    // hand-edited "When" re-derives from wall + zone.
+    fd.set("startAtIso", prefillStartIso && start === (prefillStart ?? "") ? prefillStartIso : "")
     fd.set("timeZone", zone)
     // Fee + paid only apply to a chargeable type; a free booking carries no amount and is never "paid".
     fd.set("amount", chargeable ? String(amount) : "")

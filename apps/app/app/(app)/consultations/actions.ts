@@ -66,6 +66,18 @@ function readInput(formData: FormData) {
   })
 }
 
+// A click-booked calendar slot carries its exact UTC instant (`startAtIso`) — prefer it over re-deriving
+// from the naive wall string, which is ambiguous on the DST fall-back hour (one wall time maps to two
+// instants). A hand-typed/edited time sends no `startAtIso` and falls back to wall + zone.
+function resolveStartAt(formData: FormData, wall: string, timeZone: string): string | null {
+  const iso = formData.get("startAtIso")
+  if (typeof iso === "string" && iso !== "") {
+    const ms = Date.parse(iso)
+    if (Number.isFinite(ms)) return new Date(ms).toISOString()
+  }
+  return zonedWallTimeToUtcISO(wall, timeZone)
+}
+
 export async function createConsultation(formData: FormData): Promise<ActionResult> {
   const gate = await requireConsultEdit()
   if (!gate.ok) return { error: gate.error }
@@ -73,8 +85,7 @@ export async function createConsultation(formData: FormData): Promise<ActionResu
   const core = readInput(formData)
   if (!core.ok) return { error: core.error }
 
-  // The form sends a naive wall time + the chosen zone; store the true UTC instant.
-  const startAt = zonedWallTimeToUtcISO(core.value.startAt, core.value.timeZone)
+  const startAt = resolveStartAt(formData, core.value.startAt, core.value.timeZone)
   if (!startAt) return { error: "Couldn't read the date/time for that time zone." }
 
   const supabase = await createClient()
