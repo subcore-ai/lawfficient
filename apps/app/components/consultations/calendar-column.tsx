@@ -1,5 +1,7 @@
 "use client"
 
+import { cn } from "@workspace/ui/lib/utils"
+
 import { BookConsultationDialog } from "@/components/consultations/book-consultation-dialog"
 import type { ConsultationType } from "@/lib/consultations/consultation-types"
 import type { CalendarColor } from "@/lib/scheduling/calendar-colors"
@@ -56,9 +58,13 @@ export function CalendarColumn({
   // Slots: a faint solid hairline in the color (calmer than dashed), and text that's a shade of the same
   // color mixed toward the theme foreground — dark on the light tint, light on the dark tint (not gray).
   const slotTint = color
-    ? { borderColor: `${color.solid}59`, color: `color-mix(in oklab, ${color.solid} 45%, var(--foreground))` }
+    ? { borderColor: `${color.solid}40`, color: `color-mix(in oklab, ${color.solid} 45%, var(--foreground))` }
     : {}
   const consultTint = color ? { backgroundColor: color.solid, color: color.text } : {}
+  // To collapse the shared border between back-to-back slots into a single hairline: a slot whose end is
+  // another slot's start drops its bottom border + bottom rounding (the next slot's top edge is the line).
+  const slotStarts = new Set(slots.map((s) => s.startMin))
+  const slotEnds = new Set(slots.map((s) => s.endMin))
 
   return (
     <>
@@ -81,11 +87,18 @@ export function CalendarColumn({
       {slots.map((s) => {
         const style = { top: top(s.startMin), height: height(s.endMin - s.startMin), ...slotTint }
         const label = formatSlotTime(s.startMin)
+        const collapse = cn(
+          slotStarts.has(s.endMin) && "rounded-b-none border-b-0",
+          slotEnds.has(s.startMin) && "rounded-t-none",
+        )
         if (!canBook) {
           return (
             <div
               key={s.startMs}
-              className="border-primary/30 text-primary/70 absolute inset-x-0.5 overflow-hidden rounded border px-1.5 text-[11px] leading-tight"
+              className={cn(
+                "border-primary/20 text-primary/70 absolute inset-x-0.5 overflow-hidden rounded border px-1.5 text-[11px] leading-tight",
+                collapse,
+              )}
               style={style}
             >
               {label}
@@ -107,7 +120,10 @@ export function CalendarColumn({
               <button
                 type="button"
                 aria-label={`Book ${label}`}
-                className="border-primary/30 text-primary hover:bg-foreground/5 absolute inset-x-0.5 cursor-pointer overflow-hidden rounded border px-1.5 text-left text-[11px] leading-tight transition-colors"
+                className={cn(
+                  "border-primary/20 text-primary hover:bg-foreground/5 absolute inset-x-0.5 cursor-pointer overflow-hidden rounded border px-1.5 text-left text-[11px] leading-tight transition-colors",
+                  collapse,
+                )}
                 style={style}
               >
                 {label}
