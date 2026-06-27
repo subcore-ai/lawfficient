@@ -130,7 +130,10 @@ booked" error. (Buffer / min-notice are Phase 5.)
   `lib/scheduling/day-calendar.ts` (`buildDayCalendar` — positions everything by firm-tz minutes-of-day,
   via `generateSlots`), re-loaded from `?attorney=&date=&type=`. The grid (`day-calendar-grid.tsx`) is a
   reusable single column.
-- **Day, multi-attorney columns** — N columns of the same grid (default ~3). _Next._
+- **Day, multi-attorney columns — built.** Toggle 1–N schedulable attorneys (chips; default the first 3,
+  capped at 6); each is a column of the same grid, all sharing one hour gutter + a common time range, free
+  slots click-to-book per column. `?attorneys=a,b,c`. The grid is a shared gutter + a `CalendarColumn` per
+  attorney (`day-calendar-grid.tsx` composes `calendar-column.tsx`).
 - **Week** — single attorney, 7-day grid. Reschedule reuses the slot picker.
 
 ### Timezone
@@ -142,8 +145,8 @@ per-consult UTC instant + `timeZone` are stored as today.
 
 1. Availability model + Settings "Office hours" editor (per attorney). **Done.**
 2. Slot engine + the exclusion-constraint guard + server-side booking validation. **Done.**
-3. Calendar UI — single attorney. **← this PR**
-4. Multi-attorney day view.
+3. Calendar UI — single attorney. **Done.**
+4. Multi-attorney day view. **← this PR**
 5. Exceptions + booking rules (buffer / min-notice / max-advance).
 
 ### Locked decisions

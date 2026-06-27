@@ -1,27 +1,32 @@
 "use client"
 
 import { usePathname, useRouter } from "next/navigation"
-import { ChevronLeft, ChevronRight } from "lucide-react"
+import { Check, ChevronLeft, ChevronRight } from "lucide-react"
 
 import { Button } from "@workspace/ui/components/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select"
+import { cn } from "@workspace/ui/lib/utils"
 
 import type { ConsultationType } from "@/lib/consultations/consultation-types"
 
 type Option = { id: string; name: string }
 
-// Attorney + date + type pickers for the calendar. Each change rewrites the URL searchParams; the server
-// re-loads the day from the new params. Date math is plain Y-M-D string arithmetic (no zone needed).
+// Keep in step with MAX_COLUMNS in the consultations page.
+const MAX_ATTORNEYS = 6
+
+// Attorney chips (toggle 1–N columns) + date + type pickers for the calendar. Each change rewrites the
+// URL searchParams; the server re-loads the day from the new params. Date math is plain Y-M-D string
+// arithmetic (no zone needed).
 export function CalendarControls({
   attorneys,
-  attorneyId,
+  attorneyIds,
   date,
   today,
   types,
   typeName,
 }: {
   attorneys: Option[]
-  attorneyId: string
+  attorneyIds: string[]
   date: string
   today: string // firm-tz today, for the Today button
   types: ConsultationType[]
@@ -30,13 +35,22 @@ export function CalendarControls({
   const router = useRouter()
   const pathname = usePathname()
 
-  function go(next: { attorney?: string; date?: string; type?: string }) {
+  function go(next: { attorneys?: string[]; date?: string; type?: string }) {
     const q = new URLSearchParams()
     q.set("view", "calendar")
-    q.set("attorney", next.attorney ?? attorneyId)
+    q.set("attorneys", (next.attorneys ?? attorneyIds).join(","))
     q.set("date", next.date ?? date)
     q.set("type", next.type ?? typeName)
     router.push(`${pathname}?${q.toString()}`)
+  }
+
+  const atCap = attorneyIds.length >= MAX_ATTORNEYS
+
+  function toggleAttorney(id: string) {
+    const has = attorneyIds.includes(id)
+    if (has && attorneyIds.length === 1) return // keep at least one column
+    if (!has && atCap) return // respect the column cap
+    go({ attorneys: has ? attorneyIds.filter((x) => x !== id) : [...attorneyIds, id] })
   }
 
   function shift(days: number): string {
@@ -54,53 +68,64 @@ export function CalendarControls({
   }).format(new Date(`${date}T12:00:00Z`))
 
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-      <Select
-        value={attorneyId}
-        onValueChange={(v) => go({ attorney: v ?? attorneyId })}
-        items={attorneys.map((a) => ({ value: a.id, label: a.name }))}
-      >
-        <SelectTrigger className="w-52">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {attorneys.map((a) => (
-            <SelectItem key={a.id} value={a.id}>
-              {a.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+    <div className="space-y-3">
+      {attorneys.length > 1 ? (
+        <div className="flex flex-wrap gap-2">
+          {attorneys.map((a) => {
+            const on = attorneyIds.includes(a.id)
+            return (
+              <button
+                key={a.id}
+                type="button"
+                onClick={() => toggleAttorney(a.id)}
+                aria-pressed={on}
+                disabled={!on && atCap}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition-colors",
+                  on
+                    ? "border-primary bg-primary/10 text-foreground"
+                    : "text-muted-foreground hover:bg-muted disabled:pointer-events-none disabled:opacity-40",
+                )}
+              >
+                {on ? <Check className="size-3.5" /> : null}
+                {a.name}
+              </button>
+            )
+          })}
+        </div>
+      ) : null}
 
-      <div className="flex items-center gap-1">
-        <Button variant="outline" size="icon" onClick={() => go({ date: shift(-1) })} aria-label="Previous day">
-          <ChevronLeft className="size-4" />
-        </Button>
-        <Button variant="outline" size="sm" onClick={() => go({ date: today })} disabled={date === today}>
-          Today
-        </Button>
-        <Button variant="outline" size="icon" onClick={() => go({ date: shift(1) })} aria-label="Next day">
-          <ChevronRight className="size-4" />
-        </Button>
-        <span className="text-foreground ml-2 text-sm font-medium">{dateLabel}</span>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+        <div className="flex items-center gap-1">
+          <Button variant="outline" size="icon" onClick={() => go({ date: shift(-1) })} aria-label="Previous day">
+            <ChevronLeft className="size-4" />
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => go({ date: today })} disabled={date === today}>
+            Today
+          </Button>
+          <Button variant="outline" size="icon" onClick={() => go({ date: shift(1) })} aria-label="Next day">
+            <ChevronRight className="size-4" />
+          </Button>
+          <span className="text-foreground ml-2 inline-block min-w-[9rem] text-sm font-medium">{dateLabel}</span>
+        </div>
+
+        <Select
+          value={typeName}
+          onValueChange={(v) => go({ type: v ?? typeName })}
+          items={types.map((t) => ({ value: t.name, label: `${t.name} · ${t.durationMin}m` }))}
+        >
+          <SelectTrigger className="w-48">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {types.map((t) => (
+              <SelectItem key={t.id} value={t.name}>
+                {t.name} · {t.durationMin}m
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
-
-      <Select
-        value={typeName}
-        onValueChange={(v) => go({ type: v ?? typeName })}
-        items={types.map((t) => ({ value: t.name, label: `${t.name} · ${t.durationMin}m` }))}
-      >
-        <SelectTrigger className="w-48">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {types.map((t) => (
-            <SelectItem key={t.id} value={t.name}>
-              {t.name} · {t.durationMin}m
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
     </div>
   )
 }
