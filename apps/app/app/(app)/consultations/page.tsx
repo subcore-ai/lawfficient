@@ -148,7 +148,8 @@ async function renderCalendar({
   const valid = Array.from(new Set(requested)).filter((id) => schedulable.some((a) => a.id === id))
   const selectedIds = (valid.length ? valid : schedulable.slice(0, 3).map((a) => a.id)).slice(0, MAX_COLUMNS)
   const date = typeof sp.date === "string" && isValidYmd(sp.date) ? sp.date : currentDateInZone(zone)
-  const selectedType = types.find((t) => t.name === sp.type) ?? types[0]!
+  // The calendar slots default to the first active type's length; the actual type is chosen when booking.
+  const selectedType = types[0]!
 
   const dayEnd = zonedWallTimeToUtcISO(`${addDay(date)}T00:00`, zone)
   // Look back a day on the lower bound so a consult that STARTED yesterday but runs into this morning is
@@ -223,8 +224,6 @@ async function renderCalendar({
         attorneyIds={selectedIds}
         date={date}
         today={currentDateInZone(zone)}
-        types={types}
-        typeName={selectedType.name}
       />
       <div className="rounded-lg border p-4">
         {!hasContent ? (

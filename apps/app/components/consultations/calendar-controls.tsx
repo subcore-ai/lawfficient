@@ -4,43 +4,35 @@ import { usePathname, useRouter } from "next/navigation"
 import { Check, ChevronLeft, ChevronRight } from "lucide-react"
 
 import { Button } from "@workspace/ui/components/button"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select"
 import { cn } from "@workspace/ui/lib/utils"
-
-import type { ConsultationType } from "@/lib/consultations/consultation-types"
 
 type Option = { id: string; name: string }
 
 // Keep in step with MAX_COLUMNS in the consultations page.
 const MAX_ATTORNEYS = 6
 
-// Attorney chips (toggle 1–N columns) + date + type pickers for the calendar. Each change rewrites the
-// URL searchParams; the server re-loads the day from the new params. Date math is plain Y-M-D string
-// arithmetic (no zone needed).
+// Calendar filters / nav: attorney chips (toggle 1–N columns) + the day. Each change rewrites the URL
+// searchParams; the server re-loads the day. Date math is plain Y-M-D string arithmetic (no zone needed).
+// The consultation type is chosen when booking (in the dialog), not here — slots default to the first type.
 export function CalendarControls({
   attorneys,
   attorneyIds,
   date,
   today,
-  types,
-  typeName,
 }: {
   attorneys: Option[]
   attorneyIds: string[]
   date: string
   today: string // firm-tz today, for the Today button
-  types: ConsultationType[]
-  typeName: string
 }) {
   const router = useRouter()
   const pathname = usePathname()
 
-  function go(next: { attorneys?: string[]; date?: string; type?: string }) {
+  function go(next: { attorneys?: string[]; date?: string }) {
     const q = new URLSearchParams()
     q.set("view", "calendar")
     q.set("attorneys", (next.attorneys ?? attorneyIds).join(","))
     q.set("date", next.date ?? date)
-    q.set("type", next.type ?? typeName)
     router.push(`${pathname}?${q.toString()}`)
   }
 
@@ -95,36 +87,17 @@ export function CalendarControls({
         </div>
       ) : null}
 
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-        <div className="flex items-center gap-1">
-          <Button variant="outline" size="icon" onClick={() => go({ date: shift(-1) })} aria-label="Previous day">
-            <ChevronLeft className="size-4" />
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => go({ date: today })} disabled={date === today}>
-            Today
-          </Button>
-          <Button variant="outline" size="icon" onClick={() => go({ date: shift(1) })} aria-label="Next day">
-            <ChevronRight className="size-4" />
-          </Button>
-          <span className="text-foreground ml-2 inline-block min-w-[9rem] text-sm font-medium">{dateLabel}</span>
-        </div>
-
-        <Select
-          value={typeName}
-          onValueChange={(v) => go({ type: v ?? typeName })}
-          items={types.map((t) => ({ value: t.name, label: `${t.name} · ${t.durationMin}m` }))}
-        >
-          <SelectTrigger className="w-48">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {types.map((t) => (
-              <SelectItem key={t.id} value={t.name}>
-                {t.name} · {t.durationMin}m
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div className="flex items-center gap-1">
+        <Button variant="outline" size="icon" onClick={() => go({ date: shift(-1) })} aria-label="Previous day">
+          <ChevronLeft className="size-4" />
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => go({ date: today })} disabled={date === today}>
+          Today
+        </Button>
+        <Button variant="outline" size="icon" onClick={() => go({ date: shift(1) })} aria-label="Next day">
+          <ChevronRight className="size-4" />
+        </Button>
+        <span className="text-foreground ml-2 inline-block min-w-[9rem] text-sm font-medium">{dateLabel}</span>
       </div>
     </div>
   )
