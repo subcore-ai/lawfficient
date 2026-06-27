@@ -203,7 +203,7 @@ async function renderCalendar({
         durationMin: c.duration_min,
         type: c.type,
         leadName: leadNames.get(c.lead_id ?? "") ?? "Lead",
-        status: c.status ?? "",
+        status: c.status,
         leadId: c.lead_id,
         timeZone: c.time_zone,
         outcome: c.outcome,

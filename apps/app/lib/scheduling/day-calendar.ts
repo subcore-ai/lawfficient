@@ -3,6 +3,7 @@
 // slot engine (lib/availability/slots) runs in UTC; office-hours wall times are converted to UTC for it,
 // and its free-slot instants back to wall-minutes for the grid. Deterministic given a fixed tz — tested.
 import { generateSlots, type Interval } from "@/lib/availability/slots"
+import type { ConsultationStatus } from "@/lib/consultations/validation"
 import { utcToZonedInput, zonedWallTimeToUtcISO } from "@/lib/consultations/time"
 
 const MS_PER_MIN = 60_000
@@ -38,7 +39,7 @@ export type CalendarConsult = {
   endMin: number
   leadName: string
   type: string
-  status: string
+  status: ConsultationStatus
   // Carried for the click-through detail dialog (view case + manage):
   leadId: string | null
   startAt: string // UTC ISO
@@ -91,7 +92,7 @@ export function buildDayCalendar(opts: {
     durationMin: number
     leadName: string
     type: string
-    status: string
+    status: ConsultationStatus
     leadId: string | null
     timeZone: string
     outcome: string | null
