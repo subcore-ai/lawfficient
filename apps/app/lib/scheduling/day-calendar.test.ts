@@ -42,4 +42,18 @@ describe("buildDayCalendar (America/New_York, summer = EDT, UTC-4)", () => {
     expect(empty.gridEndMin).toBe(18 * 60)
     expect(empty.slots).toEqual([])
   })
+
+  test("a consult that started the prior day blocks this morning's slots but isn't shown", () => {
+    const cal = buildDayCalendar({
+      date,
+      tz,
+      windows: [{ startTime: "00:00", endTime: "01:00" }], // hours straddling midnight so the carry-over overlaps
+      // 03:30Z = 23:30 EDT on Jun 30 (prior day), 60 min → runs to 00:30 EDT Jul 1
+      consults: [{ id: "carry", startAt: "2026-07-01T03:30:00Z", durationMin: 60, leadName: "Owl", type: "Initial", status: "scheduled" }],
+      durationMin: 30,
+      nowMs: 0,
+    })
+    expect(cal.consults).toEqual([]) // not shown — belongs to the prior day's grid
+    expect(cal.slots.map((s) => s.startMin)).toEqual([30]) // 00:00 slot blocked, 00:30 free
+  })
 })

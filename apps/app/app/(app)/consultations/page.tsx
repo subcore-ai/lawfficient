@@ -1,3 +1,5 @@
+import type { ReactNode } from "react"
+
 import { toHm } from "@/lib/availability/queries"
 import { BookConsultationDialog } from "@/components/consultations/book-consultation-dialog"
 import { CalendarControls } from "@/components/consultations/calendar-controls"
@@ -26,11 +28,21 @@ function firmToday(tz: string): string {
   }
 }
 
-// Next calendar date (string math in UTC — only the Y-M-D matters).
-function addDay(date: string): string {
+// Shift a calendar date by N days (string math in UTC — only the Y-M-D matters).
+function addDay(date: string, n = 1): string {
   const d = new Date(`${date}T00:00:00Z`)
-  d.setUTCDate(d.getUTCDate() + 1)
+  d.setUTCDate(d.getUTCDate() + n)
   return d.toISOString().slice(0, 10)
+}
+
+// True only for a real calendar date — the regex alone would accept e.g. 2026-13-40, which would then
+// desync weekdayOf() from the day-bounds query.
+function isValidYmd(s: string): boolean {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s)
+  if (!m) return false
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])]
+  const dt = new Date(Date.UTC(y, mo - 1, d))
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === mo - 1 && dt.getUTCDate() === d
 }
 
 type Search = Record<string, string | string[] | undefined>
@@ -52,14 +64,12 @@ export default async function ConsultationsPage({ searchParams }: { searchParams
   const supabase = await createClient()
   const canManage = me?.permissions?.includes("consultations.edit") ?? false
 
-  const [consultRes, leadsRes, staffRes, firmRes, typesRes] = await Promise.all([
-    supabase.from("consultations").select("*").eq("archived", false).order("start_at", { ascending: false }),
+  const [leadsRes, staffRes, firmRes, typesRes] = await Promise.all([
     supabase.from("leads").select("id, first_name, last_name, archived").order("created_at", { ascending: false }),
     supabase.from("profiles").select("id, name, status, schedulable").order("name"),
     supabase.from("firms").select("timezone").single(),
     supabase.from("consultation_types").select("*").eq("is_active", true).order("position").order("created_at"),
   ])
-  if (consultRes.error) throw consultRes.error
   if (leadsRes.error) throw leadsRes.error
   if (staffRes.error) throw staffRes.error
 
@@ -72,8 +82,16 @@ export default async function ConsultationsPage({ searchParams }: { searchParams
   const types: ConsultationType[] = typesRes.error ? [] : (typesRes.data ?? []).map(mapConsultationTypeRow)
   const tz = firmRes.data?.timezone ?? null
 
-  const views = (consultRes.data ?? []).map((r) => mapConsultationRow(r, leadNames, profileNames))
-  const { upcoming, past } = partitionConsultations(views, new Date().toISOString())
+  // The status board (list view) is the full consult list's only consumer — load it lazily so the
+  // calendar view doesn't pay for an unfiltered scan + mapping it never renders.
+  let board: ReactNode = null
+  if (view === "list") {
+    const consultRes = await supabase.from("consultations").select("*").eq("archived", false).order("start_at", { ascending: false })
+    if (consultRes.error) throw consultRes.error
+    const views = (consultRes.data ?? []).map((r) => mapConsultationRow(r, leadNames, profileNames))
+    const { upcoming, past } = partitionConsultations(views, new Date().toISOString())
+    board = <ConsultationsBoard upcoming={upcoming} past={past} canManage={canManage} />
+  }
 
   return (
     <>
@@ -85,11 +103,9 @@ export default async function ConsultationsPage({ searchParams }: { searchParams
 
       <CalendarViewToggle view={view} />
 
-      {view === "calendar" ? (
-        await renderCalendar({ sp, supabase, allProfiles, leadNames, leadOptions, attorneys, types, tz, canManage })
-      ) : (
-        <ConsultationsBoard upcoming={upcoming} past={past} canManage={canManage} />
-      )}
+      {view === "calendar"
+        ? await renderCalendar({ sp, supabase, allProfiles, leadNames, leadOptions, attorneys, types, tz, canManage })
+        : board}
     </>
   )
 }
@@ -131,11 +147,14 @@ async function renderCalendar({
   }
 
   const attorneyId = typeof sp.attorney === "string" && schedulable.some((a) => a.id === sp.attorney) ? sp.attorney : schedulable[0]!.id
-  const date = typeof sp.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(sp.date) ? sp.date : firmToday(zone)
+  const date = typeof sp.date === "string" && isValidYmd(sp.date) ? sp.date : firmToday(zone)
   const selectedType = types.find((t) => t.name === sp.type) ?? types[0]!
 
-  const dayStart = zonedWallTimeToUtcISO(`${date}T00:00`, zone)
   const dayEnd = zonedWallTimeToUtcISO(`${addDay(date)}T00:00`, zone)
+  // Look back a day on the lower bound so a consult that STARTED yesterday but runs into this morning is
+  // still subtracted from today's slots. buildDayCalendar shows only same-day-start consults but blocks on
+  // all of them; 0043's exclusion constraint is the hard backstop regardless.
+  const loadFrom = zonedWallTimeToUtcISO(`${addDay(date, -1)}T00:00`, zone)
   const [availRes, dayConsultRes] = await Promise.all([
     supabase
       .from("attorney_availability")
@@ -143,13 +162,13 @@ async function renderCalendar({
       .eq("attorney_id", attorneyId)
       .eq("weekday", weekdayOf(date))
       .order("start_time"),
-    dayStart && dayEnd
+    loadFrom && dayEnd
       ? supabase
           .from("consultations")
           .select("id, start_at, duration_min, type, lead_id, status")
           .eq("attorney_id", attorneyId)
           .eq("archived", false)
-          .gte("start_at", dayStart)
+          .gte("start_at", loadFrom)
           .lt("start_at", dayEnd)
           .not("status", "in", "(canceled,no_show)")
       : Promise.resolve({ data: [], error: null }),

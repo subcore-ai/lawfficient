@@ -84,7 +84,7 @@ export function DayCalendarGrid({
           if (!canBook) {
             return (
               <div
-                key={`s-${s.startMin}`}
+                key={s.startMs}
                 className="border-primary/40 text-primary/70 absolute inset-x-0 overflow-hidden rounded border border-dashed px-1.5 text-[11px] leading-tight"
                 style={style}
               >
@@ -94,7 +94,7 @@ export function DayCalendarGrid({
           }
           return (
             <BookConsultationDialog
-              key={`s-${s.startMin}`}
+              key={s.startMs}
               leads={leads}
               attorneys={attorneys}
               consultationTypes={consultationTypes}

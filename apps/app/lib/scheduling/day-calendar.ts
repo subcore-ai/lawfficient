@@ -25,6 +25,12 @@ function hhmmToMin(hhmm: string): number {
   return (h ?? 0) * 60 + (m ?? 0)
 }
 
+function addDays(date: string, n: number): string {
+  const d = new Date(`${date}T00:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + n)
+  return d.toISOString().slice(0, 10)
+}
+
 export type CalendarWindow = { startMin: number; endMin: number }
 export type CalendarConsult = {
   id: string
@@ -34,7 +40,9 @@ export type CalendarConsult = {
   type: string
   status: string
 }
-export type CalendarSlot = { startMin: number; endMin: number; startInput: string } // startInput → datetime-local
+// startMs = the slot's UTC instant (a stable, collision-free key — wall time repeats on DST fallback);
+// startInput = the firm-tz datetime-local string for pre-filling the booking dialog.
+export type CalendarSlot = { startMin: number; endMin: number; startMs: number; startInput: string }
 export type DayCalendar = {
   weekday: number
   windows: CalendarWindow[]
@@ -54,6 +62,8 @@ export function buildDayCalendar(opts: {
   date: string // YYYY-MM-DD
   tz: string
   windows: { startTime: string; endTime: string }[] // this weekday's office hours (HH:MM)
+  // The attorney's consults that may touch this day — including any that STARTED on the prior day but
+  // carry over (the caller buffers the lower bound). All of them block slots; only same-day-start ones show.
   consults: { id: string; startAt: string; durationMin: number; leadName: string; type: string; status: string }[]
   durationMin: number // free-slot length (from the chosen consult type)
   nowMs: number
@@ -73,17 +83,24 @@ export function buildDayCalendar(opts: {
     if (s && e) utcWindows.push({ start: Date.parse(s), end: Date.parse(e) })
   }
 
-  const calConsults: CalendarConsult[] = consults.map((c) => {
-    const startMin = wallMinutes(Date.parse(c.startAt), tz)
-    return {
-      id: c.id,
-      startMin,
-      endMin: startMin + c.durationMin,
-      leadName: c.leadName,
-      type: c.type,
-      status: c.status,
-    }
-  })
+  // Day bounds (UTC), to separate same-day consults (shown on this grid) from carry-overs (which belong
+  // to the prior day's grid but still block this morning's slots).
+  const dayStartMs = Date.parse(zonedWallTimeToUtcISO(`${date}T00:00`, tz) ?? "")
+  const dayEndMs = Date.parse(zonedWallTimeToUtcISO(`${addDays(date, 1)}T00:00`, tz) ?? "")
+  const bounded = Number.isFinite(dayStartMs) && Number.isFinite(dayEndMs)
+  const startsToday = (iso: string) => {
+    if (!bounded) return true
+    const s = Date.parse(iso)
+    return s >= dayStartMs && s < dayEndMs
+  }
+
+  const calConsults: CalendarConsult[] = consults
+    .filter((c) => startsToday(c.startAt))
+    .map((c) => {
+      const startMin = wallMinutes(Date.parse(c.startAt), tz)
+      return { id: c.id, startMin, endMin: startMin + c.durationMin, leadName: c.leadName, type: c.type, status: c.status }
+    })
+  // Every loaded consult blocks slots; generateSlots ignores any that don't actually overlap a window.
   const booked: Interval[] = consults.map((c) => {
     const s = Date.parse(c.startAt)
     return { start: s, end: s + c.durationMin * MS_PER_MIN }
@@ -96,7 +113,7 @@ export function buildDayCalendar(opts: {
     nowMs,
   }).map((s) => {
     const startMin = wallMinutes(s, tz)
-    return { startMin, endMin: startMin + durationMin, startInput: utcToZonedInput(new Date(s).toISOString(), tz) }
+    return { startMin, endMin: startMin + durationMin, startMs: s, startInput: utcToZonedInput(new Date(s).toISOString(), tz) }
   })
 
   // Grid spans 8am–6pm by default, widened to fit any earlier/later window or consult.

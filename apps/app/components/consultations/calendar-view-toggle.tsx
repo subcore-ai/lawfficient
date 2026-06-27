@@ -12,10 +12,18 @@ export function CalendarViewToggle({ view }: { view: "list" | "calendar" }) {
   const active = "bg-background text-foreground shadow-sm"
   return (
     <div className="bg-muted text-muted-foreground mb-4 inline-flex items-center rounded-lg p-1 text-sm">
-      <Link href="/consultations?view=list" className={cn(item, view === "list" && active)}>
+      <Link
+        href="/consultations?view=list"
+        aria-current={view === "list" ? "page" : undefined}
+        className={cn(item, view === "list" && active)}
+      >
         <List className="size-4" /> List
       </Link>
-      <Link href="/consultations?view=calendar" className={cn(item, view === "calendar" && active)}>
+      <Link
+        href="/consultations?view=calendar"
+        aria-current={view === "calendar" ? "page" : undefined}
+        className={cn(item, view === "calendar" && active)}
+      >
         <CalendarDays className="size-4" /> Calendar
       </Link>
     </div>
