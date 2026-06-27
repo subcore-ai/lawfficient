@@ -13,5 +13,8 @@ export async function requirePermission(permission: AppPermission, resource: str
   if (!user) return { ok: false, error: "You're not signed in." }
   if (!(user.permissions?.includes(permission) ?? false))
     return { ok: false, error: `You don't have permission to manage ${resource}.` }
+  // Guard the tenant id: a nullish firmId makes PostgREST silently drop a `.eq("firm_id", …)` filter
+  // (fail-open cross-tenant reads), so reject here before any action runs a firm-scoped query.
+  if (!user.firmId) return { ok: false, error: "Your session is missing firm context." }
   return { ok: true, user }
 }
