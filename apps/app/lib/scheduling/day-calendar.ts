@@ -52,6 +52,22 @@ export type DayCalendar = {
   gridEndMin: number
 }
 
+// Wall-clock formatters for the grid, shared by the gutter + columns. mod 24 so a grid widened past
+// midnight by a long late consult still labels hours correctly (24:00 → 12 AM, not 12 PM).
+export function formatSlotTime(min: number): string {
+  const h24 = Math.floor(min / 60) % 24
+  const m = min % 60
+  const ampm = h24 < 12 ? "AM" : "PM"
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12
+  return `${h12}:${String(m).padStart(2, "0")} ${ampm}`
+}
+export function formatHourLabel(hour: number): string {
+  const h24 = hour % 24
+  const ampm = h24 < 12 ? "AM" : "PM"
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12
+  return `${h12} ${ampm}`
+}
+
 // Weekday (0=Sun..6=Sat) of a YYYY-MM-DD calendar date — a date has one weekday regardless of tz.
 export function weekdayOf(date: string): number {
   const [y, mo, d] = date.split("-").map(Number)

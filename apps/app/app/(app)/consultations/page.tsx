@@ -5,7 +5,7 @@ import { BookConsultationDialog } from "@/components/consultations/book-consulta
 import { CalendarControls } from "@/components/consultations/calendar-controls"
 import { CalendarViewToggle } from "@/components/consultations/calendar-view-toggle"
 import { ConsultationsBoard } from "@/components/consultations/consultations-board"
-import { DayCalendarGrid } from "@/components/consultations/day-calendar-grid"
+import { DayCalendar } from "@/components/consultations/day-calendar-grid"
 import { PageHeader } from "@/components/page-header"
 import { getCurrentUser } from "@/lib/auth/session"
 import { mapConsultationTypeRow, type ConsultationType } from "@/lib/consultations/consultation-types"
@@ -18,6 +18,8 @@ import { createClient } from "@/lib/supabase/server"
 export const metadata = { title: "Consultations" }
 
 const DEFAULT_TZ = "America/New_York"
+// Cap simultaneous attorney columns so the day grid stays legible.
+const MAX_COLUMNS = 6
 
 // The current calendar date in the firm's zone, as YYYY-MM-DD (en-CA renders ISO-style).
 function firmToday(tz: string): string {
@@ -146,7 +148,11 @@ async function renderCalendar({
     )
   }
 
-  const attorneyId = typeof sp.attorney === "string" && schedulable.some((a) => a.id === sp.attorney) ? sp.attorney : schedulable[0]!.id
+  // Selected attorneys: ?attorneys=id1,id2,… → valid + schedulable, capped; default the first few.
+  const requested =
+    typeof sp.attorneys === "string" ? sp.attorneys.split(",") : Array.isArray(sp.attorneys) ? sp.attorneys : []
+  const valid = requested.filter((id) => schedulable.some((a) => a.id === id))
+  const selectedIds = (valid.length ? valid : schedulable.slice(0, 3).map((a) => a.id)).slice(0, MAX_COLUMNS)
   const date = typeof sp.date === "string" && isValidYmd(sp.date) ? sp.date : firmToday(zone)
   const selectedType = types.find((t) => t.name === sp.type) ?? types[0]!
 
@@ -155,18 +161,19 @@ async function renderCalendar({
   // still subtracted from today's slots. buildDayCalendar shows only same-day-start consults but blocks on
   // all of them; 0043's exclusion constraint is the hard backstop regardless.
   const loadFrom = zonedWallTimeToUtcISO(`${addDay(date, -1)}T00:00`, zone)
+  // One batched read per table across all selected attorneys, grouped by attorney below.
   const [availRes, dayConsultRes] = await Promise.all([
     supabase
       .from("attorney_availability")
-      .select("start_time, end_time")
-      .eq("attorney_id", attorneyId)
+      .select("attorney_id, start_time, end_time")
+      .in("attorney_id", selectedIds)
       .eq("weekday", weekdayOf(date))
       .order("start_time"),
     loadFrom && dayEnd
       ? supabase
           .from("consultations")
-          .select("id, start_at, duration_min, type, lead_id, status")
-          .eq("attorney_id", attorneyId)
+          .select("id, attorney_id, start_at, duration_min, type, lead_id, status")
+          .in("attorney_id", selectedIds)
           .eq("archived", false)
           .gte("start_at", loadFrom)
           .lt("start_at", dayEnd)
@@ -177,27 +184,45 @@ async function renderCalendar({
   if (availRes.error) throw availRes.error
   if (dayConsultRes.error) throw dayConsultRes.error
 
-  const windows = (availRes.data ?? []).map((w) => ({ startTime: toHm(w.start_time), endTime: toHm(w.end_time) }))
-  const dayConsults = (dayConsultRes.data ?? []).map((c) => ({
-    id: c.id,
-    startAt: c.start_at,
-    durationMin: c.duration_min,
-    type: c.type,
-    leadName: leadNames.get(c.lead_id ?? "") ?? "Lead",
-    status: c.status ?? "",
-  }))
-  const cal = buildDayCalendar({ date, tz: zone, windows, consults: dayConsults, durationMin: selectedType.durationMin, nowMs: Date.now() })
+  const nowMs = Date.now()
+  const columns = selectedIds.map((id) => {
+    const windows = (availRes.data ?? [])
+      .filter((w) => w.attorney_id === id)
+      .map((w) => ({ startTime: toHm(w.start_time), endTime: toHm(w.end_time) }))
+    const consults = (dayConsultRes.data ?? [])
+      .filter((c) => c.attorney_id === id)
+      .map((c) => ({
+        id: c.id,
+        startAt: c.start_at,
+        durationMin: c.duration_min,
+        type: c.type,
+        leadName: leadNames.get(c.lead_id ?? "") ?? "Lead",
+        status: c.status ?? "",
+      }))
+    const cal = buildDayCalendar({ date, tz: zone, windows, consults, durationMin: selectedType.durationMin, nowMs })
+    return { attorney: schedulable.find((a) => a.id === id)!, cal }
+  })
+
+  const anyHours = columns.some((c) => c.cal.windows.length > 0)
 
   return (
     <div className="space-y-4">
-      <CalendarControls attorneys={schedulable} attorneyId={attorneyId} date={date} today={firmToday(zone)} types={types} typeName={selectedType.name} />
+      <CalendarControls
+        attorneys={schedulable}
+        attorneyIds={selectedIds}
+        date={date}
+        today={firmToday(zone)}
+        types={types}
+        typeName={selectedType.name}
+      />
       <div className="rounded-lg border p-4">
-        {windows.length === 0 ? (
-          <p className="text-muted-foreground py-8 text-center text-sm">No office hours set for this day.</p>
+        {!anyHours ? (
+          <p className="text-muted-foreground py-8 text-center text-sm">
+            No office hours set for the selected {columns.length > 1 ? "attorneys" : "attorney"} on this day.
+          </p>
         ) : (
-          <DayCalendarGrid
-            cal={cal}
-            attorneyId={attorneyId}
+          <DayCalendar
+            columns={columns}
             typeName={selectedType.name}
             leads={leadOptions}
             attorneys={attorneys}
