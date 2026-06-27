@@ -22,7 +22,7 @@ export default async function SettingsSchedulingPage() {
   // availability row, then fan the windows out per attorney.
   const [staffRes, availRes] = await Promise.all([
     supabase.from("profiles").select("id, name, email, schedulable, status").order("name"),
-    supabase.from("attorney_availability").select("*"),
+    supabase.from("attorney_availability").select("*").order("weekday").order("start_time"),
   ])
   // Surface a load failure instead of silently rendering an empty editor (which a save could persist).
   if (staffRes.error) throw staffRes.error

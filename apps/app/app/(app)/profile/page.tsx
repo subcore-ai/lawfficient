@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation"
 
-import { PageHeader } from "@/components/page-header"
 import { ProfileSettings } from "@/components/profile-form"
 import { getCurrentUser } from "@/lib/auth/session"
 import { createClient } from "@/lib/supabase/server"
@@ -8,7 +7,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/env"
 import { CURRENT_USER } from "@/data"
 import type { Role } from "@/data/types"
 
-export const metadata = { title: "My profile" }
+export const metadata = { title: "My profile · Account" }
 
 type ProfileView = {
   name: string
@@ -56,12 +55,5 @@ async function load(): Promise<ProfileView> {
 
 export default async function ProfilePage() {
   const view = await load()
-  return (
-    <>
-      <PageHeader title="My profile" description="Manage your display name and password." />
-      <div className="max-w-5xl">
-        <ProfileSettings {...view} />
-      </div>
-    </>
-  )
+  return <ProfileSettings {...view} />
 }

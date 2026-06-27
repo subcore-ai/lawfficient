@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/server"
 export type ActionResult = { ok: true } | { error: string }
 
 const PATH = "/settings/scheduling"
+const MY_PATH = "/profile/office-hours"
 
 type Gate = { ok: true; user: CurrentUser } | { ok: false; error: string }
 
@@ -63,6 +64,7 @@ export async function setAttorneyAvailability(
   if (rpcErr) return { error: "Couldn't save office hours." }
 
   revalidatePath(PATH)
+  revalidatePath(MY_PATH) // same hours show on the attorney's own /profile/office-hours view
   return { ok: true }
 }
 
@@ -88,5 +90,40 @@ export async function setSchedulable(attorneyId: string, schedulable: boolean): 
   if (error || !data || data.length === 0) return { error: "Couldn't update." }
 
   revalidatePath(PATH)
+  revalidatePath(MY_PATH) // toggling schedulable changes whether their /profile/office-hours editor shows
+  return { ok: true }
+}
+
+// Self-service: the signed-in user replaces their OWN office hours (from their profile). RLS (0041)
+// allows the owner (attorney_id = auth.uid()), and this goes through the same atomic, advisory-locked
+// RPC the admin path uses — just pinned to the caller's own id, so it can't touch anyone else's.
+export async function setMyAvailability(windows: WindowInput[]): Promise<ActionResult> {
+  const me = await getCurrentUser()
+  if (!me) return { error: "You're not signed in." }
+  if (!me.id) return { error: "Your session is missing user context." }
+
+  const valid = validateWindows(windows)
+  if (!valid.ok) return { error: valid.error }
+
+  const supabase = await createClient()
+  // Only schedulable users have office hours — an admin decides who takes consultations.
+  const { data: prof, error: profErr } = await supabase
+    .from("profiles")
+    .select("schedulable")
+    .eq("id", me.id)
+    .maybeSingle()
+  if (profErr) return { error: "Couldn't save office hours." }
+  if (!prof?.schedulable) {
+    return { error: "You're not set up to take consultations yet — ask an admin to enable it." }
+  }
+
+  const { error } = await supabase.rpc("set_attorney_availability", {
+    p_attorney_id: me.id,
+    p_windows: valid.value,
+  })
+  if (error) return { error: "Couldn't save office hours." }
+
+  revalidatePath(MY_PATH)
+  revalidatePath(PATH) // the admin Settings → Office hours editor shows the same hours
   return { ok: true }
 }

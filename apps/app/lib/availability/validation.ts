@@ -18,19 +18,28 @@ export function timeToMinutes(time: string): number | null {
 }
 
 // Validate the full set submitted for one attorney; returns the normalized "HH:MM" windows on success.
+// Takes `unknown`: a server action's argument is only a TypeScript contract at the call site, so a
+// malformed payload (non-array, null/non-object elements, non-string times) must return an error rather
+// than throw.
 export function validateWindows(
-  windows: WindowInput[]
+  windows: unknown
 ): { ok: true; value: WindowInput[] } | { ok: false; error: string } {
-  const parsed: (WindowInput & { s: number; e: number })[] = []
+  if (!Array.isArray(windows)) return { ok: false, error: "Invalid office hours." }
+  const parsed: { weekday: number; startTime: string; endTime: string; s: number; e: number }[] = []
   for (const w of windows) {
-    if (!Number.isInteger(w.weekday) || w.weekday < 0 || w.weekday > 6) {
+    if (typeof w !== "object" || w === null) return { ok: false, error: "Invalid office hours." }
+    const { weekday, startTime, endTime } = w as Record<string, unknown>
+    if (typeof startTime !== "string" || typeof endTime !== "string") {
+      return { ok: false, error: "Enter a valid time." }
+    }
+    if (!Number.isInteger(weekday) || (weekday as number) < 0 || (weekday as number) > 6) {
       return { ok: false, error: "Invalid day of week." }
     }
-    const s = timeToMinutes(w.startTime)
-    const e = timeToMinutes(w.endTime)
+    const s = timeToMinutes(startTime)
+    const e = timeToMinutes(endTime)
     if (s === null || e === null) return { ok: false, error: "Enter a valid time." }
     if (s >= e) return { ok: false, error: "Start time must be before end time." }
-    parsed.push({ weekday: w.weekday, startTime: w.startTime.slice(0, 5), endTime: w.endTime.slice(0, 5), s, e })
+    parsed.push({ weekday: weekday as number, startTime: startTime.slice(0, 5), endTime: endTime.slice(0, 5), s, e })
   }
   // No overlapping windows within a day (adjacent end == next start is fine).
   for (let d = 0; d <= 6; d++) {
