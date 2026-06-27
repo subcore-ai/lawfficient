@@ -64,6 +64,7 @@ export async function setAttorneyAvailability(
   if (rpcErr) return { error: "Couldn't save office hours." }
 
   revalidatePath(PATH)
+  revalidatePath(MY_PATH) // same hours show on the attorney's own /profile/office-hours view
   return { ok: true }
 }
 
@@ -89,6 +90,7 @@ export async function setSchedulable(attorneyId: string, schedulable: boolean): 
   if (error || !data || data.length === 0) return { error: "Couldn't update." }
 
   revalidatePath(PATH)
+  revalidatePath(MY_PATH) // toggling schedulable changes whether their /profile/office-hours editor shows
   return { ok: true }
 }
 
