@@ -60,11 +60,14 @@ export function ConsultationActions({
   status,
   outcome,
   compact = false,
+  hideEdit = false,
 }: {
   consultationId: string
   status: ConsultationStatus
   outcome: string | null
   compact?: boolean
+  // The calendar's detail dialog edits fields inline, so it hides this menu's "Edit consultation…" entry.
+  hideEdit?: boolean
 }) {
   const { pending, run } = useRun()
   const [editOpen, setEditOpen] = React.useState(false)
@@ -95,7 +98,9 @@ export function ConsultationActions({
         <DropdownMenuContent align="end">
           {isActive ? (
             <>
-              <DropdownMenuItem onClick={() => setEditOpen(true)}>Edit consultation…</DropdownMenuItem>
+              {hideEdit ? null : (
+                <DropdownMenuItem onClick={() => setEditOpen(true)}>Edit consultation…</DropdownMenuItem>
+              )}
               <DropdownMenuItem onClick={() => run(() => setConsultationStatus(consultationId, "completed"), "Marked completed")}>
                 Mark completed
               </DropdownMenuItem>
@@ -120,7 +125,9 @@ export function ConsultationActions({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <EditConsultationDialog consultationId={consultationId} open={editOpen} onOpenChange={setEditOpen} />
+      {hideEdit ? null : (
+        <EditConsultationDialog consultationId={consultationId} open={editOpen} onOpenChange={setEditOpen} />
+      )}
       <OutcomeDialog open={outcomeOpen} onOpenChange={setOutcomeOpen} consultationId={consultationId} current={outcome} />
       <DeleteConfirmDialog open={deleteOpen} onOpenChange={setDeleteOpen} consultationId={consultationId} />
     </>
