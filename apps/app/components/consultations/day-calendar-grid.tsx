@@ -43,6 +43,9 @@ export function DayCalendar({
   // One dialog for the whole grid, keyed by id — the live consult is derived from the columns, so after a
   // reschedule / cancel / delete revalidate it stays in sync (and closes if the consult is gone).
   const selected = columns.flatMap((c) => c.cal.consults).find((c) => c.id === selectedId) ?? null
+  // Drop a stale id during render once its consult vanishes (canceled / deleted, or the day changed), so it
+  // can't silently reopen the dialog if that consult later reappears (e.g. navigate away + back).
+  if (selectedId !== null && selected === null) setSelectedId(null)
 
   return (
     <div>
