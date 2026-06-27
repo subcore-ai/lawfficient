@@ -51,7 +51,11 @@ export function CalendarColumn({
   // dark tint in dark mode (a fixed pastel looked washed-out on dark). Slot text stays theme-aware; the
   // consult block is the opaque color with its own readable text (mode-independent).
   const officeTint = color ? { backgroundColor: `color-mix(in oklab, ${color.solid} 30%, var(--background))` } : {}
-  const slotTint = color ? { borderColor: color.solid, color: "var(--muted-foreground)" } : {}
+  // Slot text is a shade of the SAME color, mixed toward the theme foreground — so it lands dark on the
+  // light tint (light mode) and light on the dark tint (dark mode), and reads as the column's color, not gray.
+  const slotTint = color
+    ? { borderColor: color.solid, color: `color-mix(in oklab, ${color.solid} 45%, var(--foreground))` }
+    : {}
   const consultTint = color ? { backgroundColor: color.solid, color: color.text } : {}
 
   return (
