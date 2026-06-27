@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 
-import { getCurrentUser, type CurrentUser } from "@/lib/auth/session"
+import { requirePermission } from "@/lib/auth/gate"
 import {
   buildLeadData,
   mergeLeadData,
@@ -23,17 +23,10 @@ export type ActionResult = { ok: true } | { error: string }
 
 const LEADS_PATH = "/leads"
 
-type Gate = { ok: true; user: CurrentUser } | { ok: false; error: string }
 type LeadsClient = Awaited<ReturnType<typeof createClient>>
 
 // Leads writes require leads.edit. RLS is the real enforcement; this returns a clean error first.
-async function requireLeadsEdit(): Promise<Gate> {
-  const user = await getCurrentUser()
-  if (!user) return { ok: false, error: "You're not signed in." }
-  if (!(user.permissions?.includes("leads.edit") ?? false))
-    return { ok: false, error: "You don't have permission to manage leads." }
-  return { ok: true, user }
-}
+const requireLeadsEdit = () => requirePermission("leads.edit", "leads")
 
 // Best-effort — an audit failure (incl. a thrown network/timeout error) must not fail the
 // user's action.

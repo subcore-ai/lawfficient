@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 
-import { getCurrentUser, type CurrentUser } from "@/lib/auth/session"
+import { requirePermission } from "@/lib/auth/gate"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 import { WEBHOOK_EVENT_TYPES, type WebhookEventType } from "@/lib/webhooks/events"
@@ -15,16 +15,8 @@ export type SecretResult = { ok: true; secret: string } | { error: string }
 
 const PATH = "/settings/integrations"
 
-type Gate = { ok: true; user: CurrentUser } | { ok: false; error: string }
-
 // RLS (authorize('settings.manage'), firm-scoped) is the real gate; this returns a clean error first.
-async function requireAdmin(): Promise<Gate> {
-  const user = await getCurrentUser()
-  if (!user) return { ok: false, error: "You're not signed in." }
-  if (!(user.permissions?.includes("settings.manage") ?? false))
-    return { ok: false, error: "You don't have permission to manage integrations." }
-  return { ok: true, user }
-}
+const requireAdmin = () => requirePermission("settings.manage", "integrations")
 
 // Keep only known event types; drop anything else a crafted submit might include.
 function cleanEventTypes(values: string[]): WebhookEventType[] {
