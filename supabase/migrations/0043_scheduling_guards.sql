@@ -10,7 +10,8 @@ create extension if not exists btree_gist with schema extensions;
 
 -- No double-booking. attorney_id is a profile id (globally unique → already firm-scoped), so we key on
 -- it alone. The half-open [start, end) range means back-to-back consults (end == next start) don't
--- overlap. Only ACTIVE consults occupy a slot: canceled / no_show / archived / unassigned don't block.
+-- overlap. Only UPCOMING consults occupy a slot — canceled / no_show / completed (all terminal) +
+-- archived / unassigned don't block; a finished consult mustn't reserve a future slot.
 -- The end is computed by an IMMUTABLE helper. Both `start_at + interval` and `extract(epoch …)` are
 -- generically STABLE (an index expression rejects them) because day/month intervals + most date_part
 -- fields depend on the session timezone. A pure MINUTES interval, though, is tz-independent, so a
@@ -31,17 +32,18 @@ alter table public.consultations
     attorney_id with =,
     tstzrange(start_at, public.consultation_end(start_at, duration_min)) with &&
   )
-  where (attorney_id is not null and not archived and status not in ('canceled', 'no_show'));
+  where (attorney_id is not null and not archived and status not in ('canceled', 'no_show', 'completed'));
 
 -- No overlapping office-hours windows for the same attorney + weekday (adjacent windows are fine).
--- Each window is an int4range of minutes-of-day: extract(epoch from `time`) is immutable (`time` has no
--- timezone), and int4range carries its own GiST support. This avoids a custom range type, whose
--- auto-generated multirange constructor would trip the mutable-search_path linter.
+-- Each window is an int4range of SECONDS-of-day (exact — no sub-minute truncation): extract(epoch from
+-- `time`) is immutable (`time` has no timezone) and int4range carries its own GiST support. This avoids
+-- a custom range type, whose auto-generated multirange constructor would trip the mutable-search_path
+-- linter. (A day fits in int4: 86399 max.)
 alter table public.attorney_availability
   add constraint attorney_availability_no_overlap
   exclude using gist (
     firm_id with =,
     attorney_id with =,
     weekday with =,
-    int4range((extract(epoch from start_time) / 60)::int, (extract(epoch from end_time) / 60)::int) with &&
+    int4range((extract(epoch from start_time))::int, (extract(epoch from end_time))::int) with &&
   );
