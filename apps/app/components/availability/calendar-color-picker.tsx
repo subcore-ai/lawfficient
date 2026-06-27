@@ -60,7 +60,7 @@ export function CalendarColorPicker({
             aria-label={on ? `${c.name} (selected — click to clear)` : c.name}
             title={c.name}
             className={cn(
-              "ring-offset-background flex size-7 items-center justify-center rounded-full transition-transform hover:scale-110 disabled:pointer-events-none",
+              "ring-offset-background focus-visible:outline-ring flex size-7 items-center justify-center rounded-full outline-none transition-transform hover:scale-110 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:pointer-events-none",
               on && "ring-foreground ring-2 ring-offset-2",
             )}
             style={{ backgroundColor: c.solid }}

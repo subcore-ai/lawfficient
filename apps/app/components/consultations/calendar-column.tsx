@@ -115,7 +115,7 @@ export function CalendarColumn({
           type="button"
           onClick={() => onSelectConsult(c)}
           title={`${c.leadName} · ${c.type} · ${formatSlotTime(c.startMin)}`}
-          className="bg-primary/85 text-primary-foreground hover:bg-primary absolute inset-x-0.5 cursor-pointer overflow-hidden rounded px-1.5 py-0.5 text-left text-[11px] leading-tight shadow-sm transition-colors"
+          className="bg-primary/85 text-primary-foreground absolute inset-x-0.5 cursor-pointer overflow-hidden rounded px-1.5 py-0.5 text-left text-[11px] leading-tight shadow-sm transition-[filter] hover:brightness-95"
           style={{ top: top(c.startMin), height: height(c.endMin - c.startMin), ...consultTint }}
         >
           <span className="block truncate font-medium">{c.leadName}</span>
