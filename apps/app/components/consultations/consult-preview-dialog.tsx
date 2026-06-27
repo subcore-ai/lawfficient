@@ -63,6 +63,18 @@ export function ConsultPreviewDialog({
 
   const [showAll, setShowAll] = React.useState(false)
   const [seededId, setSeededId] = React.useState<string | null>(null)
+  // Snapshot of the loaded values, to gate "Save changes" on actual edits.
+  const [original, setOriginal] = React.useState<{
+    date: string
+    from: string
+    to: string
+    type: string
+    attorney: string
+    amount: number
+    paid: boolean
+  } | null>(null)
+  // Focus a non-input on open so the date field doesn't grab focus + select itself.
+  const initialFocusRef = React.useRef<HTMLButtonElement>(null)
   const [pending, startTransition] = React.useTransition()
 
   // Seed time/type from the calendar consult during render (so editing is instant), keyed by the consult
@@ -95,6 +107,16 @@ export function ConsultPreviewDialog({
         setAmount(r.consult.amount ?? 0)
         setPaid(r.consult.paid)
         setReady(true)
+        const seedWhen = splitWall(utcToZonedInput(consult.startAt, consult.timeZone))
+        setOriginal({
+          date: seedWhen.day,
+          from: seedWhen.time,
+          to: seedWhen.time ? addMinutesToTime(seedWhen.time, consult.endMin - consult.startMin) : "",
+          type: consult.type,
+          attorney: r.consult.attorneyId ?? UNASSIGNED,
+          amount: r.consult.amount ?? 0,
+          paid: r.consult.paid,
+        })
       })
       .catch(() => {})
     return () => {
@@ -108,6 +130,15 @@ export function ConsultPreviewDialog({
   const typeDuration = selected?.durationMin ?? 30
   const durationMin = fromTime && toTime ? minutesBetween(fromTime, toTime) : 0
   const validTime = Boolean(day) && durationMin >= 5
+  const dirty =
+    !!original &&
+    (day !== original.date ||
+      fromTime !== original.from ||
+      toTime !== original.to ||
+      type !== original.type ||
+      attorney !== original.attorney ||
+      amount !== original.amount ||
+      paid !== original.paid)
 
   function onTypeChange(name: string) {
     setType(name)
@@ -152,7 +183,7 @@ export function ConsultPreviewDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" initialFocus={initialFocusRef}>
         {consult ? (
           <>
             <DialogHeader>
@@ -208,6 +239,7 @@ export function ConsultPreviewDialog({
               <div className="border-t pt-3">
                 <button
                   type="button"
+                  ref={initialFocusRef}
                   onClick={() => setShowAll((s) => !s)}
                   className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs font-medium transition-colors"
                   aria-expanded={showAll}
@@ -273,10 +305,10 @@ export function ConsultPreviewDialog({
               )}
               {canManage ? (
                 <div className="flex items-center gap-2">
-                  <Button size="sm" onClick={save} disabled={pending || !ready || !validTime}>
+                  <Button size="sm" onClick={save} disabled={pending || !ready || !validTime || !dirty}>
                     {pending ? "Saving…" : "Save changes"}
                   </Button>
-                  <ConsultationActions consultationId={consult.id} status={consult.status} outcome={consult.outcome} hideEdit />
+                  <ConsultationActions consultationId={consult.id} status={consult.status} outcome={consult.outcome} hideEdit compact />
                 </div>
               ) : null}
             </DialogFooter>
