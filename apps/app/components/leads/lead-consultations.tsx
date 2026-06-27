@@ -121,15 +121,7 @@ export function LeadConsultations({
                   ) : null}
                   <StatusPill {...consultationStatusMeta(c.status)} dot />
                   {canManage ? (
-                    <ConsultationActions
-                      consultationId={c.id}
-                      status={c.status}
-                      outcome={c.outcome}
-                      startAt={c.startAt}
-                      timeZone={c.timeZone}
-                      durationMin={c.durationMin}
-                      compact
-                    />
+                    <ConsultationActions consultationId={c.id} status={c.status} outcome={c.outcome} compact />
                   ) : null}
                 </div>
               </li>

@@ -65,15 +65,7 @@ export function ConsultPreviewDialog({
                 <span />
               )}
               {canManage ? (
-                <ConsultationActions
-                  consultationId={consult.id}
-                  status={consult.status}
-                  outcome={consult.outcome}
-                  startAt={consult.startAt}
-                  timeZone={consult.timeZone}
-                  // endMin − startMin is exactly the stored duration_min (consults aren't grid-clamped).
-                  durationMin={consult.endMin - consult.startMin}
-                />
+                <ConsultationActions consultationId={consult.id} status={consult.status} outcome={consult.outcome} />
               ) : null}
             </DialogFooter>
           </>
