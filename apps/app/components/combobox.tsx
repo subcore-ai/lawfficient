@@ -31,9 +31,16 @@ export function Combobox({
 }) {
   const [open, setOpen] = React.useState(false)
   const [query, setQuery] = React.useState("")
+  const [active, setActive] = React.useState(0)
+  const activeItemRef = React.useRef<HTMLLIElement>(null)
   const selected = options.find((o) => o.value === value)
   const q = query.trim().toLowerCase()
   const filtered = q ? options.filter((o) => o.label.toLowerCase().includes(q)) : options
+
+  // Keep the highlighted option scrolled into view (within the list, not the page) as you arrow through.
+  React.useEffect(() => {
+    if (open) activeItemRef.current?.scrollIntoView({ block: "nearest" })
+  }, [active, open])
 
   function choose(v: string) {
     onValueChange(v)
@@ -52,13 +59,27 @@ export function Combobox({
         onFocus={() => {
           setOpen(true)
           setQuery("")
+          setActive(0)
         }}
         onBlur={() => window.setTimeout(() => setOpen(false), 120)}
-        onChange={(e) => setQuery(e.target.value)}
+        onChange={(e) => {
+          setQuery(e.target.value)
+          setActive(0)
+        }}
         onKeyDown={(e) => {
           if (e.key === "Escape") {
             setOpen(false)
             e.currentTarget.blur()
+          } else if (e.key === "ArrowDown") {
+            e.preventDefault()
+            setOpen(true)
+            setActive((a) => Math.min(filtered.length - 1, a + 1))
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault()
+            setActive((a) => Math.max(0, a - 1))
+          } else if (e.key === "Enter" && open && filtered[active]) {
+            e.preventDefault()
+            choose(filtered[active].value)
           }
         }}
       />
@@ -67,16 +88,18 @@ export function Combobox({
           {filtered.length === 0 ? (
             <li className="text-muted-foreground px-2 py-1.5 text-sm">{emptyText}</li>
           ) : (
-            filtered.map((o) => (
-              <li key={o.value}>
+            filtered.map((o, i) => (
+              <li key={o.value} ref={i === active ? activeItemRef : null}>
                 <button
                   type="button"
                   // Keep the input focused so its blur doesn't close the list before this click lands.
                   onMouseDown={(e) => e.preventDefault()}
+                  onMouseMove={() => setActive(i)}
                   onClick={() => choose(o.value)}
                   className={cn(
-                    "hover:bg-muted flex w-full items-center rounded-sm px-2 py-1.5 text-left text-sm transition-colors",
-                    o.value === value && "bg-muted/60",
+                    "flex w-full items-center rounded-sm px-2 py-1.5 text-left text-sm transition-colors",
+                    i === active ? "bg-muted" : "hover:bg-muted",
+                    o.value === value && "font-medium",
                   )}
                 >
                   {o.label}

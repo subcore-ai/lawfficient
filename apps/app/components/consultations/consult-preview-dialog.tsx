@@ -97,6 +97,9 @@ export function ConsultPreviewDialog({
   const [pending, startTransition] = React.useTransition()
 
   const editable = canManage && !!consult && isLive(consult.status)
+  // Depend on the stable id, not the consult object: the page rebuilds the prop on every server render, so
+  // an object dep would reload + wipe in-progress edits on any revalidation while the dialog is open.
+  const consultId = consult?.id ?? null
 
   // Seed time/type from the calendar consult during render for an instant read (the load below corrects to
   // the canonical DB row). Keyed by the consult being shown — adjust-on-change, not a sync setState effect.
@@ -118,9 +121,9 @@ export function ConsultPreviewDialog({
   // Load the canonical row + picker lists (only for a live consult). Seed the editable fields AND the
   // dirty-baseline from the freshly-loaded values, never the (possibly stale) calendar prop.
   React.useEffect(() => {
-    if (!open || !consult || !editable) return
+    if (!open || !consultId || !editable) return
     let active = true
-    loadConsultationForEdit(consult.id)
+    loadConsultationForEdit(consultId)
       .then((r) => {
         if (!active) return
         if (!r.ok) {
@@ -157,7 +160,7 @@ export function ConsultPreviewDialog({
     return () => {
       active = false
     }
-  }, [open, consult, editable])
+  }, [open, consultId, editable])
 
   const activeTypes = types.filter((t) => t.isActive)
   const selected = activeTypes.find((t) => t.name === type)
