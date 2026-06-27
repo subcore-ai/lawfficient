@@ -26,7 +26,6 @@ import {
 import { Field } from "@/components/form-field"
 import type { ConsultationType } from "@/lib/consultations/consultation-types"
 import { addMinutesToTime, minutesBetween, splitWall, utcToZonedInput } from "@/lib/consultations/time"
-import { FIRM_TIMEZONES } from "@/lib/firm/timezones"
 
 type Option = { id: string; name: string }
 const UNASSIGNED = "__none__"
@@ -48,7 +47,6 @@ export function EditConsultationDialog({
   const dayId = React.useId()
   const fromId = React.useId()
   const toId = React.useId()
-  const zoneId = React.useId()
   const amountId = React.useId()
 
   const [loading, setLoading] = React.useState(true)
@@ -256,21 +254,6 @@ export function EditConsultationDialog({
                     : "Pick a start and end time."}
                 </p>
               </div>
-
-              <Field label="Time zone" htmlFor={zoneId} className="sm:col-span-2">
-                <Select value={zone} onValueChange={(v) => setZone(v ?? zone)} items={FIRM_TIMEZONES.map((z) => ({ value: z.value, label: z.label }))}>
-                  <SelectTrigger id={zoneId} className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {FIRM_TIMEZONES.map((z) => (
-                      <SelectItem key={z.value} value={z.value}>
-                        {z.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
 
               {chargeable ? (
                 <div className="flex items-end gap-4 sm:col-span-2">

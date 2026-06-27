@@ -75,7 +75,6 @@ export function BookConsultationDialog({
   const leadSelectId = React.useId()
   const typeSelectId = React.useId()
   const attorneySelectId = React.useId()
-  const zoneSelectId = React.useId()
 
   const activeTypes = consultationTypes.filter((t) => t.isActive)
   const firstType = activeTypes.find((t) => t.name === prefillType) ?? activeTypes[0]
@@ -262,20 +261,6 @@ export function BookConsultationDialog({
                   : "Pick a start and end time."}
               </p>
             </div>
-            <Field label="Time zone" htmlFor={zoneSelectId} className="sm:col-span-2">
-              <Select value={zone} onValueChange={(v) => setZone(v ?? DEFAULT_TZ)} items={FIRM_TIMEZONES.map((z) => ({ value: z.value, label: z.label }))}>
-                <SelectTrigger id={zoneSelectId} className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {FIRM_TIMEZONES.map((z) => (
-                    <SelectItem key={z.value} value={z.value}>
-                      {z.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
             {chargeable ? (
               <div className="flex items-end gap-4 sm:col-span-2">
                 <Field label="Fee ($)" htmlFor={amountId}>

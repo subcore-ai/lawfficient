@@ -9,7 +9,8 @@ import { formatSlotTime, type CalendarConsult, type CalendarSlot, type CalendarW
 
 type Option = { id: string; name: string }
 
-export const PX_PER_MIN = 0.9
+// Vertical scale. A touch over 1px/min so a 30-minute block fits two lines (lead + type) without clipping.
+export const PX_PER_MIN = 1.1
 
 // One attorney's day, as the BODY of a calendar column: office hours shaded, booked consults as blocks,
 // free slots as click-to-book buttons. Absolutely positioned inside a `relative` parent and aligned to a
@@ -144,12 +145,17 @@ export function CalendarColumn({
           key={c.id}
           type="button"
           onClick={() => onSelectConsult(c)}
-          title={`${c.leadName} · ${c.type} · ${formatSlotTime(c.startMin)}`}
-          className="bg-primary/85 text-primary-foreground absolute inset-x-0.5 cursor-pointer overflow-hidden rounded px-1.5 py-0.5 text-left text-[11px] leading-tight shadow-sm transition-[filter] hover:brightness-95"
+          title={`${c.leadName} · ${c.type} · ${formatSlotTime(c.startMin)} – ${formatSlotTime(c.endMin)}`}
+          className="bg-primary/85 text-primary-foreground absolute inset-x-0.5 flex cursor-pointer items-start justify-between gap-1.5 overflow-hidden rounded px-1.5 py-0.5 text-left text-[11px] leading-tight shadow-sm transition-[filter] hover:brightness-95"
           style={{ top: top(c.startMin), height: height(c.endMin - c.startMin), ...consultTint }}
         >
-          <span className="block truncate font-medium">{c.leadName}</span>
-          <span className="block truncate opacity-80">{c.type}</span>
+          <span className="min-w-0">
+            <span className="block truncate font-medium">{c.leadName}</span>
+            <span className="block truncate opacity-80">{c.type}</span>
+          </span>
+          <span className="shrink-0 text-[10px] whitespace-nowrap opacity-60 tabular-nums">
+            {formatSlotTime(c.startMin)} – {formatSlotTime(c.endMin)}
+          </span>
         </button>
       ))}
     </>
