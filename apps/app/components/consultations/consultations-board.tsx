@@ -97,6 +97,7 @@ function ConsultationCard({ consultation: c, canManage }: { consultation: Consul
             outcome={c.outcome}
             startAt={c.startAt}
             timeZone={c.timeZone}
+            durationMin={c.durationMin}
           />
         </div>
       ) : null}

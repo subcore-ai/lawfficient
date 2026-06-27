@@ -62,6 +62,7 @@ export function ConsultationActions({
   outcome,
   startAt,
   timeZone,
+  durationMin,
   compact = false,
 }: {
   consultationId: string
@@ -69,6 +70,7 @@ export function ConsultationActions({
   outcome: string | null
   startAt: string
   timeZone: string
+  durationMin: number
   compact?: boolean
 }) {
   const { pending, run } = useRun()
@@ -100,7 +102,7 @@ export function ConsultationActions({
         <DropdownMenuContent align="end">
           {isActive ? (
             <>
-              <DropdownMenuItem onClick={() => setRescheduleOpen(true)}>Reschedule…</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setRescheduleOpen(true)}>Edit time &amp; duration…</DropdownMenuItem>
               <DropdownMenuItem onClick={() => run(() => setConsultationStatus(consultationId, "completed"), "Marked completed")}>
                 Mark completed
               </DropdownMenuItem>
@@ -131,6 +133,7 @@ export function ConsultationActions({
         consultationId={consultationId}
         startAt={startAt}
         timeZone={timeZone}
+        durationMin={durationMin}
       />
       <OutcomeDialog open={outcomeOpen} onOpenChange={setOutcomeOpen} consultationId={consultationId} current={outcome} />
       <DeleteConfirmDialog open={deleteOpen} onOpenChange={setDeleteOpen} consultationId={consultationId} />
@@ -144,38 +147,44 @@ function RescheduleDialog({
   consultationId,
   startAt,
   timeZone,
+  durationMin,
 }: {
   open: boolean
   onOpenChange: (o: boolean) => void
   consultationId: string
   startAt: string
   timeZone: string
+  durationMin: number
 }) {
   const startId = React.useId()
+  const durId = React.useId()
   const { pending, run } = useRun()
-  // Re-seed the field to the consult's current time each time the dialog opens (it stays mounted, so a
-  // defaultValue would go stale after a cancel or a prior reschedule). React-recommended: adjust state
-  // during render on the open transition rather than in an effect.
+  // Re-seed both fields each time the dialog opens (it stays mounted, so a defaultValue would go stale).
+  // React-recommended: adjust state during render on the open transition rather than in an effect.
   const [value, setValue] = React.useState("")
+  const [duration, setDuration] = React.useState(durationMin)
   const [prevOpen, setPrevOpen] = React.useState(false)
   if (open !== prevOpen) {
     setPrevOpen(open)
-    if (open) setValue(utcToZonedInput(startAt, timeZone))
+    if (open) {
+      setValue(utcToZonedInput(startAt, timeZone))
+      setDuration(durationMin)
+    }
   }
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    run(() => rescheduleConsultation(consultationId, value), "Consultation rescheduled", () => onOpenChange(false))
+    run(() => rescheduleConsultation(consultationId, value, duration), "Consultation updated", () => onOpenChange(false))
   }
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-sm">
         <form onSubmit={onSubmit}>
           <DialogHeader>
-            <DialogTitle>Reschedule consultation</DialogTitle>
-            <DialogDescription>Pick a new date and time. The consult is marked rescheduled.</DialogDescription>
+            <DialogTitle>Edit time &amp; duration</DialogTitle>
+            <DialogDescription>Change the date, time, or length. Moving the time marks it rescheduled.</DialogDescription>
           </DialogHeader>
-          <div className="py-4">
-            <Field label="New date &amp; time" htmlFor={startId}>
+          <div className="grid gap-4 py-4">
+            <Field label="Date &amp; time" htmlFor={startId}>
               <Input
                 id={startId}
                 name="startAt"
@@ -185,11 +194,22 @@ function RescheduleDialog({
                 required
               />
             </Field>
+            <Field label="Duration (min)" htmlFor={durId}>
+              <Input
+                id={durId}
+                type="number"
+                min={5}
+                step={5}
+                value={duration}
+                onChange={(e) => setDuration(Number(e.target.value) || 0)}
+                required
+              />
+            </Field>
           </div>
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
             <Button type="submit" disabled={pending}>
-              {pending ? "Saving…" : "Reschedule"}
+              {pending ? "Saving…" : "Save"}
             </Button>
           </DialogFooter>
         </form>

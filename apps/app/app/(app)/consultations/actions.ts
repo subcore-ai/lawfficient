@@ -162,43 +162,58 @@ export async function updateConsultation(id: string, formData: FormData): Promis
   return { ok: true }
 }
 
-// Move the start time + flag the consult as rescheduled. `startAtWall` is a naive wall time; it's
-// interpreted in the consult's stored time zone.
-export async function rescheduleConsultation(id: string, startAtWall: string): Promise<ActionResult> {
+// Edit the consult's time and/or duration. `startAtWall` is a naive wall time interpreted in the consult's
+// stored zone. Moving the time flags it "rescheduled"; a duration-only change keeps the current status.
+export async function rescheduleConsultation(
+  id: string,
+  startAtWall: string,
+  durationMin: number,
+): Promise<ActionResult> {
   const gate = await requireConsultEdit()
   if (!gate.ok) return { error: gate.error }
+  if (!Number.isInteger(durationMin) || durationMin < 5 || durationMin > 1440) {
+    return { error: "Duration must be 5–1440 minutes." }
+  }
 
   const supabase = await createClient()
   const { data: current, error: readErr } = await supabase
     .from("consultations")
-    .select("time_zone, status, lead_id")
+    .select("time_zone, status, lead_id, start_at")
     .eq("id", id)
     .single()
-  if (readErr || !current) return { error: "Couldn't reschedule the consultation." }
+  if (readErr || !current) return { error: "Couldn't update the consultation." }
   if (current.status === "completed" || current.status === "canceled" || current.status === "no_show") {
-    return { error: "This consultation is finalized and can't be rescheduled." }
+    return { error: "This consultation is finalized and can't be edited." }
   }
 
   const startAt = zonedWallTimeToUtcISO(startAtWall, current.time_zone)
   if (!startAt) return { error: "Choose a valid date and time." }
+  const timeChanged = Date.parse(startAt) !== Date.parse(current.start_at)
 
-  // The `.in()` filter makes the move atomic — a consult that became terminal between the read and the
-  // write is excluded (0 rows), so we never reschedule a finalized one.
+  // The `.in()` filter makes the write atomic — a consult that became terminal between the read and the
+  // write is excluded (0 rows). Only flag "rescheduled" when the time actually moves.
   const { data: updated, error } = await supabase
     .from("consultations")
-    .update({ start_at: startAt, status: "rescheduled", last_activity: new Date().toISOString() })
+    .update({
+      start_at: startAt,
+      duration_min: durationMin,
+      ...(timeChanged ? { status: "rescheduled" as const } : {}),
+      last_activity: new Date().toISOString(),
+    })
     .eq("id", id)
     .in("status", ["scheduled", "paid", "rescheduled"])
     .select("id")
     .maybeSingle()
   if (error?.code === "23P01") return { error: "That attorney already has a consultation at that time." }
-  if (error) return { error: "Couldn't reschedule the consultation." }
-  if (!updated) return { error: "This consultation is finalized and can't be rescheduled." }
+  if (error) return { error: "Couldn't update the consultation." }
+  if (!updated) return { error: "This consultation is finalized and can't be edited." }
 
-  await audit(supabase, gate.user.id, id, "", "rescheduled")
+  await audit(supabase, gate.user.id, id, "", timeChanged ? "rescheduled" : "duration_changed")
   await recordLeadEvent(
     current.lead_id,
-    `Consultation rescheduled to ${formatConsultationWhen(startAt, current.time_zone)}`,
+    timeChanged
+      ? `Consultation rescheduled to ${formatConsultationWhen(startAt, current.time_zone)}`
+      : `Consultation duration set to ${durationMin} min`,
   )
   revalidate(current.lead_id)
   return { ok: true }

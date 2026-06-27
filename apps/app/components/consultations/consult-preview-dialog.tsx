@@ -71,6 +71,8 @@ export function ConsultPreviewDialog({
                   outcome={consult.outcome}
                   startAt={consult.startAt}
                   timeZone={consult.timeZone}
+                  // endMin − startMin is exactly the stored duration_min (consults aren't grid-clamped).
+                  durationMin={consult.endMin - consult.startMin}
                 />
               ) : null}
             </DialogFooter>
