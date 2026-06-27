@@ -1,6 +1,9 @@
 "use client"
 
+import * as React from "react"
+
 import { CalendarColumn, PX_PER_MIN } from "@/components/consultations/calendar-column"
+import { ConsultPreviewDialog } from "@/components/consultations/consult-preview-dialog"
 import type { ConsultationType } from "@/lib/consultations/consultation-types"
 import { formatHourLabel, type DayCalendar as DayCalendarData } from "@/lib/scheduling/day-calendar"
 
@@ -26,6 +29,7 @@ export function DayCalendar({
   defaultTimeZone: string | null
   canBook: boolean
 }) {
+  const [selectedId, setSelectedId] = React.useState<string | null>(null)
   if (columns.length === 0) return null
 
   const gridStartMin = Math.min(...columns.map((c) => c.cal.gridStartMin))
@@ -35,6 +39,13 @@ export function DayCalendar({
   const firstHour = Math.ceil(gridStartMin / 60)
   const lastHour = Math.floor(gridEndMin / 60)
   const hours = Array.from({ length: lastHour - firstHour + 1 }, (_, i) => firstHour + i)
+
+  // One dialog for the whole grid, keyed by id — the live consult is derived from the columns, so after a
+  // reschedule / cancel / delete revalidate it stays in sync (and closes if the consult is gone).
+  const selected = columns.flatMap((c) => c.cal.consults).find((c) => c.id === selectedId) ?? null
+  // Drop a stale id during render once its consult vanishes (canceled / deleted, or the day changed), so it
+  // can't silently reopen the dialog if that consult later reappears (e.g. navigate away + back).
+  if (selectedId !== null && selected === null) setSelectedId(null)
 
   return (
     <div>
@@ -76,11 +87,21 @@ export function DayCalendar({
                 consultationTypes={consultationTypes}
                 defaultTimeZone={defaultTimeZone}
                 canBook={canBook}
+                onSelectConsult={(consult) => setSelectedId(consult.id)}
               />
             </div>
           ))}
         </div>
       </div>
+
+      <ConsultPreviewDialog
+        consult={selected}
+        open={selected !== null}
+        onOpenChange={(o) => {
+          if (!o) setSelectedId(null)
+        }}
+        canManage={canBook}
+      />
     </div>
   )
 }

@@ -3,6 +3,7 @@
 // slot engine (lib/availability/slots) runs in UTC; office-hours wall times are converted to UTC for it,
 // and its free-slot instants back to wall-minutes for the grid. Deterministic given a fixed tz — tested.
 import { generateSlots, type Interval } from "@/lib/availability/slots"
+import type { ConsultationStatus } from "@/lib/consultations/validation"
 import { utcToZonedInput, zonedWallTimeToUtcISO } from "@/lib/consultations/time"
 
 const MS_PER_MIN = 60_000
@@ -38,7 +39,12 @@ export type CalendarConsult = {
   endMin: number
   leadName: string
   type: string
-  status: string
+  status: ConsultationStatus
+  // Carried for the click-through detail dialog (view case + manage):
+  leadId: string | null
+  startAt: string // UTC ISO
+  timeZone: string
+  outcome: string | null
 }
 // startMs = the slot's UTC instant (a stable, collision-free key — wall time repeats on DST fallback);
 // startInput = the firm-tz datetime-local string for pre-filling the booking dialog.
@@ -80,7 +86,17 @@ export function buildDayCalendar(opts: {
   windows: { startTime: string; endTime: string }[] // this weekday's office hours (HH:MM)
   // The attorney's consults that may touch this day — including any that STARTED on the prior day but
   // carry over (the caller buffers the lower bound). All of them block slots; only same-day-start ones show.
-  consults: { id: string; startAt: string; durationMin: number; leadName: string; type: string; status: string }[]
+  consults: {
+    id: string
+    startAt: string
+    durationMin: number
+    leadName: string
+    type: string
+    status: ConsultationStatus
+    leadId: string | null
+    timeZone: string
+    outcome: string | null
+  }[]
   durationMin: number // free-slot length (from the chosen consult type)
   nowMs: number
 }): DayCalendar {
@@ -114,7 +130,18 @@ export function buildDayCalendar(opts: {
     .filter((c) => startsToday(c.startAt))
     .map((c) => {
       const startMin = wallMinutes(Date.parse(c.startAt), tz)
-      return { id: c.id, startMin, endMin: startMin + c.durationMin, leadName: c.leadName, type: c.type, status: c.status }
+      return {
+        id: c.id,
+        startMin,
+        endMin: startMin + c.durationMin,
+        leadName: c.leadName,
+        type: c.type,
+        status: c.status,
+        leadId: c.leadId,
+        startAt: c.startAt,
+        timeZone: c.timeZone,
+        outcome: c.outcome,
+      }
     })
   // Every loaded consult blocks slots; generateSlots ignores any that don't actually overlap a window.
   const booked: Interval[] = consults.map((c) => {

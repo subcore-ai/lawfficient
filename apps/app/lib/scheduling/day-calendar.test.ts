@@ -20,13 +20,23 @@ describe("buildDayCalendar (America/New_York, summer = EDT, UTC-4)", () => {
       windows: [{ startTime: "09:00", endTime: "12:00" }],
       // 14:00Z = 10:00 EDT
       consults: [
-        { id: "c1", startAt: "2026-07-01T14:00:00Z", durationMin: 30, leadName: "Maria", type: "Initial", status: "scheduled" },
+        { id: "c1", startAt: "2026-07-01T14:00:00Z", durationMin: 30, leadName: "Maria", type: "Initial", status: "scheduled", leadId: "l1", timeZone: tz, outcome: null },
       ],
       durationMin: 30,
       nowMs: 0,
     })
     expect(cal.windows).toEqual([{ startMin: 540, endMin: 720 }]) // 9:00–12:00
-    expect(cal.consults[0]).toMatchObject({ startMin: 600, endMin: 630, leadName: "Maria" }) // 10:00–10:30 EDT
+    // 10:00–10:30 EDT, with the detail-dialog metadata passed through unchanged.
+    expect(cal.consults[0]).toMatchObject({
+      startMin: 600,
+      endMin: 630,
+      leadName: "Maria",
+      status: "scheduled",
+      leadId: "l1",
+      startAt: "2026-07-01T14:00:00Z",
+      timeZone: tz,
+      outcome: null,
+    })
     // 30-min slots 9–12 minus the 10:00–10:30 booking: 9:00, 9:30, 10:30, 11:00, 11:30
     expect(cal.slots.map((s) => s.startMin)).toEqual([540, 570, 630, 660, 690])
     expect(cal.slots[0]?.startInput).toBe("2026-07-01T09:00") // datetime-local prefill is the NY wall time
@@ -49,7 +59,7 @@ describe("buildDayCalendar (America/New_York, summer = EDT, UTC-4)", () => {
       tz,
       windows: [{ startTime: "00:00", endTime: "01:00" }], // hours straddling midnight so the carry-over overlaps
       // 03:30Z = 23:30 EDT on Jun 30 (prior day), 60 min → runs to 00:30 EDT Jul 1
-      consults: [{ id: "carry", startAt: "2026-07-01T03:30:00Z", durationMin: 60, leadName: "Owl", type: "Initial", status: "scheduled" }],
+      consults: [{ id: "carry", startAt: "2026-07-01T03:30:00Z", durationMin: 60, leadName: "Owl", type: "Initial", status: "scheduled", leadId: "l2", timeZone: tz, outcome: null }],
       durationMin: 30,
       nowMs: 0,
     })
