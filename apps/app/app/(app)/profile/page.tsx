@@ -65,28 +65,40 @@ async function load(): Promise<ProfileView> {
   return { name: me.name, email: me.email, role: me.role, pod, editable: true, googleConnected, avatarUrl: me.avatarUrl }
 }
 
-// Only schedulable users (an admin marks who takes consultations) get the office-hours editor. Returns
-// null otherwise so the section is hidden entirely. Self-read is allowed by RLS (0041).
-async function loadMyOfficeHours(): Promise<{ windows: AvailabilityWindow[] } | null> {
+type OfficeHoursLoad = { windows: AvailabilityWindow[] } | { error: true } | null
+
+// Best-effort: the office-hours card is secondary to the profile, so a failed load must NEVER take the
+// whole page (incl. name + password) down. Returns null when the user isn't schedulable (no card),
+// { error } when a read fails (the page shows a notice instead of silently hiding real hours, and
+// treating a failed read as "not schedulable" would do exactly that), or the windows. Self-read +
+// stable order are RLS-allowed (0041) / DB-ordered.
+async function loadMyOfficeHours(): Promise<OfficeHoursLoad> {
   if (!isSupabaseConfigured()) return null
   const me = await getCurrentUser()
   if (!me) return null
 
-  const supabase = await createClient()
-  const { data: prof } = await supabase
-    .from("profiles")
-    .select("schedulable")
-    .eq("id", me.id)
-    .maybeSingle()
-  if (!prof?.schedulable) return null
+  try {
+    const supabase = await createClient()
+    const { data: prof, error: profErr } = await supabase
+      .from("profiles")
+      .select("schedulable")
+      .eq("id", me.id)
+      .maybeSingle()
+    if (profErr) return { error: true }
+    if (!prof?.schedulable) return null
 
-  const { data: avail, error } = await supabase
-    .from("attorney_availability")
-    .select("*")
-    .eq("attorney_id", me.id)
-  if (error) throw error
+    const { data: avail, error } = await supabase
+      .from("attorney_availability")
+      .select("*")
+      .eq("attorney_id", me.id)
+      .order("weekday")
+      .order("start_time")
+    if (error) return { error: true }
 
-  return { windows: (avail ?? []).map(mapAvailabilityRow) }
+    return { windows: (avail ?? []).map(mapAvailabilityRow) }
+  } catch {
+    return { error: true }
+  }
 }
 
 export default async function ProfilePage() {
@@ -96,7 +108,16 @@ export default async function ProfilePage() {
       <PageHeader title="My profile" description="Manage your display name and password." />
       <div className="flex max-w-5xl flex-col gap-6">
         <ProfileSettings {...view} />
-        {officeHours ? (
+        {officeHours == null ? null : "error" in officeHours ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>My office hours</CardTitle>
+              <CardDescription>
+                Couldn&apos;t load your office hours right now — refresh to try again.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        ) : (
           <Card>
             <CardHeader>
               <CardTitle>My office hours</CardTitle>
@@ -109,7 +130,7 @@ export default async function ProfilePage() {
               <WeeklyHoursEditor windows={officeHours.windows} onSave={setMyAvailability} canEdit />
             </CardContent>
           </Card>
-        ) : null}
+        )}
       </div>
     </>
   )

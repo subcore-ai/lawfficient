@@ -98,6 +98,7 @@ export async function setSchedulable(attorneyId: string, schedulable: boolean): 
 export async function setMyAvailability(windows: WindowInput[]): Promise<ActionResult> {
   const me = await getCurrentUser()
   if (!me) return { error: "You're not signed in." }
+  if (!me.id) return { error: "Your session is missing user context." }
 
   const valid = validateWindows(windows)
   if (!valid.ok) return { error: valid.error }
@@ -121,5 +122,6 @@ export async function setMyAvailability(windows: WindowInput[]): Promise<ActionR
   if (error) return { error: "Couldn't save office hours." }
 
   revalidatePath(MY_PATH)
+  revalidatePath(PATH) // the admin Settings → Office hours editor shows the same hours
   return { ok: true }
 }

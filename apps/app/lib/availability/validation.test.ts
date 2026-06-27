@@ -72,4 +72,13 @@ describe("validateWindows", () => {
     const r = validateWindows([{ weekday: 7, startTime: "09:00", endTime: "17:00" }])
     expect(r.ok).toBe(false)
   })
+
+  test("rejects malformed payloads instead of throwing", () => {
+    expect(validateWindows(null).ok).toBe(false)
+    expect(validateWindows("nope").ok).toBe(false)
+    expect(validateWindows({ weekday: 1 }).ok).toBe(false)
+    expect(validateWindows([null]).ok).toBe(false)
+    expect(validateWindows([{ weekday: 1 }]).ok).toBe(false)
+    expect(validateWindows([{ weekday: 1, startTime: 9, endTime: 17 }]).ok).toBe(false)
+  })
 })
