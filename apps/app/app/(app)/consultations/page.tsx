@@ -173,6 +173,9 @@ async function renderCalendar({
           .not("status", "in", "(canceled,no_show)")
       : Promise.resolve({ data: [], error: null }),
   ])
+  // Fail loud: a swallowed error would render as "No office hours" or an empty/wrong slot grid.
+  if (availRes.error) throw availRes.error
+  if (dayConsultRes.error) throw dayConsultRes.error
 
   const windows = (availRes.data ?? []).map((w) => ({ startTime: toHm(w.start_time), endTime: toHm(w.end_time) }))
   const dayConsults = (dayConsultRes.data ?? []).map((c) => ({

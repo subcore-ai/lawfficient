@@ -8,14 +8,17 @@ type Option = { id: string; name: string }
 
 const PX_PER_MIN = 0.9
 
+// mod 24 so a grid widened past midnight by a long late consult (gridEndMin > 1440) still labels hours
+// correctly — 24:00 → 12 AM, 25:00 → 1 AM, not "12 PM" / "1 PM".
 function fmtTime(min: number): string {
-  const h24 = Math.floor(min / 60)
+  const h24 = Math.floor(min / 60) % 24
   const m = min % 60
   const ampm = h24 < 12 ? "AM" : "PM"
   const h12 = h24 % 12 === 0 ? 12 : h24 % 12
   return `${h12}:${String(m).padStart(2, "0")} ${ampm}`
 }
-function fmtHour(h24: number): string {
+function fmtHour(hour: number): string {
+  const h24 = hour % 24
   const ampm = h24 < 12 ? "AM" : "PM"
   const h12 = h24 % 12 === 0 ? 12 : h24 % 12
   return `${h12} ${ampm}`
