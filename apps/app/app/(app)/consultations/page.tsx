@@ -41,7 +41,8 @@ type Search = Record<string, string | string[] | undefined>
 
 export default async function ConsultationsPage({ searchParams }: { searchParams: Promise<Search> }) {
   const sp = await searchParams
-  const view = sp.view === "calendar" ? "calendar" : "list"
+  // Calendar is the default view; ?view=list opts into the status board.
+  const view = sp.view === "list" ? "list" : "calendar"
 
   if (!isSupabaseConfigured()) {
     return (
