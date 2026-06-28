@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation"
 import { CalendarControls } from "@/components/consultations/calendar-controls"
 import { DayCalendar } from "@/components/consultations/day-calendar-grid"
 import type { ConsultationType } from "@/lib/consultations/consultation-types"
-import { utcToZonedInput } from "@/lib/consultations/time"
 import type { ConsultationStatus } from "@/lib/consultations/validation"
 import type { CalendarColor } from "@/lib/scheduling/calendar-colors"
 import { buildDayCalendar, MAX_CALENDAR_COLUMNS } from "@/lib/scheduling/day-calendar"
@@ -74,14 +73,6 @@ export function CalendarBoard({
 }) {
   const [selected, setSelected] = React.useState<string[]>(initialSelected)
   const router = useRouter()
-  // Latest view context for the realtime handler — the subscription is set up once but reads fresh values
-  // through this ref, so it can scope the refresh to the viewed day + picked calendars without re-subscribing.
-  const ctxRef = React.useRef<{ date: string; tz: string; selected: string[]; shownIds: Set<string> }>({
-    date,
-    tz,
-    selected: initialSelected,
-    shownIds: new Set(),
-  })
 
   // If the firm's calendars change (an attorney removed), drop stale ids from the selection.
   const validSelected = selected.filter((id) => attorneyDays.some((a) => a.attorney.id === id))
@@ -96,21 +87,10 @@ export function CalendarBoard({
     writeSelection(next)
   }
 
-  // Sync the realtime handler's view context after each commit (ref write in an effect, not during render).
-  React.useEffect(() => {
-    ctxRef.current = {
-      date,
-      tz,
-      selected: validSelected,
-      shownIds: new Set(
-        attorneyDays.filter((a) => validSelected.includes(a.attorney.id)).flatMap((a) => a.consults.map((c) => c.id)),
-      ),
-    }
-  })
-
   // Realtime: subscribe to consultation changes (Postgres Changes respects RLS, so only this firm's) and
-  // re-load the day from the server on a RELEVANT change — a booking / reschedule / cancel shows live.
-  // Debounced to coalesce bursts; the day's selection persists (React state) across the refresh.
+  // re-load the day from the server on a change — a booking / reschedule / cancel by anyone shows live.
+  // Debounced to coalesce bursts; the day's selection persists (React state) across the refresh. A firm-wide
+  // refresh (not client-side scoping) keeps this simple + always-correct — fine for this low-volume table.
   React.useEffect(() => {
     const supabase = createClient()
     let timer: ReturnType<typeof setTimeout> | undefined
@@ -123,17 +103,7 @@ export function CalendarBoard({
       if (data.session?.access_token) void supabase.realtime.setAuth(data.session.access_token)
       channel = supabase
         .channel("consultations-calendar")
-        .on("postgres_changes", { event: "*", schema: "public", table: "consultations" }, (payload) => {
-          // Scope the refresh to this view: skip a change only when we can PROVE it's off-day / off-calendar
-          // AND not one of the consults shown now — else every firm-wide change would re-query the day.
-          const { date: d, tz: z, selected: sel, shownIds } = ctxRef.current
-          const rec = (payload.new ?? {}) as { id?: string; attorney_id?: string; start_at?: string }
-          const changedId = rec.id ?? (payload.old as { id?: string } | undefined)?.id
-          const touchesShown = !!changedId && shownIds.has(changedId)
-          if (!touchesShown && rec.attorney_id && rec.start_at) {
-            const inView = sel.includes(rec.attorney_id) && utcToZonedInput(rec.start_at, z).slice(0, 10) === d
-            if (!inView) return
-          }
+        .on("postgres_changes", { event: "*", schema: "public", table: "consultations" }, () => {
           if (timer) clearTimeout(timer)
           timer = setTimeout(() => router.refresh(), 400)
         })
