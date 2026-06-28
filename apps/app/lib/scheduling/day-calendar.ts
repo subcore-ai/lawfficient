@@ -84,6 +84,19 @@ export function weekdayOf(date: string): number {
   return new Date(Date.UTC(y ?? 1970, (mo ?? 1) - 1, d ?? 1)).getUTCDay()
 }
 
+// Monday on or before a YYYY-MM-DD date — the calendar prefetches this whole week so paging days within it
+// is client-side (no server round-trip until you cross into a new week).
+export function weekStartOf(date: string): string {
+  const fromMonday = (weekdayOf(date) + 6) % 7 // Sun→6, Mon→0, Tue→1 … Sat→5
+  return addDays(date, -fromMonday)
+}
+
+// The 7 dates Mon..Sun of the week containing `date`.
+export function weekDatesOf(date: string): string[] {
+  const start = weekStartOf(date)
+  return Array.from({ length: 7 }, (_, i) => addDays(start, i))
+}
+
 export function buildDayCalendar(opts: {
   date: string // YYYY-MM-DD
   tz: string

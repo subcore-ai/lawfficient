@@ -1,11 +1,30 @@
 import { describe, expect, test } from "bun:test"
 
-import { buildDayCalendar, weekdayOf } from "./day-calendar"
+import { buildDayCalendar, weekDatesOf, weekStartOf, weekdayOf } from "./day-calendar"
 
 describe("weekdayOf", () => {
   test("computes the weekday of a calendar date (0=Sun..6=Sat)", () => {
     expect(weekdayOf("2021-01-01")).toBe(5) // Friday
     expect(weekdayOf("2000-01-01")).toBe(6) // Saturday
+  })
+})
+
+describe("weekStartOf / weekDatesOf", () => {
+  test("weekStartOf returns the Monday on or before the date", () => {
+    expect(weekStartOf("2026-07-01")).toBe("2026-06-29") // Wednesday → that week's Monday
+    expect(weekStartOf("2026-06-29")).toBe("2026-06-29") // a Monday → itself
+    expect(weekStartOf("2026-07-05")).toBe("2026-06-29") // a Sunday → the week's Monday (not the next one)
+  })
+  test("weekDatesOf lists the 7 Mon..Sun dates of the week", () => {
+    expect(weekDatesOf("2026-07-01")).toEqual([
+      "2026-06-29",
+      "2026-06-30",
+      "2026-07-01",
+      "2026-07-02",
+      "2026-07-03",
+      "2026-07-04",
+      "2026-07-05",
+    ])
   })
 })
 
