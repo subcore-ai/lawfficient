@@ -94,16 +94,30 @@ export function CalendarBoard({
   React.useEffect(() => {
     const supabase = createClient()
     let timer: ReturnType<typeof setTimeout> | undefined
-    const channel = supabase
-      .channel("consultations-calendar")
-      .on("postgres_changes", { event: "*", schema: "public", table: "consultations" }, () => {
-        if (timer) clearTimeout(timer)
-        timer = setTimeout(() => router.refresh(), 400)
-      })
-      .subscribe()
+    let channel: ReturnType<typeof supabase.channel> | undefined
+    let active = true
+    // Authenticate the realtime socket with the user's session FIRST — otherwise Postgres Changes runs as
+    // anon and RLS silently drops every event (the common "realtime isn't working" cause with @supabase/ssr).
+    void supabase.auth.getSession().then(({ data }) => {
+      if (!active) return
+      if (data.session?.access_token) void supabase.realtime.setAuth(data.session.access_token)
+      channel = supabase
+        .channel("consultations-calendar")
+        .on("postgres_changes", { event: "*", schema: "public", table: "consultations" }, (payload) => {
+          // TEMP debug (remove once verified): confirms events arrive past RLS.
+          console.info("[calendar realtime] change:", payload.eventType)
+          if (timer) clearTimeout(timer)
+          timer = setTimeout(() => router.refresh(), 400)
+        })
+        .subscribe((status, err) => {
+          // TEMP debug (remove once verified): SUBSCRIBED = connected; CHANNEL_ERROR/TIMED_OUT = auth/conn.
+          console.info("[calendar realtime] status:", status, err?.message ?? "")
+        })
+    })
     return () => {
+      active = false
       if (timer) clearTimeout(timer)
-      void supabase.removeChannel(channel)
+      if (channel) void supabase.removeChannel(channel)
     }
   }, [router])
 
