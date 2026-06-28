@@ -23,7 +23,7 @@ function Tabs({
 // A segmented tab bar: the tabs sit in a bordered tray, the active tab a raised filled tile. (Vertical
 // orientation keeps a left baseline border.)
 const tabsListVariants = cva(
-  "group/tabs-list border-border inline-flex items-center gap-1 text-muted-foreground group-data-horizontal/tabs:rounded-lg group-data-horizontal/tabs:border group-data-horizontal/tabs:bg-muted/40 group-data-horizontal/tabs:p-1 group-data-vertical/tabs:flex-col group-data-vertical/tabs:items-stretch group-data-vertical/tabs:border-l group-data-vertical/tabs:pl-1",
+  "group/tabs-list border-border inline-flex items-center gap-1 text-muted-foreground group-data-horizontal/tabs:w-fit group-data-horizontal/tabs:rounded-lg group-data-horizontal/tabs:border group-data-horizontal/tabs:p-1 group-data-vertical/tabs:flex-col group-data-vertical/tabs:items-stretch group-data-vertical/tabs:border-l group-data-vertical/tabs:pl-1",
   {
     variants: {
       variant: {
