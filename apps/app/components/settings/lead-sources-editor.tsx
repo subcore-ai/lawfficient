@@ -155,7 +155,7 @@ function NewSourceDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button size="sm" />}>
+      <DialogTrigger render={<Button size="sm" variant="outline" />}>
         <Plus className="size-4" /> New source
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">

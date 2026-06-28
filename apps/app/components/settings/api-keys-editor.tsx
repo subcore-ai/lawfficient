@@ -132,7 +132,7 @@ function NewApiKeyDialog({ onCreated }: { onCreated: (rawKey: string) => void })
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogTrigger render={<Button size="sm" />}>
+      <DialogTrigger render={<Button size="sm" variant="outline" />}>
         <Plus className="size-4" /> New API key
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">

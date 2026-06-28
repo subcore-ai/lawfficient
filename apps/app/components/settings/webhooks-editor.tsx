@@ -152,7 +152,7 @@ function NewEndpointDialog({ onCreated }: { onCreated: (secret: string) => void 
         if (!o) setSelected(new Set())
       }}
     >
-      <DialogTrigger render={<Button size="sm" />}>
+      <DialogTrigger render={<Button size="sm" variant="outline" />}>
         <Plus className="size-4" /> Add endpoint
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">

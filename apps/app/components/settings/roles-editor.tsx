@@ -56,7 +56,7 @@ export function CreateRoleDialog() {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button size="sm" />}>
+      <DialogTrigger render={<Button size="sm" variant="outline" />}>
         <Plus className="size-4" /> New role
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
