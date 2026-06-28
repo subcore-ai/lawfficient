@@ -91,13 +91,18 @@ export function SortableTaxonomyList({
     // Chain writes so rapid drags apply in order (the last drag wins in the DB, not whichever request
     // responds last). On failure, refresh to the server's real order rather than a possibly-stale snapshot.
     chainRef.current = chainRef.current
-      .catch(() => {})
       .then(() => reorderTaxonomies(category, orderedIds))
       .then((res) => {
         if (res && "error" in res) {
           toast.error(res.error)
           router.refresh()
         }
+      })
+      .catch(() => {
+        // A thrown action (network / server failure) rejects the promise — surface it, re-sync to the
+        // server's real order, and keep the chain resolved so the next drag still runs.
+        toast.error("Couldn't save the new order.")
+        router.refresh()
       })
   }
 
