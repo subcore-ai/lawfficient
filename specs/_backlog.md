@@ -62,26 +62,6 @@ fallback work — out of scope for that, but a real data-exposure.
 
 ---
 
-## Leads — list pagination + server-side pipeline counts
-
-_Added 2026-06-22 (surfaced in the #22 review)._
-
-**What:** the leads list (`app/(app)/leads/page.tsx`) loads every row with an unbounded
-`select("*")` and filters/counts client-side over the loaded array. Past PostgREST's default
-1000-row cap, a firm silently sees missing leads in the table AND wrong per-status count-strip
-numbers. The dashboard KPIs already avoid this with `count` queries.
-
-**Why deferred:** the approved plan chose client-side filtering over the loaded set for v1
-(searchParams as the documented scale path); no firm has >1000 leads pre-launch.
-
-**Fix:** server-side pagination (searchParams: page/status/source/search) + a per-status
-`count` query (or a `lead_status_counts(firm)` RPC) for the strip, so both the list and the
-counts stay correct at scale.
-
-**Priority:** before any firm approaches ~1000 leads.
-
----
-
 ## Testing — RLS + server-action integration harness (local Supabase)
 
 _Added 2026-06-22 (surfaced in the #27 notes review)._
