@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation"
+
 import { LeadsTable, type LeadsFilters } from "@/components/leads/leads-table"
 import { NewLeadDialog } from "@/components/leads/new-lead-dialog"
 import { PageHeader } from "@/components/page-header"
@@ -26,14 +28,19 @@ function one(sp: Search, key: string): string | undefined {
 export default async function LeadsPage({ searchParams }: { searchParams: Promise<Search> }) {
   const sp = await searchParams
   const me = await getCurrentUser()
-  const canEdit = me?.permissions?.includes("leads.edit") ?? false
-  const canManage = me?.permissions?.includes("settings.manage") ?? false
+  // The (app) layout already redirects unauthenticated users; guard here too so `me` is non-null
+  // below and no firm-scoped query ever runs without a firm id.
+  if (!me) redirect("/login")
+  const canEdit = me.permissions?.includes("leads.edit") ?? false
+  const canManage = me.permissions?.includes("settings.manage") ?? false
 
   const status = one(sp, "status")
   const source = one(sp, "source")
   const assignee = one(sp, "assignee")
   const rawQ = one(sp, "q") ?? ""
   const q = rawQ.trim().toLowerCase()
+  // Escape LIKE wildcards so a literal % or _ the user types matches literally, not as a wildcard.
+  const qPattern = q.replace(/[\\%_]/g, "\\$&")
   const showArchived = one(sp, "archived") === "1"
   const page = Math.max(1, Number(one(sp, "page")) || 1)
 
@@ -44,22 +51,39 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
     .from("leads")
     .select("*", { count: "exact" })
     .order("last_activity", { ascending: false })
+    .order("id", { ascending: false }) // stable tiebreaker so paged results don't shuffle when last_activity ties
   if (!showArchived) leadsQuery = leadsQuery.eq("archived", false)
   if (status) leadsQuery = leadsQuery.eq("status_id", status)
   if (source) leadsQuery = leadsQuery.eq("source", source)
   if (assignee === UNASSIGNED) leadsQuery = leadsQuery.is("assigned_to_id", null)
   else if (assignee) leadsQuery = leadsQuery.eq("assigned_to_id", assignee)
-  if (q) leadsQuery = leadsQuery.ilike("search_text", `%${q}%`)
+  if (q) leadsQuery = leadsQuery.ilike("search_text", `%${qPattern}%`)
   leadsQuery = leadsQuery.range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1)
 
   const [leadsRes, statusRows, staff, taxRows, facetsRes] = await Promise.all([
     leadsQuery,
-    me ? getFirmStatusRows(me.firmId) : Promise.resolve([]),
-    me ? getFirmStaff(me.firmId) : Promise.resolve([]),
-    me ? getFirmTaxonomyRows(me.firmId) : Promise.resolve([]),
+    getFirmStatusRows(me.firmId),
+    getFirmStaff(me.firmId),
+    getFirmTaxonomyRows(me.firmId),
     supabase.rpc("lead_facets"),
   ])
   if (leadsRes.error) throw leadsRes.error
+  if (facetsRes.error) throw facetsRes.error // don't render zeroed counts on a facet failure
+
+  const total = leadsRes.count ?? 0
+  // A stale or hand-edited ?page past the end returns an empty range — bounce to the last real page.
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  if (page > totalPages) {
+    const qs = new URLSearchParams()
+    if (status) qs.set("status", status)
+    if (source) qs.set("source", source)
+    if (assignee) qs.set("assignee", assignee)
+    if (rawQ) qs.set("q", rawQ)
+    if (showArchived) qs.set("archived", "1")
+    if (totalPages > 1) qs.set("page", String(totalPages))
+    const query = qs.toString()
+    redirect(query ? `/leads?${query}` : "/leads")
+  }
 
   const statuses = statusRows.map(mapLeadStatus)
   const byId = new Map(statuses.map((s) => [s.id, s]))
@@ -92,7 +116,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
         filters={filters}
         page={page}
         pageSize={PAGE_SIZE}
-        total={leadsRes.count ?? 0}
+        total={total}
         canEdit={canEdit}
         canManage={canManage}
       />

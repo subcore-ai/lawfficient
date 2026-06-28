@@ -116,11 +116,18 @@ export function LeadsTable({
     setUrlQ(filters.q)
     setQ(filters.q)
   }
+  // Keep the debounced push pointed at the LATEST setParams so a status/source change made while a
+  // keystroke is still pending isn't clobbered by a stale filters snapshot when the timer fires.
+  const setParamsRef = React.useRef(setParams)
+  React.useEffect(() => {
+    setParamsRef.current = setParams
+  }, [setParams])
   const searchTimer = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  React.useEffect(() => () => clearTimeout(searchTimer.current), []) // clear a pending push on unmount
   function onSearch(value: string) {
     setQ(value)
     if (searchTimer.current) clearTimeout(searchTimer.current)
-    searchTimer.current = setTimeout(() => setParams({ q: value || null }), 300)
+    searchTimer.current = setTimeout(() => setParamsRef.current({ q: value || null }), 300)
   }
 
   const statusOptions = statuses.map((s) => ({ value: s.id, label: s.name }))
