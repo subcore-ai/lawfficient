@@ -162,7 +162,10 @@ export async function reorderTaxonomies(category: string, orderedIds: string[]):
   const { data: rows, error: readErr } = await supabase.from("firm_taxonomies").select("id").eq("category", category)
   if (readErr || !rows) return { error: "Couldn't reorder." }
   const known = new Set(rows.map((r) => r.id))
-  const complete = orderedIds.length === known.size && orderedIds.every((id) => known.has(id))
+  const unique = new Set(orderedIds)
+  // A complete permutation: no duplicates, and exactly the category's ids (rejects a dup-padded list too).
+  const complete =
+    unique.size === orderedIds.length && unique.size === known.size && orderedIds.every((id) => known.has(id))
   if (!complete) return { error: "The list changed — refresh and try again." }
 
   // Write each row's position to its new index. Sequential updates (admin-only + rare; position isn't unique).
