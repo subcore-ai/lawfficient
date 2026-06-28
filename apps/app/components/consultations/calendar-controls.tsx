@@ -1,19 +1,26 @@
 "use client"
 
+import * as React from "react"
 import { usePathname, useRouter } from "next/navigation"
-import { Check, ChevronLeft, ChevronRight } from "lucide-react"
+import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react"
 
 import { Button } from "@workspace/ui/components/button"
+import { Checkbox } from "@workspace/ui/components/checkbox"
+import { Input } from "@workspace/ui/components/input"
+import { Popover, PopoverContent, PopoverTrigger } from "@workspace/ui/components/popover"
 import { cn } from "@workspace/ui/lib/utils"
 
 type Option = { id: string; name: string }
 
 // Keep in step with MAX_COLUMNS in the consultations page.
 const MAX_ATTORNEYS = 6
+// Remember the picked calendars across visits (the URL stays the source of truth for the server load).
+const STORAGE_KEY = "consultations.calendars"
 
-// Calendar filters / nav: attorney chips (toggle 1–N columns) + the day. Each change rewrites the URL
-// searchParams; the server re-loads the day. Date math is plain Y-M-D string arithmetic (no zone needed).
-// The consultation type is chosen when booking (in the dialog), not here — slots default to the first type.
+// Calendar filters / nav: a calendars multi-select (search + checkboxes, 1–N columns) + the day. Each
+// change rewrites the URL searchParams (the server re-loads the day) AND mirrors the picked calendars to
+// localStorage; on a visit without an explicit ?attorneys= we re-apply the remembered set. Date math is
+// plain Y-M-D string arithmetic. The consultation type is chosen when booking, not here.
 export function CalendarControls({
   attorneys,
   attorneyIds,
@@ -27,14 +34,40 @@ export function CalendarControls({
 }) {
   const router = useRouter()
   const pathname = usePathname()
+  const [open, setOpen] = React.useState(false)
+  const [query, setQuery] = React.useState("")
 
-  function go(next: { attorneys?: string[]; date?: string }) {
-    const q = new URLSearchParams()
-    q.set("view", "calendar")
-    q.set("attorneys", (next.attorneys ?? attorneyIds).join(","))
-    q.set("date", next.date ?? date)
-    router.push(`${pathname}?${q.toString()}`)
-  }
+  const go = React.useCallback(
+    (next: { attorneys?: string[]; date?: string }) => {
+      const ids = next.attorneys ?? attorneyIds
+      const q = new URLSearchParams()
+      q.set("view", "calendar")
+      q.set("attorneys", ids.join(","))
+      q.set("date", next.date ?? date)
+      if (next.attorneys) window.localStorage.setItem(STORAGE_KEY, ids.join(","))
+      router.push(`${pathname}?${q.toString()}`)
+    },
+    [attorneyIds, date, pathname, router],
+  )
+
+  // On a visit without an explicit ?attorneys=, re-apply the remembered selection (once).
+  const applied = React.useRef(false)
+  React.useEffect(() => {
+    if (applied.current) return
+    applied.current = true
+    const params = new URLSearchParams(window.location.search)
+    if (params.has("attorneys")) return
+    const saved = window.localStorage.getItem(STORAGE_KEY)
+    if (!saved) return
+    const ids = saved
+      .split(",")
+      .filter((id) => attorneys.some((a) => a.id === id))
+      .slice(0, MAX_ATTORNEYS)
+    if (ids.length && ids.join(",") !== attorneyIds.join(",")) {
+      params.set("attorneys", ids.join(","))
+      router.replace(`${pathname}?${params.toString()}`) // replace: no history entry, no back-trap
+    }
+  }, [attorneys, attorneyIds, pathname, router])
 
   const atCap = attorneyIds.length >= MAX_ATTORNEYS
 
@@ -59,32 +92,58 @@ export function CalendarControls({
     year: "numeric",
   }).format(new Date(`${date}T12:00:00Z`))
 
+  const q = query.trim().toLowerCase()
+  const filtered = q ? attorneys.filter((a) => a.name.toLowerCase().includes(q)) : attorneys
+  const triggerLabel =
+    attorneyIds.length === attorneys.length
+      ? "All calendars"
+      : `${attorneyIds.length} calendar${attorneyIds.length === 1 ? "" : "s"}`
+
   return (
     <div className="space-y-3">
       {attorneys.length > 1 ? (
-        <div className="flex flex-wrap gap-2">
-          {attorneys.map((a) => {
-            const on = attorneyIds.includes(a.id)
-            return (
-              <button
-                key={a.id}
-                type="button"
-                onClick={() => toggleAttorney(a.id)}
-                aria-pressed={on}
-                disabled={!on && atCap}
-                className={cn(
-                  "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition-colors",
-                  on
-                    ? "border-primary bg-primary/10 text-foreground"
-                    : "text-muted-foreground hover:bg-muted disabled:pointer-events-none disabled:opacity-40",
-                )}
-              >
-                {on ? <Check className="size-3.5" /> : null}
-                {a.name}
-              </button>
-            )
-          })}
-        </div>
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger render={<Button type="button" variant="outline" size="sm" className="justify-between gap-2" />}>
+            <span className="inline-flex items-center gap-1.5">
+              <CalendarDays className="size-4" /> {triggerLabel}
+            </span>
+            <ChevronDown className="size-4 opacity-60" />
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-64 p-0">
+            <div className="border-b p-2">
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search calendars…"
+                autoComplete="off"
+                className="h-8"
+              />
+            </div>
+            <ul className="max-h-64 overflow-auto p-1">
+              {filtered.length === 0 ? (
+                <li className="text-muted-foreground px-2 py-1.5 text-sm">No calendars found.</li>
+              ) : (
+                filtered.map((a) => {
+                  const on = attorneyIds.includes(a.id)
+                  const disabled = (!on && atCap) || (on && attorneyIds.length === 1)
+                  return (
+                    <li key={a.id}>
+                      <label
+                        className={cn(
+                          "flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm",
+                          disabled ? "cursor-not-allowed opacity-50" : "hover:bg-muted cursor-pointer",
+                        )}
+                      >
+                        <Checkbox checked={on} disabled={disabled} onCheckedChange={() => toggleAttorney(a.id)} />
+                        <span className="truncate">{a.name}</span>
+                      </label>
+                    </li>
+                  )
+                })
+              )}
+            </ul>
+          </PopoverContent>
+        </Popover>
       ) : null}
 
       <div className="flex items-center gap-1">
