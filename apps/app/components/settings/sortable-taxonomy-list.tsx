@@ -96,6 +96,8 @@ export function SortableTaxonomyList({
         if (res && "error" in res) {
           toast.error(res.error)
           router.refresh()
+        } else {
+          toast.success("Order updated")
         }
       })
       .catch(() => {
