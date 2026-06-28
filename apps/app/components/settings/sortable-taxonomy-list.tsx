@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useRouter } from "next/navigation"
 import {
   DndContext,
   KeyboardSensor,
@@ -65,6 +66,9 @@ export function SortableTaxonomyList({
   // Re-sync with server data (a create/edit/delete/revalidate hands us a new array) without losing the
   // optimistic order: on success the revalidated `options` already match, so this is a no-op then.
   const [snapshot, setSnapshot] = React.useState(options)
+  const router = useRouter()
+  // Serialize reorder writes through one chain so rapid drags persist in drag order.
+  const chainRef = React.useRef<Promise<unknown>>(Promise.resolve())
   if (snapshot !== options) {
     setSnapshot(options)
     setItems(options)
@@ -81,18 +85,20 @@ export function SortableTaxonomyList({
     const oldIndex = items.findIndex((o) => o.id === active.id)
     const newIndex = items.findIndex((o) => o.id === over.id)
     if (oldIndex < 0 || newIndex < 0) return
-    const prev = items
     const next = arrayMove(items, oldIndex, newIndex)
     setItems(next) // optimistic
-    void reorderTaxonomies(
-      category,
-      next.map((o) => o.id),
-    ).then((res) => {
-      if ("error" in res) {
-        setItems(prev) // revert on failure
-        toast.error(res.error)
-      }
-    })
+    const orderedIds = next.map((o) => o.id)
+    // Chain writes so rapid drags apply in order (the last drag wins in the DB, not whichever request
+    // responds last). On failure, refresh to the server's real order rather than a possibly-stale snapshot.
+    chainRef.current = chainRef.current
+      .catch(() => {})
+      .then(() => reorderTaxonomies(category, orderedIds))
+      .then((res) => {
+        if (res && "error" in res) {
+          toast.error(res.error)
+          router.refresh()
+        }
+      })
   }
 
   return (
