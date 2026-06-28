@@ -177,6 +177,37 @@ export async function addTimeOff(attorneyId: string, formData: FormData): Promis
   return { ok: true }
 }
 
+// Add a firm-wide holiday — a time-off range with attorney_id NULL that closes the date(s) for EVERY
+// attorney (e.g. Christmas), instead of duplicating it onto each. Admin-only; RLS (0044 + 0048) also enforces
+// settings.manage for a NULL-attorney row.
+export async function addFirmHoliday(formData: FormData): Promise<ActionResult> {
+  const me = await getCurrentUser()
+  if (!me) return { error: "You're not signed in." }
+  // Fail closed on a missing firm id (matches the other actions here). The insert is RLS-scoped to
+  // current_firm_id(), but never run a firm-scoped write without firm context.
+  if (!me.firmId) return { error: "Your session is missing firm context." }
+  if (!(me.permissions?.includes("settings.manage") ?? false)) {
+    return { error: "Only an admin can set firm holidays." }
+  }
+
+  const parsed = parseTimeOffInput({ startDate: formData.get("startDate"), endDate: formData.get("endDate") })
+  if (!parsed.ok) return { error: parsed.error }
+
+  const supabase = await createClient()
+  // attorney_id NULL = firm-wide; .select().single() turns an RLS denial into a real error.
+  const { error } = await supabase
+    .from("availability_exceptions")
+    .insert({ attorney_id: null, start_date: parsed.value.startDate, end_date: parsed.value.endDate })
+    .select("id")
+    .single()
+  if (error) return { error: "Couldn't add the holiday." }
+
+  revalidatePath(PATH)
+  revalidatePath(MY_PATH)
+  revalidatePath(CALENDAR_PATH)
+  return { ok: true }
+}
+
 // Remove a time-off range. RLS (0044) restricts deletes to settings.manage OR the owner; a 0-row delete
 // (someone else's row / wrong id) surfaces as a clean error.
 export async function removeTimeOff(id: string): Promise<ActionResult> {

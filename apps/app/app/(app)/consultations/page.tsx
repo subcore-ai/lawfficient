@@ -188,7 +188,8 @@ async function renderCalendar({
     supabase
       .from("availability_exceptions")
       .select("attorney_id, start_date, end_date")
-      .in("attorney_id", allIds)
+      // Per-attorney time off for the loaded attorneys + firm-wide holidays (attorney_id IS NULL).
+      .or(`attorney_id.in.(${allIds.join(",")}),attorney_id.is.null`)
       .lte("start_date", weekLast)
       .gte("end_date", weekStart),
   ])
@@ -208,7 +209,9 @@ async function renderCalendar({
       list.push({ startTime: toHm(w.start_time), endTime: toHm(w.end_time) })
     }
     const offDates = weekDates.filter((d) =>
-      (offRes.data ?? []).some((e) => e.attorney_id === a.id && e.start_date <= d && e.end_date >= d),
+      (offRes.data ?? []).some(
+        (e) => (e.attorney_id === a.id || e.attorney_id === null) && e.start_date <= d && e.end_date >= d,
+      ),
     )
     const consults = (weekConsultRes.data ?? [])
       .filter((c) => c.attorney_id === a.id)

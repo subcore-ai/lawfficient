@@ -112,10 +112,7 @@ in one statement (mirrors the `set_lead_qualification` RPC, `0031`).
 
 _Added 2026-06-27 (scoped out of the sellable scheduling core so each phase stayed shippable)._
 
-**What:** Follow-ups to the consultation calendar (spec 13), each deliberately deferred:
-- **Firm-wide holidays** — one entry that closes ALL attorneys (e.g. Christmas) instead of adding the date
-  to every attorney's time off. Likely `availability_exceptions.attorney_id NULL` = firm-wide (admin-only
-  RLS); the calendar/slot query unions per-attorney + firm-wide.
+**What:** Follow-ups to the consultation calendar (spec 13), each deliberately deferred (firm-wide holidays shipped 2026-06-28 — migration 0048, `attorney_id` NULL):
 - **Partial-day overrides** — block part of a day (e.g. off 2–4pm) or change hours for a single date, not
   just full-day off. Today's `availability_exceptions` is whole-day only.
 - **Private time-off labels** — an optional reason/label on a time-off entry ("Vacation", "Court"),
@@ -131,4 +128,4 @@ _Added 2026-06-27 (scoped out of the sellable scheduling core so each phase stay
 core "see availability, book a free slot, don't double-book, mark days off" value. These extend it but
 aren't table-stakes for v1.
 
-**Priority:** **Medium** (firm-wide holidays first — most-requested for real firms).
+**Priority:** **Medium.** Partial-day overrides + booking rules are the next-most-useful.

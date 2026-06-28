@@ -7,7 +7,7 @@ import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
 import { toast } from "@workspace/ui/components/sonner"
 
-import { addTimeOff, removeTimeOff } from "@/app/(app)/settings/scheduling/actions"
+import { addFirmHoliday, addTimeOff, removeTimeOff } from "@/app/(app)/settings/scheduling/actions"
 import { Field } from "@/components/form-field"
 import type { TimeOff } from "@/lib/availability/exceptions"
 
@@ -27,11 +27,14 @@ export function TimeOffManager({
   attorneyId,
   entries,
   canEdit,
+  noun = "time off",
 }: {
-  attorneyId: string
+  attorneyId: string | null // null = firm-wide holidays
   entries: TimeOff[]
   canEdit: boolean
+  noun?: string
 }) {
+  const Noun = noun.charAt(0).toUpperCase() + noun.slice(1)
   const startId = React.useId()
   const endId = React.useId()
   const [pending, startTransition] = React.useTransition()
@@ -42,12 +45,12 @@ export function TimeOffManager({
     const fd = new FormData(e.currentTarget)
     startTransition(async () => {
       try {
-        const res = await addTimeOff(attorneyId, fd)
+        const res = attorneyId === null ? await addFirmHoliday(fd) : await addTimeOff(attorneyId, fd)
         if ("error" in res) {
           toast.error(res.error)
           return
         }
-        toast.success("Time off added")
+        toast.success(`${Noun} added`)
         formRef.current?.reset()
       } catch {
         toast.error("Something went wrong. Please try again.")
@@ -63,7 +66,7 @@ export function TimeOffManager({
           toast.error(res.error)
           return
         }
-        toast.success("Time off removed")
+        toast.success(`${Noun} removed`)
       } catch {
         toast.error("Something went wrong. Please try again.")
       }
@@ -73,7 +76,7 @@ export function TimeOffManager({
   return (
     <div className="space-y-4">
       {entries.length === 0 ? (
-        <p className="text-muted-foreground text-sm">No time off scheduled.</p>
+        <p className="text-muted-foreground text-sm">No {noun} scheduled.</p>
       ) : (
         <ul className="divide-y rounded-md border">
           {entries.map((e) => (
@@ -85,7 +88,7 @@ export function TimeOffManager({
                   size="icon"
                   onClick={() => onRemove(e.id)}
                   disabled={pending}
-                  aria-label={`Remove time off ${fmtRange(e.startDate, e.endDate)}`}
+                  aria-label={`Remove ${noun} ${fmtRange(e.startDate, e.endDate)}`}
                 >
                   <Trash2 className="size-4" />
                 </Button>
@@ -104,7 +107,7 @@ export function TimeOffManager({
             <Input id={endId} name="endDate" type="date" required className="w-40" />
           </Field>
           <Button type="submit" disabled={pending}>
-            {pending ? "Adding…" : "Add time off"}
+            {pending ? "Adding…" : `Add ${noun}`}
           </Button>
         </form>
       ) : null}
