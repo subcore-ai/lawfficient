@@ -1,7 +1,6 @@
 "use client"
 
 import * as React from "react"
-import { usePathname, useRouter } from "next/navigation"
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react"
 
 import { Button } from "@workspace/ui/components/button"
@@ -14,43 +13,26 @@ import { MAX_CALENDAR_COLUMNS } from "@/lib/scheduling/day-calendar"
 
 type Option = { id: string; name: string }
 
-// Remember the viewed day in a cookie so the server renders it on the next visit (no flash, no client-side
-// re-nav). Calendars are remembered the same way, by CalendarBoard.
-const DATE_COOKIE = "consultations.calendarDate"
-
-// Calendar filters / nav: a calendars multi-select (search + checkboxes; the selection is owned by
-// CalendarBoard, which filters client-side — toggling never hits the server) + the day. Day changes rewrite
-// ?date= (the server re-loads the day) and mirror to sessionStorage; on a visit with no ?date= we re-apply
-// the remembered day. Date math is plain Y-M-D string arithmetic.
+// Calendar filters + day nav. The calendars multi-select (search + checkboxes) is owned by CalendarBoard,
+// which filters client-side. Day prev/next/today call onGo; the board decides whether that pages client-side
+// within the loaded week or fetches a new week. Date math is plain Y-M-D string arithmetic.
 export function CalendarControls({
   attorneys,
   selected,
   onToggle,
   date,
   today,
+  onGo,
 }: {
   attorneys: Option[]
   selected: string[]
   onToggle: (id: string) => void
   date: string
   today: string // firm-tz today, for the Today button
+  onGo: (date: string) => void
 }) {
-  const router = useRouter()
-  const pathname = usePathname()
   const [open, setOpen] = React.useState(false)
   const [query, setQuery] = React.useState("")
-
-  const goDate = React.useCallback(
-    (d: string) => {
-      const params = new URLSearchParams(window.location.search)
-      params.set("view", "calendar")
-      params.set("date", d)
-      // Remember the day server-side so a later visit with no ?date= still opens here (no flash).
-      document.cookie = `${DATE_COOKIE}=${d}; path=/; max-age=31536000; samesite=lax`
-      router.push(`${pathname}?${params.toString()}`)
-    },
-    [pathname, router],
-  )
 
   const atCap = selected.length >= MAX_CALENDAR_COLUMNS
 
@@ -122,13 +104,13 @@ export function CalendarControls({
         </Popover>
       ) : null}
 
-      <Button variant="outline" size="icon" onClick={() => goDate(shift(-1))} aria-label="Previous day">
+      <Button variant="outline" size="icon" onClick={() => onGo(shift(-1))} aria-label="Previous day">
         <ChevronLeft className="size-4" />
       </Button>
-      <Button variant="outline" size="default" onClick={() => goDate(today)} disabled={date === today}>
+      <Button variant="outline" size="default" onClick={() => onGo(today)} disabled={date === today}>
         Today
       </Button>
-      <Button variant="outline" size="icon" onClick={() => goDate(shift(1))} aria-label="Next day">
+      <Button variant="outline" size="icon" onClick={() => onGo(shift(1))} aria-label="Next day">
         <ChevronRight className="size-4" />
       </Button>
       <span className="text-foreground ml-2 inline-block min-w-[9rem] text-sm font-medium">{dateLabel}</span>

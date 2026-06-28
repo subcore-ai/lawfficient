@@ -12,7 +12,7 @@ import { mapConsultationTypeRow, type ConsultationType } from "@/lib/consultatio
 import { mapConsultationRow, partitionConsultations } from "@/lib/consultations/queries"
 import { currentDateInZone, zonedWallTimeToUtcISO } from "@/lib/consultations/time"
 import { colorFor } from "@/lib/scheduling/calendar-colors"
-import { MAX_CALENDAR_COLUMNS, weekdayOf } from "@/lib/scheduling/day-calendar"
+import { MAX_CALENDAR_COLUMNS, weekDatesOf } from "@/lib/scheduling/day-calendar"
 import { isSupabaseConfigured } from "@/lib/supabase/env"
 import { createClient } from "@/lib/supabase/server"
 
@@ -160,54 +160,57 @@ async function renderCalendar({
   // The calendar slots default to the first active type's length; the actual type is chosen when booking.
   const selectedType = types[0]!
 
-  const dayEnd = zonedWallTimeToUtcISO(`${addDay(date)}T00:00`, zone)
-  // Look back a day on the lower bound so a consult that STARTED yesterday but runs into this morning is
-  // still subtracted from today's slots. buildDayCalendar shows only same-day-start consults but blocks on
-  // all of them; 0043's exclusion constraint is the hard backstop regardless.
-  const loadFrom = zonedWallTimeToUtcISO(`${addDay(date, -1)}T00:00`, zone)
-  // One batched read per table across all selected attorneys, grouped by attorney below. The exceptions
-  // read returns only those whose range COVERS this date (start_date <= date <= end_date).
-  const [availRes, dayConsultRes, offRes] = await Promise.all([
+  // Load the whole week containing `date` so paging days within it is client-side (no re-fetch). One batched
+  // read per table across all schedulable attorneys; grouped by attorney + weekday below.
+  const weekDates = weekDatesOf(date)
+  const weekStart = weekDates[0]!
+  const weekLast = weekDates[6]!
+  const weekEndUtc = zonedWallTimeToUtcISO(`${addDay(weekLast)}T00:00`, zone) // exclusive: the next Monday
+  // Look back a day so a consult that STARTED the day before the week but carries into Monday morning still
+  // subtracts from its slots. buildDayCalendar shows only same-day-start consults but blocks on all of them.
+  const loadFrom = zonedWallTimeToUtcISO(`${addDay(weekStart, -1)}T00:00`, zone)
+  const [availRes, weekConsultRes, offRes] = await Promise.all([
     supabase
       .from("attorney_availability")
-      .select("attorney_id, start_time, end_time")
+      .select("attorney_id, weekday, start_time, end_time")
       .in("attorney_id", allIds)
-      .eq("weekday", weekdayOf(date))
       .order("start_time"),
-    loadFrom && dayEnd
+    loadFrom && weekEndUtc
       ? supabase
           .from("consultations")
           .select("id, attorney_id, start_at, duration_min, type, lead_id, status, time_zone, outcome")
           .in("attorney_id", allIds)
           .eq("archived", false)
           .gte("start_at", loadFrom)
-          .lt("start_at", dayEnd)
+          .lt("start_at", weekEndUtc)
           .not("status", "in", "(canceled,no_show)")
       : Promise.resolve({ data: [], error: null }),
     supabase
       .from("availability_exceptions")
-      .select("attorney_id")
+      .select("attorney_id, start_date, end_date")
       .in("attorney_id", allIds)
-      .lte("start_date", date)
-      .gte("end_date", date),
+      .lte("start_date", weekLast)
+      .gte("end_date", weekStart),
   ])
   // Fail loud: a swallowed error would render as "No office hours" or an empty/wrong slot grid.
   if (availRes.error) throw availRes.error
-  if (dayConsultRes.error) throw dayConsultRes.error
+  if (weekConsultRes.error) throw weekConsultRes.error
   if (offRes.error) throw offRes.error
-  const offIds = new Set((offRes.data ?? []).map((e) => e.attorney_id))
 
   const nowMs = Date.now()
-  // Build each schedulable attorney's RAW day (office-hour windows already account for time off). The
-  // browser builds + filters the columns and keeps the consults live over realtime.
-  const attorneyDays = schedulable.map((a) => {
-    const off = offIds.has(a.id)
-    const windows = off
-      ? []
-      : (availRes.data ?? [])
-          .filter((w) => w.attorney_id === a.id)
-          .map((w) => ({ startTime: toHm(w.start_time), endTime: toHm(w.end_time) }))
-    const consults = (dayConsultRes.data ?? [])
+  // Each schedulable attorney's whole week: office hours by weekday, the week's consults, and which dates are
+  // off (time off). The browser builds the picked day's columns from this, so paging days never hits the DB.
+  const attorneyWeeks = schedulable.map((a) => {
+    const hoursByWeekday: Record<number, { startTime: string; endTime: string }[]> = {}
+    for (const w of availRes.data ?? []) {
+      if (w.attorney_id !== a.id) continue
+      const list = (hoursByWeekday[w.weekday] ??= [])
+      list.push({ startTime: toHm(w.start_time), endTime: toHm(w.end_time) })
+    }
+    const offDates = weekDates.filter((d) =>
+      (offRes.data ?? []).some((e) => e.attorney_id === a.id && e.start_date <= d && e.end_date >= d),
+    )
+    const consults = (weekConsultRes.data ?? [])
       .filter((c) => c.attorney_id === a.id)
       .map((c) => ({
         id: c.id,
@@ -220,12 +223,13 @@ async function renderCalendar({
         timeZone: c.time_zone,
         outcome: c.outcome,
       }))
-    return { attorney: a, windows, consults, off, color: colorByAttorney.get(a.id) ?? null }
+    return { attorney: a, color: colorByAttorney.get(a.id) ?? null, hoursByWeekday, offDates, consults }
   })
 
   return (
     <CalendarBoard
-      attorneyDays={attorneyDays}
+      attorneyWeeks={attorneyWeeks}
+      weekDates={weekDates}
       initialSelected={initialSelected}
       date={date}
       today={currentDateInZone(zone)}
