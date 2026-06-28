@@ -2,9 +2,11 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { Phone, Search } from "lucide-react"
+import { usePathname, useRouter } from "next/navigation"
+import { ChevronLeft, ChevronRight, Phone, Search } from "lucide-react"
 
+import { Button } from "@workspace/ui/components/button"
+import { Card, CardContent } from "@workspace/ui/components/card"
 import { Input } from "@workspace/ui/components/input"
 import {
   Select,
@@ -34,8 +36,9 @@ import { InlineSelect } from "@/components/inline-select"
 import { LeadRowActions } from "@/components/leads/lead-row-actions"
 import { ShowArchivedToggle } from "@/components/show-archived-toggle"
 import { StatusPill } from "@/components/status-pill"
-import type { AssigneeOption, LeadStatusView, LeadView } from "@/lib/leads/queries"
 import { formatDate } from "@/lib/format"
+import { LEAD_SOURCES } from "@/lib/leads/validation"
+import type { AssigneeOption, LeadStatusView, LeadView } from "@/lib/leads/queries"
 import { qualificationBadge } from "@/lib/status"
 import type { FirmTaxonomies } from "@/lib/taxonomies/queries"
 
@@ -43,28 +46,89 @@ import type { FirmTaxonomies } from "@/lib/taxonomies/queries"
 const ALL = "__all__"
 const UNASSIGNED = "__none__"
 
+export type LeadsFilters = {
+  status: string
+  source: string
+  assignee: string
+  q: string
+  showArchived: boolean
+}
+
 export function LeadsTable({
   leads,
   statuses,
+  statusCounts,
+  archivedCount,
   assignees,
   taxonomies,
+  filters,
+  page,
+  pageSize,
+  total,
   canEdit,
   canManage,
 }: {
   leads: LeadView[]
   statuses: LeadStatusView[]
+  statusCounts: Record<string, number>
+  archivedCount: number
   assignees: AssigneeOption[]
   taxonomies: FirmTaxonomies
+  filters: LeadsFilters
+  page: number
+  pageSize: number
+  total: number
   canEdit: boolean
   canManage: boolean
 }) {
-  const [query, setQuery] = React.useState("")
-  const [status, setStatus] = React.useState(ALL)
-  const [source, setSource] = React.useState(ALL)
-  const [assignee, setAssignee] = React.useState(ALL)
-  const [showArchived, setShowArchived] = React.useState(false)
-  const [, startTransition] = React.useTransition()
   const router = useRouter()
+  const pathname = usePathname()
+  const [, startTransition] = React.useTransition()
+
+  // Filter/search/page state lives in the URL (so the server re-fetches the right slice). The current params
+  // are rebuilt from props — no useSearchParams, so no Suspense boundary is forced. Any filter change resets
+  // paging to page 1; an explicit `page` update keeps it.
+  const setParams = React.useCallback(
+    (updates: Record<string, string | null>) => {
+      const params = new URLSearchParams()
+      if (filters.status) params.set("status", filters.status)
+      if (filters.source) params.set("source", filters.source)
+      if (filters.assignee) params.set("assignee", filters.assignee)
+      if (filters.q) params.set("q", filters.q)
+      if (filters.showArchived) params.set("archived", "1")
+      if (page > 1) params.set("page", String(page))
+      for (const [k, v] of Object.entries(updates)) {
+        if (v === null || v === "") params.delete(k)
+        else params.set(k, v)
+      }
+      if (!("page" in updates)) params.delete("page")
+      const qs = params.toString()
+      router.push(qs ? `${pathname}?${qs}` : pathname)
+    },
+    [router, pathname, filters, page],
+  )
+
+  // Debounced search: type instantly (local state), push the URL ~300ms after the user stops.
+  const [q, setQ] = React.useState(filters.q)
+  const [urlQ, setUrlQ] = React.useState(filters.q)
+  if (filters.q !== urlQ) {
+    // URL changed under us (back/forward, or a reset) — resync the input.
+    setUrlQ(filters.q)
+    setQ(filters.q)
+  }
+  // Keep the debounced push pointed at the LATEST setParams so a status/source change made while a
+  // keystroke is still pending isn't clobbered by a stale filters snapshot when the timer fires.
+  const setParamsRef = React.useRef(setParams)
+  React.useEffect(() => {
+    setParamsRef.current = setParams
+  }, [setParams])
+  const searchTimer = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  React.useEffect(() => () => clearTimeout(searchTimer.current), []) // clear a pending push on unmount
+  function onSearch(value: string) {
+    setQ(value)
+    if (searchTimer.current) clearTimeout(searchTimer.current)
+    searchTimer.current = setTimeout(() => setParamsRef.current({ q: value || null }), 300)
+  }
 
   const statusOptions = statuses.map((s) => ({ value: s.id, label: s.name }))
   const assigneeName = new Map(assignees.map((a) => [a.id, a.name]))
@@ -72,25 +136,10 @@ export function LeadsTable({
     { value: UNASSIGNED, label: "Unassigned" },
     ...assignees.map((a) => ({ value: a.id, label: a.name })),
   ]
-  const sources = Array.from(new Set(leads.map((l) => l.source))).sort()
 
-  const archivedCount = leads.filter((l) => l.archived).length
-  const counts = statuses.map((s) => ({
-    ...s,
-    count: leads.filter((l) => !l.archived && l.status.id === s.id).length,
-  }))
-
-  const filtered = leads.filter((l) => {
-    if (!showArchived && l.archived) return false
-    const haystack = `${l.firstName} ${l.lastName} ${l.email} ${l.phone} ${l.data.city ?? ""}`.toLowerCase()
-    return (
-      (query === "" || haystack.includes(query.toLowerCase())) &&
-      (status === ALL || l.status.id === status) &&
-      (source === ALL || l.source === source) &&
-      (assignee === ALL ||
-        (assignee === UNASSIGNED ? !l.assignedToId : l.assignedToId === assignee))
-    )
-  })
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
+  const start = total === 0 ? 0 : (page - 1) * pageSize + 1
+  const end = Math.min(page * pageSize, total)
 
   function onStatusChange(id: string, statusId: string) {
     startTransition(async () => {
@@ -108,28 +157,51 @@ export function LeadsTable({
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-        {counts.map((stage) => (
-          <div key={stage.id} className="bg-card rounded-lg px-3 py-2.5 ring-1 ring-foreground/10">
-            <div className="text-2xl font-semibold tabular-nums">{stage.count}</div>
-            <div className="text-muted-foreground mt-0.5 text-xs leading-tight">{stage.name}</div>
-          </div>
-        ))}
+        {statuses.map((stage) => {
+          const active = filters.status === stage.id
+          const toggle = () => setParams({ status: active ? null : stage.id })
+          return (
+            <Card
+              key={stage.id}
+              size="sm"
+              role="button"
+              tabIndex={0}
+              aria-pressed={active}
+              onClick={toggle}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault()
+                  toggle()
+                }
+              }}
+              className={cn(
+                "focus-visible:outline-ring cursor-pointer outline-none transition focus-visible:outline-2 focus-visible:outline-offset-2",
+                active ? "ring-2 ring-foreground/40" : "hover:ring-foreground/25",
+              )}
+            >
+              <CardContent>
+                <div className="text-2xl font-semibold tabular-nums">{statusCounts[stage.id] ?? 0}</div>
+                <div className="text-muted-foreground mt-0.5 text-xs leading-tight">{stage.name}</div>
+              </CardContent>
+            </Card>
+          )
+        })}
       </div>
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <div className="relative sm:max-w-xs sm:flex-1">
           <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
           <Input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            value={q}
+            onChange={(e) => onSearch(e.target.value)}
             placeholder="Search name, email, phone…"
             className="h-8 pl-8"
           />
         </div>
         <div className="flex items-center gap-2">
           <Select
-            value={status}
-            onValueChange={(v) => setStatus(v ?? ALL)}
+            value={filters.status || ALL}
+            onValueChange={(v) => setParams({ status: !v || v === ALL ? null : v })}
             items={[{ value: ALL, label: "All statuses" }, ...statusOptions]}
           >
             <SelectTrigger className="h-8" aria-label="Filter by status">
@@ -145,16 +217,16 @@ export function LeadsTable({
             </SelectContent>
           </Select>
           <Select
-            value={source}
-            onValueChange={(v) => setSource(v ?? ALL)}
-            items={[{ value: ALL, label: "All sources" }, ...sources.map((s) => ({ value: s, label: s }))]}
+            value={filters.source || ALL}
+            onValueChange={(v) => setParams({ source: !v || v === ALL ? null : v })}
+            items={[{ value: ALL, label: "All sources" }, ...LEAD_SOURCES.map((s) => ({ value: s, label: s }))]}
           >
             <SelectTrigger className="h-8" aria-label="Filter by source">
               <SelectValue placeholder="Source" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={ALL}>All sources</SelectItem>
-              {sources.map((s) => (
+              {LEAD_SOURCES.map((s) => (
                 <SelectItem key={s} value={s}>
                   {s}
                 </SelectItem>
@@ -162,8 +234,8 @@ export function LeadsTable({
             </SelectContent>
           </Select>
           <Select
-            value={assignee}
-            onValueChange={(v) => setAssignee(v ?? ALL)}
+            value={filters.assignee || ALL}
+            onValueChange={(v) => setParams({ assignee: !v || v === ALL ? null : v })}
             items={[
               { value: ALL, label: "All assignees" },
               { value: UNASSIGNED, label: "Unassigned" },
@@ -185,9 +257,13 @@ export function LeadsTable({
           </Select>
         </div>
         <div className="flex items-center gap-3 sm:ml-auto">
-          <ShowArchivedToggle checked={showArchived} onChange={setShowArchived} count={archivedCount} />
-          <span className="text-muted-foreground text-xs">
-            {filtered.length} of {leads.length}
+          <ShowArchivedToggle
+            checked={filters.showArchived}
+            onChange={(v) => setParams({ archived: v ? "1" : null })}
+            count={archivedCount}
+          />
+          <span className="text-muted-foreground text-xs tabular-nums">
+            {start}–{end} of {total}
           </span>
         </div>
       </div>
@@ -206,24 +282,19 @@ export function LeadsTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.map((l) => (
+            {leads.map((l) => (
               <TableRow
                 key={l.id}
                 // Whole-row click navigates to the lead (pointer convenience). The name <Link> stays
                 // the keyboard/screen-reader path; the interactive cells below stopPropagation so the
                 // Status/Assigned selects and the ⋯ menu work without navigating.
                 onClick={(e) => {
-                  // Let interactive controls handle their own clicks (the inline Status/Assigned
-                  // selects, the ⋯ menu, the name link); navigate from anywhere else in the row.
                   if (
                     e.target instanceof Element &&
                     e.target.closest('a, button, [data-slot="select-trigger"]')
                   )
                     return
-                  // Modifier-clicks (open in a new tab/window) belong to the name <Link>, not the row.
                   if (e.metaKey || e.ctrlKey || e.shiftKey) return
-                  // Don't hijack a text selection made *within this row* (e.g. copying an email);
-                  // a selection elsewhere on the page shouldn't block row navigation.
                   const sel = window.getSelection()
                   if (
                     sel &&
@@ -243,8 +314,6 @@ export function LeadsTable({
                   <Link href={`/leads/${l.id}`} className="font-medium hover:underline">
                     {l.firstName} {l.lastName}
                   </Link>
-                  {/* Email stays visible as text; phone shows as a tel: icon that reveals the
-                      number on hover. The whole-row click handler skips <a> targets, so it dials. */}
                   <div className="text-muted-foreground mt-0.5 flex items-center gap-2 text-xs">
                     {l.email ? <span>{l.email}</span> : null}
                     {l.phone ? (
@@ -260,8 +329,6 @@ export function LeadsTable({
                         >
                           <Phone className="size-3.5" />
                         </TooltipTrigger>
-                        {/* The tooltip is portaled; stop clicks inside it from bubbling (via React's
-                            event tree) to the row's navigation handler. */}
                         <TooltipContent onClick={(e) => e.stopPropagation()}>{l.phone}</TooltipContent>
                       </Tooltip>
                     ) : null}
@@ -315,7 +382,7 @@ export function LeadsTable({
                 </TableCell>
               </TableRow>
             ))}
-            {filtered.length === 0 ? (
+            {leads.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="text-muted-foreground h-24 text-center">
                   No leads match your filters.
@@ -325,6 +392,32 @@ export function LeadsTable({
           </TableBody>
         </Table>
       </div>
+
+      {totalPages > 1 ? (
+        <div className="flex items-center justify-between">
+          <span className="text-muted-foreground text-xs tabular-nums">
+            Page {page} of {totalPages}
+          </span>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page <= 1}
+              onClick={() => setParams({ page: String(page - 1) })}
+            >
+              <ChevronLeft className="size-4" /> Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page >= totalPages}
+              onClick={() => setParams({ page: String(page + 1) })}
+            >
+              Next <ChevronRight className="size-4" />
+            </Button>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

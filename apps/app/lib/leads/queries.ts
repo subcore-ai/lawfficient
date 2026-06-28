@@ -51,8 +51,12 @@ export function mapLeadStatus(row: LeadStatusRow): LeadStatusView {
 }
 
 // Returns null if the lead's status isn't in the map — impossible given the FK + loading all
-// firm statuses, but keeps the mapper total. Callers filter nulls.
-export function mapLeadRow(row: LeadRow, statusesById: Map<string, LeadStatusView>): LeadView | null {
+// firm statuses, but keeps the mapper total. Callers filter nulls. `search_text` (a generated column the
+// mapper never reads) is omitted from the param so RPC/constructed rows that predate it still type-check.
+export function mapLeadRow(
+  row: Omit<LeadRow, "search_text">,
+  statusesById: Map<string, LeadStatusView>,
+): LeadView | null {
   const status = statusesById.get(row.status_id)
   if (!status) return null
   return {

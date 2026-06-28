@@ -475,10 +475,10 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "consultations_attorney_id_fkey"
-            columns: ["attorney_id"]
+            columns: ["attorney_id", "firm_id"]
             isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "firm_id"]
           },
           {
             foreignKeyName: "consultations_booked_by_id_fkey"
@@ -496,10 +496,10 @@ export type Database = {
           },
           {
             foreignKeyName: "consultations_lead_id_fkey"
-            columns: ["lead_id"]
+            columns: ["lead_id", "firm_id"]
             isOneToOne: false
             referencedRelation: "leads"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "firm_id"]
           },
         ]
       }
@@ -1047,6 +1047,7 @@ export type Database = {
           last_activity: string
           last_name: string
           phone: string
+          search_text: string | null
           source: string
           status_id: string
         }
@@ -1063,6 +1064,7 @@ export type Database = {
           last_activity?: string
           last_name: string
           phone?: string
+          search_text?: string | null
           source: string
           status_id: string
         }
@@ -1079,6 +1081,7 @@ export type Database = {
           last_activity?: string
           last_name?: string
           phone?: string
+          search_text?: string | null
           source?: string
           status_id?: string
         }
@@ -1454,11 +1457,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "webhook_deliveries_endpoint_id_fkey"
-            columns: ["endpoint_id"]
+            foreignKeyName: "webhook_deliveries_endpoint_id_firm_id_fkey"
+            columns: ["endpoint_id", "firm_id"]
             isOneToOne: false
             referencedRelation: "webhook_endpoints"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "firm_id"]
           },
           {
             foreignKeyName: "webhook_deliveries_firm_id_fkey"
@@ -1490,11 +1493,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "webhook_endpoint_secrets_endpoint_id_fkey"
-            columns: ["endpoint_id"]
-            isOneToOne: true
+            foreignKeyName: "webhook_endpoint_secrets_endpoint_id_firm_id_fkey"
+            columns: ["endpoint_id", "firm_id"]
+            isOneToOne: false
             referencedRelation: "webhook_endpoints"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "firm_id"]
           },
           {
             foreignKeyName: "webhook_endpoint_secrets_firm_id_fkey"
@@ -1625,11 +1628,11 @@ export type Database = {
         }
         Returns: {
           archived: boolean
-          assigned_to_id: string | null
+          assigned_to_id: string
           created_at: string
           data: Json
           email: string
-          external_id: string | null
+          external_id: string
           firm_id: string
           first_name: string
           id: string
@@ -1647,6 +1650,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      consultation_end: {
+        Args: { p_duration_min: number; p_start: string }
+        Returns: string
+      }
       current_firm_id: { Args: never; Returns: string }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
       firm_exists: { Args: { p_firm_id: string }; Returns: boolean }
@@ -1659,8 +1666,13 @@ export type Database = {
         Returns: boolean
       }
       invite_token_for: { Args: { p_user_id: string }; Returns: string }
+      lead_facets: { Args: never; Returns: Json }
       rename_firm_taxonomy: {
         Args: { p_id: string; p_label: string; p_notes: string }
+        Returns: undefined
+      }
+      seed_consultation_types: {
+        Args: { p_firm_id: string }
         Returns: undefined
       }
       seed_firm_taxonomies: { Args: { p_firm_id: string }; Returns: undefined }
@@ -1976,4 +1988,3 @@ export const Constants = {
     },
   },
 } as const
-
