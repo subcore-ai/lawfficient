@@ -8,10 +8,13 @@ import { cn } from "@workspace/ui/lib/utils"
 // List ⇄ Calendar switch. Switching to Calendar drops the attorney/date/type params so the calendar
 // opens on its defaults (first attorney, today, first type).
 export function CalendarViewToggle({ view }: { view: "list" | "calendar" }) {
-  const item = "flex items-center gap-1.5 rounded-md px-3 py-1 font-medium transition-colors"
-  const active = "bg-background text-foreground shadow-sm"
+  // Mirrors the shared Tabs look (baseline border under the row, active item a subtle rounded pill). It's a
+  // URL nav (Links), not the in-page Tabs component, so it matches the style rather than reusing it.
+  const item =
+    "inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+  const active = "bg-muted text-foreground"
   return (
-    <div className="bg-muted text-muted-foreground mb-4 inline-flex items-center rounded-lg p-1 text-sm">
+    <div className="border-border mb-4 flex h-10 w-full items-center gap-1 border-b">
       <Link
         href="/consultations?view=list"
         aria-current={view === "list" ? "page" : undefined}
