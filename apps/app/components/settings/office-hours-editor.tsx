@@ -129,8 +129,10 @@ function AttorneyItem({ attorney, canManage }: { attorney: Attorney; canManage: 
   return (
     <AccordionItem value={attorney.id}>
       <AccordionTrigger>
-        <span className="flex-1 truncate">{attorney.name}</span>
-        <span className="text-muted-foreground hidden text-xs font-normal sm:inline">{attorney.email}</span>
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="truncate">{attorney.name}</span>
+          <span className="text-muted-foreground truncate text-xs font-normal">{attorney.email}</span>
+        </span>
       </AccordionTrigger>
       <AccordionPanel className="space-y-6">
         <WeeklyHoursEditor
