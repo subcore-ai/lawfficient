@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { CalendarControls } from "@/components/consultations/calendar-controls"
 import { DayCalendar } from "@/components/consultations/day-calendar-grid"
 import type { ConsultationType } from "@/lib/consultations/consultation-types"
+import { utcToZonedInput } from "@/lib/consultations/time"
 import type { ConsultationStatus } from "@/lib/consultations/validation"
 import type { CalendarColor } from "@/lib/scheduling/calendar-colors"
 import { buildDayCalendar, MAX_CALENDAR_COLUMNS, weekdayOf } from "@/lib/scheduling/day-calendar"
@@ -51,7 +52,6 @@ export function CalendarBoard({
   weekDates,
   initialSelected,
   date,
-  today,
   tz,
   slotDuration,
   slotTypeName,
@@ -65,7 +65,6 @@ export function CalendarBoard({
   weekDates: string[]
   initialSelected: string[]
   date: string
-  today: string
   tz: string
   slotDuration: number
   slotTypeName: string
@@ -178,6 +177,10 @@ export function CalendarBoard({
     })
 
   const hasContent = columns.some((c) => c.off || c.cal.windows.length > 0 || c.cal.consults.length > 0)
+
+  // Firm "today" derived from the ticking clock (not a frozen server snapshot) so the Today control stays
+  // correct even if the calendar is left open past midnight.
+  const today = utcToZonedInput(new Date(now).toISOString(), tz).slice(0, 10)
 
   return (
     <div className="space-y-4">
