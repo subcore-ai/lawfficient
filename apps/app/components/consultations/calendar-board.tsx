@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useRouter } from "next/navigation"
 
 import { CalendarControls } from "@/components/consultations/calendar-controls"
 import { DayCalendar } from "@/components/consultations/day-calendar-grid"
@@ -8,6 +9,7 @@ import type { ConsultationType } from "@/lib/consultations/consultation-types"
 import type { ConsultationStatus } from "@/lib/consultations/validation"
 import type { CalendarColor } from "@/lib/scheduling/calendar-colors"
 import { buildDayCalendar } from "@/lib/scheduling/day-calendar"
+import { createClient } from "@/lib/supabase/client"
 
 type Option = { id: string; name: string }
 
@@ -71,6 +73,7 @@ export function CalendarBoard({
   canBook: boolean
 }) {
   const [selected, setSelected] = React.useState<string[]>(initialSelected)
+  const router = useRouter()
 
   // If the firm's calendars change (an attorney removed), drop stale ids from the selection.
   const validSelected = selected.filter((id) => attorneyDays.some((a) => a.attorney.id === id))
@@ -84,6 +87,25 @@ export function CalendarBoard({
     setSelected(next)
     writeSelection(next)
   }
+
+  // Realtime: subscribe to consultation changes (Postgres Changes respects RLS, so only this firm's) and
+  // re-load the day from the server on a change — a booking / reschedule / cancel by anyone shows live.
+  // Debounced to coalesce bursts; the day's selection persists (React state) across the refresh.
+  React.useEffect(() => {
+    const supabase = createClient()
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const channel = supabase
+      .channel("consultations-calendar")
+      .on("postgres_changes", { event: "*", schema: "public", table: "consultations" }, () => {
+        if (timer) clearTimeout(timer)
+        timer = setTimeout(() => router.refresh(), 400)
+      })
+      .subscribe()
+    return () => {
+      if (timer) clearTimeout(timer)
+      void supabase.removeChannel(channel)
+    }
+  }, [router])
 
   // Build only the picked columns, in the browser — no server round-trip on toggle. (≤6 columns, cheap.)
   const columns = attorneyDays
