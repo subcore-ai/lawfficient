@@ -2,15 +2,14 @@
 
 import * as React from "react"
 
-import { Button } from "@workspace/ui/components/button"
 import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@workspace/ui/components/card"
+  Accordion,
+  AccordionItem,
+  AccordionPanel,
+  AccordionTrigger,
+} from "@workspace/ui/components/accordion"
+import { Button } from "@workspace/ui/components/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@workspace/ui/components/card"
 import {
   Select,
   SelectContent,
@@ -61,7 +60,11 @@ export function OfficeHoursEditor({
           {canManage ? " Add a team member above to get started." : ""}
         </p>
       ) : (
-        attorneys.map((a) => <AttorneyCard key={a.id} attorney={a} canManage={canManage} />)
+        <Accordion multiple>
+          {attorneys.map((a) => (
+            <AttorneyItem key={a.id} attorney={a} canManage={canManage} />
+          ))}
+        </Accordion>
       )}
     </div>
   )
@@ -112,7 +115,7 @@ function AddAttorney({ staff }: { staff: { id: string; name: string }[] }) {
   )
 }
 
-function AttorneyCard({ attorney, canManage }: { attorney: Attorney; canManage: boolean }) {
+function AttorneyItem({ attorney, canManage }: { attorney: Attorney; canManage: boolean }) {
   const [pending, startTransition] = React.useTransition()
   const [saving, setSaving] = React.useState(false)
 
@@ -124,19 +127,12 @@ function AttorneyCard({ attorney, canManage }: { attorney: Attorney; canManage: 
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{attorney.name}</CardTitle>
-        <CardDescription>{attorney.email}</CardDescription>
-        {canManage ? (
-          <CardAction>
-            <Button variant="ghost" size="sm" onClick={remove} disabled={pending || saving}>
-              Remove
-            </Button>
-          </CardAction>
-        ) : null}
-      </CardHeader>
-      <CardContent className="space-y-6">
+    <AccordionItem value={attorney.id}>
+      <AccordionTrigger>
+        <span className="flex-1 truncate">{attorney.name}</span>
+        <span className="text-muted-foreground hidden text-xs font-normal sm:inline">{attorney.email}</span>
+      </AccordionTrigger>
+      <AccordionPanel className="space-y-6">
         <WeeklyHoursEditor
           windows={attorney.windows}
           onSave={(w) => setAttorneyAvailability(attorney.id, w)}
@@ -152,7 +148,14 @@ function AttorneyCard({ attorney, canManage }: { attorney: Attorney; canManage: 
           <p className="text-sm font-medium">Calendar color</p>
           <CalendarColorPicker attorneyId={attorney.id} current={attorney.calendarColor} canEdit={canManage} />
         </div>
-      </CardContent>
-    </Card>
+        {canManage ? (
+          <div className="border-t pt-4">
+            <Button variant="ghost" size="sm" onClick={remove} disabled={pending || saving}>
+              Remove from scheduling
+            </Button>
+          </div>
+        ) : null}
+      </AccordionPanel>
+    </AccordionItem>
   )
 }
