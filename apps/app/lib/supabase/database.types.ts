@@ -17,27 +17,30 @@ export type Database = {
       api_idempotency_keys: {
         Row: {
           api_key_id: string
+          consultation_id: string | null
           created_at: string
           firm_id: string
           id: string
           idempotency_key: string
-          lead_id: string
+          lead_id: string | null
         }
         Insert: {
           api_key_id: string
+          consultation_id?: string | null
           created_at?: string
           firm_id: string
           id?: string
           idempotency_key: string
-          lead_id: string
+          lead_id?: string | null
         }
         Update: {
           api_key_id?: string
+          consultation_id?: string | null
           created_at?: string
           firm_id?: string
           id?: string
           idempotency_key?: string
-          lead_id?: string
+          lead_id?: string | null
         }
         Relationships: [
           {
@@ -45,6 +48,13 @@ export type Database = {
             columns: ["api_key_id"]
             isOneToOne: false
             referencedRelation: "api_keys"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "api_idempotency_keys_consultation_id_fkey"
+            columns: ["consultation_id"]
+            isOneToOne: false
+            referencedRelation: "consultations"
             referencedColumns: ["id"]
           },
           {
@@ -1612,6 +1622,41 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      api_book_consultation: {
+        Args: {
+          p_amount: number
+          p_api_key_id?: string
+          p_attorney_id: string
+          p_data: Json
+          p_duration_min: number
+          p_firm_id: string
+          p_idempotency_key?: string
+          p_lead_id: string
+          p_paid: boolean
+          p_start_at: string
+          p_time_zone: string
+          p_type: string
+        }
+        Returns: {
+          amount: number
+          archived: boolean
+          attorney_id: string
+          created_at: string
+          data: Json
+          duration_min: number
+          firm_id: string
+          id: string
+          last_activity: string
+          lead_id: string
+          outcome: string
+          paid: boolean
+          replayed: boolean
+          start_at: string
+          status: Database["public"]["Enums"]["consultation_status"]
+          time_zone: string
+          type: string
+        }[]
+      }
       api_create_lead: {
         Args: {
           p_api_key_id?: string
@@ -1643,6 +1688,46 @@ export type Database = {
           source: string
           status_id: string
         }[]
+      }
+      api_update_consultation: {
+        Args: {
+          p_attorney_id?: string
+          p_duration_min?: number
+          p_firm_id: string
+          p_id: string
+          p_reschedule?: boolean
+          p_start_at?: string
+          p_status?: Database["public"]["Enums"]["consultation_status"]
+          p_time_zone?: string
+        }
+        Returns: {
+          amount: number
+          archived: boolean
+          attorney_id: string
+          created_at: string
+          data: Json
+          duration_min: number
+          firm_id: string
+          id: string
+          last_activity: string
+          lead_id: string
+          outcome: string
+          paid: boolean
+          replayed: boolean
+          start_at: string
+          status: Database["public"]["Enums"]["consultation_status"]
+          time_zone: string
+          type: string
+        }[]
+      }
+      api_validate_booking: {
+        Args: {
+          p_attorney_id: string
+          p_duration_min: number
+          p_firm_id: string
+          p_start: string
+        }
+        Returns: undefined
       }
       authorize: {
         Args: {
@@ -1988,3 +2073,4 @@ export const Constants = {
     },
   },
 } as const
+
