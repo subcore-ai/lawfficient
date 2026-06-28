@@ -149,32 +149,27 @@ export async function setTaxonomyActive(id: string, isActive: boolean): Promise<
   return { ok: true }
 }
 
-export async function reorderTaxonomy(id: string, direction: "up" | "down"): Promise<ActionResult> {
+// Persist a full drag-and-drop reordering: `orderedIds` is every row in the category, in the new order.
+export async function reorderTaxonomies(category: string, orderedIds: string[]): Promise<ActionResult> {
   const gate = await requireAdmin()
   if (!gate.ok) return { error: gate.error }
+  if (!isCategory(category)) return { error: "Unknown category." }
+  if (orderedIds.length === 0) return { ok: true }
 
   const supabase = await createClient()
-  const { data: row } = await supabase
-    .from("firm_taxonomies")
-    .select("category, position")
-    .eq("id", id)
-    .single()
-  if (!row) return { error: "Couldn't reorder." }
+  // The ids must be EXACTLY this category's rows (a complete permutation). RLS scopes to the firm; this also
+  // rejects a stale list (a value added/removed in another tab) so we never persist a partial order.
+  const { data: rows, error: readErr } = await supabase.from("firm_taxonomies").select("id").eq("category", category)
+  if (readErr || !rows) return { error: "Couldn't reorder." }
+  const known = new Set(rows.map((r) => r.id))
+  const complete = orderedIds.length === known.size && orderedIds.every((id) => known.has(id))
+  if (!complete) return { error: "The list changed — refresh and try again." }
 
-  // The adjacent row in the same category to swap positions with.
-  const base = supabase.from("firm_taxonomies").select("id, position").eq("category", row.category)
-  const filtered = direction === "up" ? base.lt("position", row.position) : base.gt("position", row.position)
-  const { data: neighbor } = await filtered
-    .order("position", { ascending: direction === "down" })
-    .limit(1)
-    .maybeSingle()
-  if (!neighbor) return { ok: true } // already at the edge — no-op
-
-  // Swap positions (two updates; admin-only + rare, so non-atomicity is fine — position isn't unique).
-  const swap1 = await supabase.from("firm_taxonomies").update({ position: neighbor.position }).eq("id", id)
-  if (swap1.error) return { error: "Couldn't reorder." }
-  const swap2 = await supabase.from("firm_taxonomies").update({ position: row.position }).eq("id", neighbor.id)
-  if (swap2.error) return { error: "Couldn't reorder." }
+  // Write each row's position to its new index. Sequential updates (admin-only + rare; position isn't unique).
+  for (let i = 0; i < orderedIds.length; i++) {
+    const { error } = await supabase.from("firm_taxonomies").update({ position: i }).eq("id", orderedIds[i]!)
+    if (error) return { error: "Couldn't reorder." }
+  }
   revalidateTaxonomyViews(gate.user.firmId)
   return { ok: true }
 }
