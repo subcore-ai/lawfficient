@@ -70,8 +70,14 @@ export async function getApiConsultationsPage(
     query = query.eq("lead_id", filters.lead)
   }
 
-  // Keyset: rows strictly "after" the cursor in (created_at desc, id desc) order.
+  // Keyset: rows strictly "after" the cursor in (created_at desc, id desc) order. The cursor is opaque
+  // but client-supplied, so validate the decoded parts before embedding them in the PostgREST filter — a
+  // forged cursor must not be able to inject filter syntax. id is a uuid; createdAt is a timestamp with
+  // no filter metacharacters.
   if (cursor) {
+    if (!isUuid(cursor.id) || /[(),]/.test(cursor.createdAt) || Number.isNaN(Date.parse(cursor.createdAt))) {
+      return { data: [], next_cursor: null }
+    }
     query = query.or(
       `created_at.lt.${cursor.createdAt},and(created_at.eq.${cursor.createdAt},id.lt.${cursor.id})`,
     )

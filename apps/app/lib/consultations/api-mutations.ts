@@ -37,6 +37,7 @@ export type ConsultationMutationResult =
 // and NEVER throws — a webhook failure must never fail the write. No-ops on an empty event list.
 export function emitConsultationEvents(firmId: string, consultationId: string, types: WebhookEventType[]) {
   if (types.length === 0) return
+  if (!firmId) return // best-effort: never run a firm-scoped read without firm context
   after(async () => {
     try {
       const admin = createAdminClient()
@@ -260,6 +261,17 @@ export async function updateConsultationViaApi(
     }
   }
   const canceling = patch.status === "canceled"
+
+  // Reschedule and cancel are distinct API operations; combining them is ambiguous (you don't move a
+  // consult you're canceling) and would make the cancel needlessly re-validate the new slot. Reject it.
+  if (rescheduling && canceling) {
+    return {
+      ok: false,
+      status: 422,
+      code: "invalid_request",
+      message: "Reschedule and cancel can't be combined in one request.",
+    }
+  }
 
   if (!rescheduling && !canceling) {
     return { ok: false, status: 422, code: "invalid_request", message: "Nothing to update." }
