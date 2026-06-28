@@ -232,7 +232,6 @@ async function renderCalendar({
       weekDates={weekDates}
       initialSelected={initialSelected}
       date={date}
-      today={currentDateInZone(zone)}
       tz={zone}
       slotDuration={selectedType.durationMin}
       slotTypeName={selectedType.name}
