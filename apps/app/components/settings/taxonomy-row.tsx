@@ -39,9 +39,11 @@ export function TaxonomyRowContent({
 }) {
   const [pending, startTransition] = React.useTransition()
   function toggleActive() {
+    const activating = !option.isActive
     startTransition(async () => {
-      const res = await setTaxonomyActive(option.id, !option.isActive)
+      const res = await setTaxonomyActive(option.id, activating)
       if ("error" in res) toast.error(res.error)
+      else toast.success(activating ? "Activated" : "Deactivated")
     })
   }
   return (

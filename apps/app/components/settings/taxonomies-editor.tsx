@@ -36,6 +36,11 @@ const SortableTaxonomyList = React.lazy(() =>
   import("@/components/settings/sortable-taxonomy-list").then((m) => ({ default: m.SortableTaxonomyList })),
 )
 
+// Client detection without a setState-in-effect: false on the server + during hydration, true afterward.
+const subscribeNoop = () => () => {}
+const snapshotTrue = () => true
+const snapshotFalse = () => false
+
 function CreateTaxonomyDialog({ category, noun }: { category: TaxonomyCategory; noun: string }) {
   const [open, setOpen] = React.useState(false)
   const [pending, startTransition] = React.useTransition()
@@ -124,6 +129,10 @@ export function TaxonomySection({
   options: TaxonomyOption[]
   canManage: boolean
 }) {
+  // dnd-kit isn't SSR-stable (it generates non-deterministic aria ids), so mount the draggable list on the
+  // client only. SSR + first paint render the deterministic static list (no hydration mismatch); after
+  // hydration `mounted` flips true and we swap to the lazy-loaded sortable list.
+  const mounted = React.useSyncExternalStore(subscribeNoop, snapshotTrue, snapshotFalse)
   return (
     <Card>
       <CardHeader>
@@ -140,12 +149,12 @@ export function TaxonomySection({
           <p className="text-muted-foreground rounded-lg border border-dashed p-6 text-center text-sm">
             No values yet.
           </p>
-        ) : canManage ? (
+        ) : canManage && mounted ? (
           <React.Suspense fallback={<StaticTaxonomyList options={options} canManage />}>
             <SortableTaxonomyList category={category} options={options} />
           </React.Suspense>
         ) : (
-          <StaticTaxonomyList options={options} canManage={false} />
+          <StaticTaxonomyList options={options} canManage={canManage} />
         )}
       </CardContent>
     </Card>
