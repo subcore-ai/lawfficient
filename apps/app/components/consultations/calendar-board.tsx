@@ -48,7 +48,6 @@ function writeSelection(ids: string[]) {
 
 export function CalendarBoard({
   attorneyWeeks,
-  weekStart,
   weekDates,
   initialSelected,
   date,
@@ -63,7 +62,6 @@ export function CalendarBoard({
   canBook,
 }: {
   attorneyWeeks: AttorneyWeek[]
-  weekStart: string
   weekDates: string[]
   initialSelected: string[]
   date: string
@@ -83,12 +81,17 @@ export function CalendarBoard({
   // The viewed day within the loaded week — paged client-side. When the server loads a different week (a
   // cross-week jump), reset to that week's anchor. adjust-during-render: React re-renders immediately, no effect.
   const [selectedDate, setSelectedDate] = React.useState(date)
-  const [loadedWeek, setLoadedWeek] = React.useState(weekStart)
+  // Follow the server's date whenever a REAL navigation changes it — cross-week, OR a same-week deep link /
+  // back-forward (the case a week-only check missed). Within-week paging uses replaceState (no server
+  // re-render), so `date` is unchanged there and the explicit setSelectedDate in goToDate stands. Reconciling
+  // here (vs a key={date} remount) keeps the realtime subscription + picked calendars + clock alive — a
+  // realtime refresh re-reads the replaceState'd ?date=, which would otherwise remount the whole board.
+  const [serverDate, setServerDate] = React.useState(date)
   // Tick a client clock (seeded from the server for a flicker-free first paint) so paging days client-side
   // never reuses a frozen "now" — today's past slots stop being bookable as time passes, no nav/refresh.
   const [now, setNow] = React.useState(nowMs)
-  if (weekStart !== loadedWeek) {
-    setLoadedWeek(weekStart)
+  if (date !== serverDate) {
+    setServerDate(date)
     setSelectedDate(date)
   }
 

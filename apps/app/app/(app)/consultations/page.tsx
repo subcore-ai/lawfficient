@@ -229,7 +229,6 @@ async function renderCalendar({
   return (
     <CalendarBoard
       attorneyWeeks={attorneyWeeks}
-      weekStart={weekStart}
       weekDates={weekDates}
       initialSelected={initialSelected}
       date={date}
