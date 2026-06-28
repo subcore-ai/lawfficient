@@ -12,15 +12,13 @@ import { mapConsultationTypeRow, type ConsultationType } from "@/lib/consultatio
 import { mapConsultationRow, partitionConsultations } from "@/lib/consultations/queries"
 import { currentDateInZone, zonedWallTimeToUtcISO } from "@/lib/consultations/time"
 import { colorFor } from "@/lib/scheduling/calendar-colors"
-import { weekdayOf } from "@/lib/scheduling/day-calendar"
+import { MAX_CALENDAR_COLUMNS, weekdayOf } from "@/lib/scheduling/day-calendar"
 import { isSupabaseConfigured } from "@/lib/supabase/env"
 import { createClient } from "@/lib/supabase/server"
 
 export const metadata = { title: "Consultations" }
 
 const DEFAULT_TZ = "America/New_York"
-// Cap simultaneous attorney columns so the day grid stays legible.
-const MAX_COLUMNS = 6
 
 // Shift a calendar date by N days (string math in UTC — only the Y-M-D matters).
 function addDay(date: string, n = 1): string {
@@ -141,14 +139,23 @@ async function renderCalendar({
     )
   }
 
-  // Picked calendars come from a cookie (CalendarBoard filters client-side); validate + cap, default the
-  // first few. ALL schedulable calendars are loaded below so toggling never hits the server.
-  const saved = (await cookies()).get("consultations.calendars")?.value
+  // Picked calendars + the viewed day both come from cookies (CalendarBoard filters client-side; the day is
+  // server-read so there's no flash). Validate + cap, default the first few. ALL schedulable calendars are
+  // loaded below so toggling never hits the server.
+  const cookieStore = await cookies()
+  const saved = cookieStore.get("consultations.calendars")?.value
+  const savedDate = cookieStore.get("consultations.calendarDate")?.value
   const requested = saved ? saved.split(".") : []
   const valid = Array.from(new Set(requested)).filter((id) => schedulable.some((a) => a.id === id))
-  const initialSelected = (valid.length ? valid : schedulable.slice(0, 3).map((a) => a.id)).slice(0, MAX_COLUMNS)
+  const initialSelected = (valid.length ? valid : schedulable.slice(0, 3).map((a) => a.id)).slice(0, MAX_CALENDAR_COLUMNS)
   const allIds = schedulable.map((a) => a.id)
-  const date = typeof sp.date === "string" && isValidYmd(sp.date) ? sp.date : currentDateInZone(zone)
+  // Day precedence: an explicit ?date= (nav / shared link) wins, else the remembered day, else firm-today.
+  const date =
+    typeof sp.date === "string" && isValidYmd(sp.date)
+      ? sp.date
+      : savedDate && isValidYmd(savedDate)
+        ? savedDate
+        : currentDateInZone(zone)
   // The calendar slots default to the first active type's length; the actual type is chosen when booking.
   const selectedType = types[0]!
 

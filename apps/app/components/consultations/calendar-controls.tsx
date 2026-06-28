@@ -10,13 +10,13 @@ import { Input } from "@workspace/ui/components/input"
 import { Popover, PopoverContent, PopoverTrigger } from "@workspace/ui/components/popover"
 import { cn } from "@workspace/ui/lib/utils"
 
+import { MAX_CALENDAR_COLUMNS } from "@/lib/scheduling/day-calendar"
+
 type Option = { id: string; name: string }
 
-// Keep in step with MAX_COLUMNS in the consultations page / CalendarBoard.
-const MAX_ATTORNEYS = 6
-// Remember the viewed day within the session, so a tab switch doesn't reset it. (Calendars are remembered
-// separately, in a cookie, by CalendarBoard.)
-const DATE_KEY = "consultations.calendarDate"
+// Remember the viewed day in a cookie so the server renders it on the next visit (no flash, no client-side
+// re-nav). Calendars are remembered the same way, by CalendarBoard.
+const DATE_COOKIE = "consultations.calendarDate"
 
 // Calendar filters / nav: a calendars multi-select (search + checkboxes; the selection is owned by
 // CalendarBoard, which filters client-side — toggling never hits the server) + the day. Day changes rewrite
@@ -45,27 +45,14 @@ export function CalendarControls({
       const params = new URLSearchParams(window.location.search)
       params.set("view", "calendar")
       params.set("date", d)
-      window.sessionStorage.setItem(DATE_KEY, d)
+      // Remember the day server-side so a later visit with no ?date= still opens here (no flash).
+      document.cookie = `${DATE_COOKIE}=${d}; path=/; max-age=31536000; samesite=lax`
       router.push(`${pathname}?${params.toString()}`)
     },
     [pathname, router],
   )
 
-  // On a visit without an explicit ?date=, re-apply the remembered day (once; replace = no back-trap).
-  const applied = React.useRef(false)
-  React.useEffect(() => {
-    if (applied.current) return
-    applied.current = true
-    const params = new URLSearchParams(window.location.search)
-    if (params.has("date")) return
-    const savedDate = window.sessionStorage.getItem(DATE_KEY)
-    if (savedDate && /^\d{4}-\d{2}-\d{2}$/.test(savedDate) && savedDate !== date) {
-      params.set("date", savedDate)
-      router.replace(`${pathname}?${params.toString()}`)
-    }
-  }, [date, pathname, router])
-
-  const atCap = selected.length >= MAX_ATTORNEYS
+  const atCap = selected.length >= MAX_CALENDAR_COLUMNS
 
   function shift(days: number): string {
     const d = new Date(`${date}T00:00:00Z`)

@@ -8,6 +8,10 @@ import { utcToZonedInput, zonedWallTimeToUtcISO } from "@/lib/consultations/time
 
 const MS_PER_MIN = 60_000
 
+// Max attorney columns the day grid shows at once (keeps it legible). Shared by the page (initial slice),
+// the board (selection cap), and the picker so the client and server caps can't silently drift.
+export const MAX_CALENDAR_COLUMNS = 6
+
 // Firm-tz wall minutes-of-day (0..1439) for a UTC instant.
 function wallMinutes(utcMs: number, tz: string): number {
   const parts = new Intl.DateTimeFormat("en-US", {
