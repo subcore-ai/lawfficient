@@ -35,9 +35,19 @@ export type ApiKeyRow = {
 }
 
 // Human label for a scope (the raw value is what the API checks).
-const SCOPE_LABEL: Record<ApiScope, string> = { "leads:read": "Read leads", "leads:write": "Write leads" }
+const SCOPE_LABEL: Record<ApiScope, string> = {
+  "leads:read": "Read leads",
+  "leads:write": "Write leads",
+  "consultations:read": "Read consultations",
+  "consultations:write": "Write consultations",
+}
 // Least-privilege default for a new key (read only).
-const DEFAULT_SCOPES: Record<ApiScope, boolean> = { "leads:read": true, "leads:write": false }
+const DEFAULT_SCOPES: Record<ApiScope, boolean> = {
+  "leads:read": true,
+  "leads:write": false,
+  "consultations:read": true,
+  "consultations:write": false,
+}
 
 function CopyButton({ value, label = "Copy" }: { value: string; label?: string }) {
   return (

@@ -220,6 +220,166 @@ export const openapiDocument = {
         },
       },
     },
+    "/consultations": {
+      get: {
+        operationId: "listConsultations",
+        summary: "List consultations",
+        description:
+          "Lists the firm's consultations, newest first, cursor-paginated and filterable. Non-archived " +
+          "by default; pass `archived=true` for archived only.",
+        security: [{ apiKey: ["consultations:read"] }],
+        parameters: [
+          { $ref: "#/components/parameters/VersionHeader" },
+          { $ref: "#/components/parameters/Limit" },
+          { $ref: "#/components/parameters/Cursor" },
+          {
+            name: "attorney",
+            in: "query",
+            required: false,
+            description: "Filter by attorney id (UUID).",
+            schema: { type: "string", format: "uuid" },
+          },
+          {
+            name: "lead",
+            in: "query",
+            required: false,
+            description: "Filter by lead id (UUID).",
+            schema: { type: "string", format: "uuid" },
+          },
+          {
+            name: "status",
+            in: "query",
+            required: false,
+            description: "Filter by lifecycle status.",
+            schema: {
+              type: "string",
+              enum: ["scheduled", "paid", "completed", "rescheduled", "canceled", "no_show"],
+            },
+          },
+          {
+            name: "archived",
+            in: "query",
+            required: false,
+            description: "`true` returns archived consultations only; otherwise non-archived are returned.",
+            schema: { type: "boolean" },
+          },
+        ],
+        responses: {
+          "200": {
+            description: "A page of consultations.",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["data", "next_cursor"],
+                  properties: {
+                    data: { type: "array", items: { $ref: "#/components/schemas/Consultation" } },
+                    next_cursor: {
+                      type: ["string", "null"],
+                      description: "Opaque cursor for the next page, or null on the last page.",
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "400": { $ref: "#/components/responses/Error" },
+          "401": { $ref: "#/components/responses/Error" },
+          "403": { $ref: "#/components/responses/Error" },
+          "429": { $ref: "#/components/responses/Error" },
+        },
+      },
+      post: {
+        operationId: "bookConsultation",
+        summary: "Book a consultation",
+        description:
+          "Books a consultation into one of an attorney's free slots. The requested time is validated " +
+          "against the attorney's office hours and time-off for that day, and the database guarantees no " +
+          "double-booking — a slot already taken returns 409. `start_at` is a UTC instant. An optional " +
+          "`Idempotency-Key` header makes a retry safe: a repeat with the same key replays the original " +
+          "201 instead of booking a second consultation. Returns the booked consultation (201) and emits " +
+          "`consultation.booked`.",
+        security: [{ apiKey: ["consultations:write"] }],
+        parameters: [
+          { $ref: "#/components/parameters/VersionHeader" },
+          { $ref: "#/components/parameters/IdempotencyKey" },
+        ],
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { $ref: "#/components/schemas/ConsultationCreate" } } },
+        },
+        responses: {
+          "201": {
+            description: "The booked consultation.",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/Consultation" } } },
+          },
+          "400": { $ref: "#/components/responses/Error" },
+          "401": { $ref: "#/components/responses/Error" },
+          "403": { $ref: "#/components/responses/Error" },
+          "409": { $ref: "#/components/responses/Error" },
+          "413": { $ref: "#/components/responses/Error" },
+          "422": { $ref: "#/components/responses/Error" },
+          "429": { $ref: "#/components/responses/Error" },
+          "503": { $ref: "#/components/responses/Error" },
+        },
+      },
+    },
+    "/consultations/{id}": {
+      get: {
+        operationId: "getConsultation",
+        summary: "Get a consultation",
+        description:
+          "Returns a single firm-scoped consultation. A consultation from another firm returns 404.",
+        security: [{ apiKey: ["consultations:read"] }],
+        parameters: [
+          { $ref: "#/components/parameters/VersionHeader" },
+          { $ref: "#/components/parameters/ConsultationId" },
+        ],
+        responses: {
+          "200": {
+            description: "The consultation.",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/Consultation" } } },
+          },
+          "401": { $ref: "#/components/responses/Error" },
+          "403": { $ref: "#/components/responses/Error" },
+          "404": { $ref: "#/components/responses/Error" },
+          "429": { $ref: "#/components/responses/Error" },
+        },
+      },
+      patch: {
+        operationId: "updateConsultation",
+        summary: "Reschedule or cancel a consultation",
+        description:
+          "Reschedules a consultation (send any of `start_at`, `duration_min`, `attorney_id`, " +
+          "`time_zone` — the new slot is re-validated against office hours, time-off, and the no-double-" +
+          "book guard) and/or cancels it (send `status: \"canceled\"`). Only a non-terminal consultation " +
+          "can change; a finalized or other-firm consultation returns 404. Returns the updated " +
+          "consultation and emits `consultation.rescheduled` and/or `consultation.canceled`.",
+        security: [{ apiKey: ["consultations:write"] }],
+        parameters: [
+          { $ref: "#/components/parameters/VersionHeader" },
+          { $ref: "#/components/parameters/ConsultationId" },
+        ],
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { $ref: "#/components/schemas/ConsultationPatch" } } },
+        },
+        responses: {
+          "200": {
+            description: "The updated consultation.",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/Consultation" } } },
+          },
+          "400": { $ref: "#/components/responses/Error" },
+          "401": { $ref: "#/components/responses/Error" },
+          "403": { $ref: "#/components/responses/Error" },
+          "404": { $ref: "#/components/responses/Error" },
+          "409": { $ref: "#/components/responses/Error" },
+          "413": { $ref: "#/components/responses/Error" },
+          "422": { $ref: "#/components/responses/Error" },
+          "429": { $ref: "#/components/responses/Error" },
+        },
+      },
+    },
   },
   components: {
     securitySchemes: {
@@ -253,6 +413,13 @@ export const openapiDocument = {
         in: "path",
         required: true,
         description: "Lead id (UUID).",
+        schema: { type: "string", format: "uuid" },
+      },
+      ConsultationId: {
+        name: "id",
+        in: "path",
+        required: true,
+        description: "Consultation id (UUID).",
         schema: { type: "string", format: "uuid" },
       },
       Limit: {
@@ -382,6 +549,93 @@ export const openapiDocument = {
           },
           status: { type: "string", description: "The firm-defined status key to move the lead to." },
           data: { $ref: "#/components/schemas/LeadData" },
+        },
+      },
+      Consultation: {
+        type: "object",
+        required: [
+          "id",
+          "lead_id",
+          "attorney_id",
+          "type",
+          "status",
+          "start_at",
+          "duration_min",
+          "time_zone",
+          "paid",
+          "amount",
+          "outcome",
+          "archived",
+          "created_at",
+          "data",
+        ],
+        properties: {
+          id: { type: "string", format: "uuid" },
+          lead_id: { type: ["string", "null"], format: "uuid", description: "The lead this consult is for." },
+          attorney_id: { type: ["string", "null"], format: "uuid" },
+          type: { type: "string", description: "The consultation type name." },
+          status: {
+            type: "string",
+            enum: ["scheduled", "paid", "completed", "rescheduled", "canceled", "no_show"],
+            description: "Booking lifecycle status.",
+          },
+          start_at: { type: "string", format: "date-time", description: "Start instant (UTC)." },
+          duration_min: { type: "integer" },
+          time_zone: { type: "string", description: "IANA time zone the consult is shown in." },
+          paid: { type: "boolean", description: "Payment status (track-only)." },
+          amount: { type: ["number", "null"], description: "Charge amount, or null." },
+          outcome: { type: ["string", "null"], description: "Post-consult qualification, or null." },
+          archived: { type: "boolean" },
+          created_at: { type: "string", format: "date-time" },
+          data: {
+            type: "object",
+            additionalProperties: true,
+            description: "Practice-specific extra fields (schemaless).",
+          },
+        },
+      },
+      ConsultationCreate: {
+        type: "object",
+        description:
+          "Booking payload. The slot must fall within the attorney's office hours for that day and not " +
+          "overlap an existing consultation or the attorney's time-off.",
+        required: ["lead_id", "attorney_id", "type", "start_at", "duration_min"],
+        properties: {
+          lead_id: { type: "string", format: "uuid", description: "The lead this consult is for." },
+          attorney_id: {
+            type: "string",
+            format: "uuid",
+            description: "A schedulable, active attorney in the firm.",
+          },
+          type: { type: "string", description: "The consultation type name (free text)." },
+          start_at: { type: "string", format: "date-time", description: "Start instant (UTC)." },
+          duration_min: { type: "integer", minimum: 5, maximum: 1440 },
+          time_zone: {
+            type: "string",
+            description: "IANA time zone (defaults to America/New_York).",
+          },
+          paid: { type: "boolean", description: "Payment status (track-only). Defaults to false." },
+          amount: { type: ["number", "null"], minimum: 0, description: "Charge amount, or null." },
+          data: {
+            type: "object",
+            additionalProperties: true,
+            description: "Practice-specific extra fields (schemaless).",
+          },
+        },
+      },
+      ConsultationPatch: {
+        type: "object",
+        description:
+          "Reschedule and/or cancel payload. Only the keys present are changed. Sending any of " +
+          "`start_at` / `duration_min` / `attorney_id` / `time_zone` reschedules (re-validated against " +
+          "office hours, time-off, and the no-double-book guard). `status` may only be set to " +
+          "\"canceled\".",
+        properties: {
+          start_at: { type: "string", format: "date-time", description: "New start instant (UTC)." },
+          duration_min: { type: "integer", minimum: 5, maximum: 1440 },
+          attorney_id: { type: "string", format: "uuid", description: "Reassign to another attorney." },
+          time_zone: { type: "string", description: "Update the display time zone." },
+          status: { type: "string", enum: ["canceled"], description: "Set to \"canceled\" to cancel." },
         },
       },
       Error: {

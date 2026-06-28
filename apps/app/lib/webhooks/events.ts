@@ -18,9 +18,16 @@ export const LEAD_EVENT_TYPES = [
   "lead.archived",
 ] as const
 
-// The full catalog (= every resource's events). Today it's just the lead events; future resources
-// concatenate their own tuples here.
-export const WEBHOOK_EVENT_TYPES = [...LEAD_EVENT_TYPES] as const
+// Consultation lifecycle events (spec 13 + 26). Booked on create; rescheduled on a slot/attorney move;
+// canceled when the consult is canceled. (Complete / no-show are in-app outcomes, not API mutations.)
+export const CONSULTATION_EVENT_TYPES = [
+  "consultation.booked",
+  "consultation.rescheduled",
+  "consultation.canceled",
+] as const
+
+// The full catalog (= every resource's events). Future resources concatenate their own tuples here.
+export const WEBHOOK_EVENT_TYPES = [...LEAD_EVENT_TYPES, ...CONSULTATION_EVENT_TYPES] as const
 
 export type WebhookEventType = (typeof WEBHOOK_EVENT_TYPES)[number]
 
