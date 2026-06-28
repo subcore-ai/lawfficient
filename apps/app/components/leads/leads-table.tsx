@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { ChevronLeft, ChevronRight, Phone, Search } from "lucide-react"
 
 import { Button } from "@workspace/ui/components/button"
+import { Card, CardContent } from "@workspace/ui/components/card"
 import { Input } from "@workspace/ui/components/input"
 import {
   Select,
@@ -151,20 +152,31 @@ export function LeadsTable({
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
         {statuses.map((stage) => {
           const active = filters.status === stage.id
+          const toggle = () => setParams({ status: active ? null : stage.id })
           return (
-            <button
+            <Card
               key={stage.id}
-              type="button"
+              size="sm"
+              role="button"
+              tabIndex={0}
               aria-pressed={active}
-              onClick={() => setParams({ status: active ? null : stage.id })}
+              onClick={toggle}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault()
+                  toggle()
+                }
+              }}
               className={cn(
-                "bg-card focus-visible:outline-ring rounded-lg px-3 py-2.5 text-left ring-1 transition outline-none focus-visible:outline-2 focus-visible:outline-offset-2",
-                active ? "ring-foreground/40" : "ring-foreground/10 hover:ring-foreground/25",
+                "focus-visible:outline-ring cursor-pointer outline-none transition focus-visible:outline-2 focus-visible:outline-offset-2",
+                active ? "ring-2 ring-foreground/40" : "hover:ring-foreground/25",
               )}
             >
-              <div className="text-2xl font-semibold tabular-nums">{statusCounts[stage.id] ?? 0}</div>
-              <div className="text-muted-foreground mt-0.5 text-xs leading-tight">{stage.name}</div>
-            </button>
+              <CardContent>
+                <div className="text-2xl font-semibold tabular-nums">{statusCounts[stage.id] ?? 0}</div>
+                <div className="text-muted-foreground mt-0.5 text-xs leading-tight">{stage.name}</div>
+              </CardContent>
+            </Card>
           )
         })}
       </div>
