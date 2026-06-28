@@ -14,7 +14,7 @@ export function CalendarViewToggle({ view }: { view: "list" | "calendar" }) {
     "inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
   const active = "bg-muted text-foreground"
   return (
-    <div className="border-border mb-4 flex h-10 w-full items-center gap-1 border-b">
+    <div className="mb-4 flex h-10 w-full items-center gap-1">
       <Link
         href="/consultations?view=list"
         aria-current={view === "list" ? "page" : undefined}
