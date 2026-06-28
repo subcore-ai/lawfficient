@@ -38,10 +38,12 @@ type Attorney = {
 export function OfficeHoursEditor({
   attorneys,
   addableStaff,
+  firmHolidays,
   canManage,
 }: {
   attorneys: Attorney[]
   addableStaff: { id: string; name: string }[]
+  firmHolidays: TimeOff[]
   canManage: boolean
 }) {
   return (
@@ -51,6 +53,21 @@ export function OfficeHoursEditor({
         inside these hours — the booking calendar uses them to offer available times. Attorneys can also
         edit their own hours from their profile.
       </p>
+
+      {canManage || firmHolidays.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Firm holidays</CardTitle>
+            <CardDescription>
+              Days the whole firm is closed — each removes that date from every attorney&apos;s calendar, so
+              you don&apos;t have to add it to everyone individually.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <TimeOffManager attorneyId={null} entries={firmHolidays} canEdit={canManage} noun="holiday" />
+          </CardContent>
+        </Card>
+      ) : null}
 
       {canManage && addableStaff.length > 0 ? <AddAttorney staff={addableStaff} /> : null}
 

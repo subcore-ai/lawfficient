@@ -205,7 +205,7 @@ export type Database = {
       }
       availability_exceptions: {
         Row: {
-          attorney_id: string
+          attorney_id: string | null
           created_at: string
           end_date: string
           firm_id: string
@@ -213,7 +213,7 @@ export type Database = {
           start_date: string
         }
         Insert: {
-          attorney_id: string
+          attorney_id?: string | null
           created_at?: string
           end_date: string
           firm_id?: string
@@ -221,7 +221,7 @@ export type Database = {
           start_date: string
         }
         Update: {
-          attorney_id?: string
+          attorney_id?: string | null
           created_at?: string
           end_date?: string
           firm_id?: string

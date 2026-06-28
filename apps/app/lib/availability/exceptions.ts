@@ -6,7 +6,7 @@ type ExceptionRow = Database["public"]["Tables"]["availability_exceptions"]["Row
 
 export type TimeOff = {
   id: string
-  attorneyId: string
+  attorneyId: string | null // null = a firm-wide holiday (closes the date for every attorney)
   startDate: string // YYYY-MM-DD (inclusive)
   endDate: string // YYYY-MM-DD (inclusive)
 }

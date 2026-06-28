@@ -39,6 +39,7 @@ export default async function SettingsSchedulingPage() {
 
   const windows = (avail ?? []).map(mapAvailabilityRow)
   const timeOff = (offRes.data ?? []).map(mapExceptionRow)
+  const firmHolidays = timeOff.filter((t) => t.attorneyId === null)
   const attorneys = (staff ?? [])
     .filter((s) => s.schedulable)
     .map((s) => ({
@@ -53,5 +54,12 @@ export default async function SettingsSchedulingPage() {
     .filter((s) => !s.schedulable && s.status === "active")
     .map((s) => ({ id: s.id, name: s.name }))
 
-  return <OfficeHoursEditor attorneys={attorneys} addableStaff={addableStaff} canManage={canManage} />
+  return (
+    <OfficeHoursEditor
+      attorneys={attorneys}
+      addableStaff={addableStaff}
+      firmHolidays={firmHolidays}
+      canManage={canManage}
+    />
+  )
 }
