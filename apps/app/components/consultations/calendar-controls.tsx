@@ -14,8 +14,10 @@ type Option = { id: string; name: string }
 
 // Keep in step with MAX_COLUMNS in the consultations page.
 const MAX_ATTORNEYS = 6
-// Remember the picked calendars across visits (the URL stays the source of truth for the server load).
+// Remember the picked calendars (across visits, localStorage) + the viewed day (within the session, so a
+// tab switch doesn't reset it) — the URL stays the source of truth for the server load.
 const STORAGE_KEY = "consultations.calendars"
+const DATE_KEY = "consultations.calendarDate"
 
 // Calendar filters / nav: a calendars multi-select (search + checkboxes, 1–N columns) + the day. Each
 // change rewrites the URL searchParams (the server re-loads the day) AND mirrors the picked calendars to
@@ -45,6 +47,7 @@ export function CalendarControls({
       q.set("attorneys", ids.join(","))
       q.set("date", next.date ?? date)
       if (next.attorneys) window.localStorage.setItem(STORAGE_KEY, ids.join(","))
+      if (next.date) window.sessionStorage.setItem(DATE_KEY, next.date)
       router.push(`${pathname}?${q.toString()}`)
     },
     [attorneyIds, date, pathname, router],
@@ -56,18 +59,26 @@ export function CalendarControls({
     if (applied.current) return
     applied.current = true
     const params = new URLSearchParams(window.location.search)
-    if (params.has("attorneys")) return
-    const saved = window.localStorage.getItem(STORAGE_KEY)
-    if (!saved) return
-    const ids = saved
-      .split(",")
-      .filter((id) => attorneys.some((a) => a.id === id))
-      .slice(0, MAX_ATTORNEYS)
-    if (ids.length && ids.join(",") !== attorneyIds.join(",")) {
-      params.set("attorneys", ids.join(","))
-      router.replace(`${pathname}?${params.toString()}`) // replace: no history entry, no back-trap
+    let changed = false
+    if (!params.has("attorneys")) {
+      const saved = window.localStorage.getItem(STORAGE_KEY)
+      const ids = saved
+        ? saved.split(",").filter((id) => attorneys.some((a) => a.id === id)).slice(0, MAX_ATTORNEYS)
+        : []
+      if (ids.length && ids.join(",") !== attorneyIds.join(",")) {
+        params.set("attorneys", ids.join(","))
+        changed = true
+      }
     }
-  }, [attorneys, attorneyIds, pathname, router])
+    if (!params.has("date")) {
+      const savedDate = window.sessionStorage.getItem(DATE_KEY)
+      if (savedDate && /^\d{4}-\d{2}-\d{2}$/.test(savedDate) && savedDate !== date) {
+        params.set("date", savedDate)
+        changed = true
+      }
+    }
+    if (changed) router.replace(`${pathname}?${params.toString()}`) // replace: no history entry, no back-trap
+  }, [attorneys, attorneyIds, date, pathname, router])
 
   const atCap = attorneyIds.length >= MAX_ATTORNEYS
 
