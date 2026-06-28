@@ -84,6 +84,9 @@ export function CalendarBoard({
   // cross-week jump), reset to that week's anchor. adjust-during-render: React re-renders immediately, no effect.
   const [selectedDate, setSelectedDate] = React.useState(date)
   const [loadedWeek, setLoadedWeek] = React.useState(weekStart)
+  // Tick a client clock (seeded from the server for a flicker-free first paint) so paging days client-side
+  // never reuses a frozen "now" — today's past slots stop being bookable as time passes, no nav/refresh.
+  const [now, setNow] = React.useState(nowMs)
   if (weekStart !== loadedWeek) {
     setLoadedWeek(weekStart)
     setSelectedDate(date)
@@ -149,6 +152,12 @@ export function CalendarBoard({
     }
   }, [router])
 
+  // Keep "now" current (1-minute tick) so today's past slots drop off even while paging days client-side.
+  React.useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 60_000)
+    return () => clearInterval(id)
+  }, [])
+
   // Build the picked columns for the viewed day, in the browser. buildDayCalendar shows only same-day-start
   // consults and ignores non-overlapping ones, so handing it the whole week's consults is safe. (≤6 columns.)
   const weekday = weekdayOf(selectedDate)
@@ -159,7 +168,7 @@ export function CalendarBoard({
       const windows = off ? [] : (a.hoursByWeekday[weekday] ?? [])
       return {
         attorney: a.attorney,
-        cal: buildDayCalendar({ date: selectedDate, tz, windows, consults: a.consults, durationMin: slotDuration, nowMs }),
+        cal: buildDayCalendar({ date: selectedDate, tz, windows, consults: a.consults, durationMin: slotDuration, nowMs: now }),
         off,
         color: a.color,
       }
