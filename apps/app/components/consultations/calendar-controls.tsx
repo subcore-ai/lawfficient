@@ -111,10 +111,10 @@ export function CalendarControls({
       : `${attorneyIds.length} calendar${attorneyIds.length === 1 ? "" : "s"}`
 
   return (
-    <div className="space-y-3">
+    <div className="flex flex-wrap items-center gap-1">
       {attorneys.length > 1 ? (
         <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger render={<Button type="button" variant="outline" size="sm" className="justify-between gap-2" />}>
+          <PopoverTrigger render={<Button type="button" variant="outline" size="default" className="mr-1 justify-between gap-2" />}>
             <span className="inline-flex items-center gap-1.5">
               <CalendarDays className="size-4" /> {triggerLabel}
             </span>
@@ -157,18 +157,16 @@ export function CalendarControls({
         </Popover>
       ) : null}
 
-      <div className="flex items-center gap-1">
-        <Button variant="outline" size="icon" onClick={() => go({ date: shift(-1) })} aria-label="Previous day">
-          <ChevronLeft className="size-4" />
-        </Button>
-        <Button variant="outline" size="default" onClick={() => go({ date: today })} disabled={date === today}>
-          Today
-        </Button>
-        <Button variant="outline" size="icon" onClick={() => go({ date: shift(1) })} aria-label="Next day">
-          <ChevronRight className="size-4" />
-        </Button>
-        <span className="text-foreground ml-2 inline-block min-w-[9rem] text-sm font-medium">{dateLabel}</span>
-      </div>
+      <Button variant="outline" size="icon" onClick={() => go({ date: shift(-1) })} aria-label="Previous day">
+        <ChevronLeft className="size-4" />
+      </Button>
+      <Button variant="outline" size="default" onClick={() => go({ date: today })} disabled={date === today}>
+        Today
+      </Button>
+      <Button variant="outline" size="icon" onClick={() => go({ date: shift(1) })} aria-label="Next day">
+        <ChevronRight className="size-4" />
+      </Button>
+      <span className="text-foreground ml-2 inline-block min-w-[9rem] text-sm font-medium">{dateLabel}</span>
     </div>
   )
 }
