@@ -1,12 +1,13 @@
 "use client"
 
 import * as React from "react"
+import { Building2 } from "lucide-react"
 
 import { CalendarColumn, PX_PER_MIN } from "@/components/consultations/calendar-column"
 import { ConsultPreviewDialog } from "@/components/consultations/consult-preview-dialog"
 import type { ConsultationType } from "@/lib/consultations/consultation-types"
 import type { CalendarColor } from "@/lib/scheduling/calendar-colors"
-import { formatHourLabel, type DayCalendar as DayCalendarData } from "@/lib/scheduling/day-calendar"
+import { formatHourLabel, type DayCalendar as DayCalendarData, type OffKind } from "@/lib/scheduling/day-calendar"
 
 type Option = { id: string; name: string }
 
@@ -22,7 +23,7 @@ export function DayCalendar({
   defaultTimeZone,
   canBook,
 }: {
-  columns: { attorney: Option; cal: DayCalendarData; off?: boolean; color?: CalendarColor | null }[]
+  columns: { attorney: Option; cal: DayCalendarData; off?: OffKind; color?: CalendarColor | null }[]
   typeName: string
   leads: Option[]
   attorneys: Option[]
@@ -63,6 +64,28 @@ export function DayCalendar({
         ))}
       </div>
 
+      {/* All-day row: firm holidays / time off, ABOVE the timed grid and aligned with the columns. */}
+      {columns.some((c) => c.off) ? (
+        <div className="mb-2 flex pl-12">
+          {columns.map((c) => (
+            <div key={c.attorney.id} className="min-w-0 flex-1 px-0.5">
+              {c.off ? (
+                <div className="flex items-center justify-center gap-1 rounded border border-red-500/30 bg-red-500/15 px-1.5 py-1 text-center text-[11px] font-medium text-red-700 dark:text-red-300">
+                  {c.off === "holiday" ? (
+                    <>
+                      <Building2 className="size-3 shrink-0" />
+                      Company holiday
+                    </>
+                  ) : (
+                    "Time off"
+                  )}
+                </div>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
+
       <div className="relative" style={{ height: gridHeight }}>
         {/* Hour lines span the full width; labels sit in the left gutter. */}
         {hours.map((h) => (
@@ -83,7 +106,6 @@ export function DayCalendar({
                 windows={c.cal.windows}
                 consults={c.cal.consults}
                 slots={c.cal.slots}
-                off={c.off}
                 color={c.color}
                 gridStartMin={gridStartMin}
                 attorneyId={c.attorney.id}

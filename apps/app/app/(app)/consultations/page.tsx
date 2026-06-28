@@ -12,7 +12,7 @@ import { mapConsultationTypeRow, type ConsultationType } from "@/lib/consultatio
 import { mapConsultationRow, partitionConsultations } from "@/lib/consultations/queries"
 import { currentDateInZone, zonedWallTimeToUtcISO } from "@/lib/consultations/time"
 import { colorFor } from "@/lib/scheduling/calendar-colors"
-import { MAX_CALENDAR_COLUMNS, weekDatesOf } from "@/lib/scheduling/day-calendar"
+import { MAX_CALENDAR_COLUMNS, type OffKind, weekDatesOf } from "@/lib/scheduling/day-calendar"
 import { isSupabaseConfigured } from "@/lib/supabase/env"
 import { createClient } from "@/lib/supabase/server"
 
@@ -208,11 +208,17 @@ async function renderCalendar({
       const list = (hoursByWeekday[w.weekday] ??= [])
       list.push({ startTime: toHm(w.start_time), endTime: toHm(w.end_time) })
     }
-    const offDates = weekDates.filter((d) =>
-      (offRes.data ?? []).some(
-        (e) => (e.attorney_id === a.id || e.attorney_id === null) && e.start_date <= d && e.end_date >= d,
-      ),
-    )
+    const offDays = weekDates
+      .map((d) => {
+        const hits = (offRes.data ?? []).filter(
+          (e) => (e.attorney_id === a.id || e.attorney_id === null) && e.start_date <= d && e.end_date >= d,
+        )
+        if (hits.length === 0) return null
+        // A firm-wide holiday (attorney_id NULL) closes everyone — it outranks the attorney's own time off.
+        const kind: OffKind = hits.some((e) => e.attorney_id === null) ? "holiday" : "time_off"
+        return { date: d, kind }
+      })
+      .filter((o): o is { date: string; kind: OffKind } => o !== null)
     const consults = (weekConsultRes.data ?? [])
       .filter((c) => c.attorney_id === a.id)
       .map((c) => ({
@@ -226,7 +232,7 @@ async function renderCalendar({
         timeZone: c.time_zone,
         outcome: c.outcome,
       }))
-    return { attorney: a, color: colorByAttorney.get(a.id) ?? null, hoursByWeekday, offDates, consults }
+    return { attorney: a, color: colorByAttorney.get(a.id) ?? null, hoursByWeekday, offDays, consults }
   })
 
   return (

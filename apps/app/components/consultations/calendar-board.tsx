@@ -9,7 +9,7 @@ import type { ConsultationType } from "@/lib/consultations/consultation-types"
 import { utcToZonedInput } from "@/lib/consultations/time"
 import type { ConsultationStatus } from "@/lib/consultations/validation"
 import type { CalendarColor } from "@/lib/scheduling/calendar-colors"
-import { buildDayCalendar, MAX_CALENDAR_COLUMNS, weekdayOf } from "@/lib/scheduling/day-calendar"
+import { buildDayCalendar, MAX_CALENDAR_COLUMNS, type OffKind, weekdayOf } from "@/lib/scheduling/day-calendar"
 import { createClient } from "@/lib/supabase/client"
 
 type Option = { id: string; name: string }
@@ -34,7 +34,7 @@ export type AttorneyWeek = {
   attorney: Option
   color: CalendarColor | null
   hoursByWeekday: Record<number, { startTime: string; endTime: string }[]>
-  offDates: string[]
+  offDays: { date: string; kind: OffKind }[]
   consults: DayConsult[]
 }
 
@@ -166,7 +166,7 @@ export function CalendarBoard({
   const columns = attorneyWeeks
     .filter((a) => validSelected.includes(a.attorney.id))
     .map((a) => {
-      const off = a.offDates.includes(selectedDate)
+      const off = a.offDays.find((o) => o.date === selectedDate)?.kind
       const windows = off ? [] : (a.hoursByWeekday[weekday] ?? [])
       return {
         attorney: a.attorney,

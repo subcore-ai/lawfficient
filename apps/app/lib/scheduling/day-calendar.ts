@@ -37,6 +37,8 @@ function addDays(date: string, n: number): string {
 }
 
 export type CalendarWindow = { startMin: number; endMin: number }
+// Why an attorney's day is closed: a firm-wide "holiday" (closes everyone) vs the attorney's own "time_off".
+export type OffKind = "holiday" | "time_off"
 export type CalendarConsult = {
   id: string
   startMin: number
