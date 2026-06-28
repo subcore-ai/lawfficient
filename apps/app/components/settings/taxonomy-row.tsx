@@ -22,9 +22,11 @@ import { Field } from "@/components/form-field"
 import { StatusPill } from "@/components/status-pill"
 import type { TaxonomyOption } from "@/lib/taxonomies/queries"
 
-// Shared by the static list and the draggable list so a row looks identical either way.
+// Shared by the static list and the draggable list so a row looks identical either way. Use a TOP border for
+// the between-row separators (not bottom): dnd-kit appends a hidden a11y node after the rows, so the last row
+// isn't :last-child and a `last:border-b-0` wouldn't apply — leaving a line that doubles the card's border.
 export const TAXONOMY_ROW_CLASS =
-  "border-border flex items-center justify-between gap-3 border-b py-2.5 first:pt-0 last:border-b-0"
+  "border-border flex items-center justify-between gap-3 border-t py-2.5 first:border-t-0 first:pt-0"
 
 // The inner content of a row: a `handle` slot on the left (the drag grip, or a static placeholder), the
 // label + badges + notes, and the manage actions. The caller owns the outer row container.
