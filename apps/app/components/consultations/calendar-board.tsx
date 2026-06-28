@@ -103,15 +103,12 @@ export function CalendarBoard({
       if (data.session?.access_token) void supabase.realtime.setAuth(data.session.access_token)
       channel = supabase
         .channel("consultations-calendar")
-        .on("postgres_changes", { event: "*", schema: "public", table: "consultations" }, (payload) => {
-          // TEMP debug (remove once verified): confirms events arrive past RLS.
-          console.info("[calendar realtime] change:", payload.eventType)
+        .on("postgres_changes", { event: "*", schema: "public", table: "consultations" }, () => {
           if (timer) clearTimeout(timer)
           timer = setTimeout(() => router.refresh(), 400)
         })
-        .subscribe((status, err) => {
-          // TEMP debug (remove once verified): SUBSCRIBED = connected; CHANNEL_ERROR/TIMED_OUT = auth/conn.
-          console.info("[calendar realtime] status:", status, err?.message ?? "")
+        .subscribe((status) => {
+          if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") console.warn("[calendar realtime]", status)
         })
     })
     return () => {
