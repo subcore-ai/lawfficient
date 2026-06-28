@@ -1,26 +1,24 @@
 import type { ReactNode } from "react"
+import { cookies } from "next/headers"
 
 import { toHm } from "@/lib/availability/queries"
 import { BookConsultationDialog } from "@/components/consultations/book-consultation-dialog"
-import { CalendarControls } from "@/components/consultations/calendar-controls"
+import { CalendarBoard } from "@/components/consultations/calendar-board"
 import { CalendarViewToggle } from "@/components/consultations/calendar-view-toggle"
 import { ConsultationsBoard } from "@/components/consultations/consultations-board"
-import { DayCalendar } from "@/components/consultations/day-calendar-grid"
 import { PageHeader } from "@/components/page-header"
 import { getCurrentUser } from "@/lib/auth/session"
 import { mapConsultationTypeRow, type ConsultationType } from "@/lib/consultations/consultation-types"
 import { mapConsultationRow, partitionConsultations } from "@/lib/consultations/queries"
 import { currentDateInZone, zonedWallTimeToUtcISO } from "@/lib/consultations/time"
 import { colorFor } from "@/lib/scheduling/calendar-colors"
-import { buildDayCalendar, weekdayOf } from "@/lib/scheduling/day-calendar"
+import { MAX_CALENDAR_COLUMNS, weekdayOf } from "@/lib/scheduling/day-calendar"
 import { isSupabaseConfigured } from "@/lib/supabase/env"
 import { createClient } from "@/lib/supabase/server"
 
 export const metadata = { title: "Consultations" }
 
 const DEFAULT_TZ = "America/New_York"
-// Cap simultaneous attorney columns so the day grid stays legible.
-const MAX_COLUMNS = 6
 
 // Shift a calendar date by N days (string math in UTC — only the Y-M-D matters).
 function addDay(date: string, n = 1): string {
@@ -141,13 +139,23 @@ async function renderCalendar({
     )
   }
 
-  // Selected attorneys: ?attorneys=id1,id2,… → valid + schedulable, capped; default the first few.
-  const requested =
-    typeof sp.attorneys === "string" ? sp.attorneys.split(",") : Array.isArray(sp.attorneys) ? sp.attorneys : []
-  // Dedupe so a repeated ?attorneys= value can't create duplicate columns / React keys.
+  // Picked calendars + the viewed day both come from cookies (CalendarBoard filters client-side; the day is
+  // server-read so there's no flash). Validate + cap, default the first few. ALL schedulable calendars are
+  // loaded below so toggling never hits the server.
+  const cookieStore = await cookies()
+  const saved = cookieStore.get("consultations.calendars")?.value
+  const savedDate = cookieStore.get("consultations.calendarDate")?.value
+  const requested = saved ? saved.split(".") : []
   const valid = Array.from(new Set(requested)).filter((id) => schedulable.some((a) => a.id === id))
-  const selectedIds = (valid.length ? valid : schedulable.slice(0, 3).map((a) => a.id)).slice(0, MAX_COLUMNS)
-  const date = typeof sp.date === "string" && isValidYmd(sp.date) ? sp.date : currentDateInZone(zone)
+  const initialSelected = (valid.length ? valid : schedulable.slice(0, 3).map((a) => a.id)).slice(0, MAX_CALENDAR_COLUMNS)
+  const allIds = schedulable.map((a) => a.id)
+  // Day precedence: an explicit ?date= (nav / shared link) wins, else the remembered day, else firm-today.
+  const date =
+    typeof sp.date === "string" && isValidYmd(sp.date)
+      ? sp.date
+      : savedDate && isValidYmd(savedDate)
+        ? savedDate
+        : currentDateInZone(zone)
   // The calendar slots default to the first active type's length; the actual type is chosen when booking.
   const selectedType = types[0]!
 
@@ -162,14 +170,14 @@ async function renderCalendar({
     supabase
       .from("attorney_availability")
       .select("attorney_id, start_time, end_time")
-      .in("attorney_id", selectedIds)
+      .in("attorney_id", allIds)
       .eq("weekday", weekdayOf(date))
       .order("start_time"),
     loadFrom && dayEnd
       ? supabase
           .from("consultations")
           .select("id, attorney_id, start_at, duration_min, type, lead_id, status, time_zone, outcome")
-          .in("attorney_id", selectedIds)
+          .in("attorney_id", allIds)
           .eq("archived", false)
           .gte("start_at", loadFrom)
           .lt("start_at", dayEnd)
@@ -178,7 +186,7 @@ async function renderCalendar({
     supabase
       .from("availability_exceptions")
       .select("attorney_id")
-      .in("attorney_id", selectedIds)
+      .in("attorney_id", allIds)
       .lte("start_date", date)
       .gte("end_date", date),
   ])
@@ -189,17 +197,17 @@ async function renderCalendar({
   const offIds = new Set((offRes.data ?? []).map((e) => e.attorney_id))
 
   const nowMs = Date.now()
-  const columns = selectedIds.map((id) => {
-    const off = offIds.has(id)
-    // Time off removes the whole day: drop the office hours so no slots generate. Existing consults still
-    // show (they were booked before the time off, or by an admin), and the column is flagged "off".
+  // Build each schedulable attorney's RAW day (office-hour windows already account for time off). The
+  // browser builds + filters the columns and keeps the consults live over realtime.
+  const attorneyDays = schedulable.map((a) => {
+    const off = offIds.has(a.id)
     const windows = off
       ? []
       : (availRes.data ?? [])
-          .filter((w) => w.attorney_id === id)
+          .filter((w) => w.attorney_id === a.id)
           .map((w) => ({ startTime: toHm(w.start_time), endTime: toHm(w.end_time) }))
     const consults = (dayConsultRes.data ?? [])
-      .filter((c) => c.attorney_id === id)
+      .filter((c) => c.attorney_id === a.id)
       .map((c) => ({
         id: c.id,
         startAt: c.start_at,
@@ -211,37 +219,23 @@ async function renderCalendar({
         timeZone: c.time_zone,
         outcome: c.outcome,
       }))
-    const cal = buildDayCalendar({ date, tz: zone, windows, consults, durationMin: selectedType.durationMin, nowMs })
-    return { attorney: schedulable.find((a) => a.id === id)!, cal, off, color: colorByAttorney.get(id) ?? null }
+    return { attorney: a, windows, consults, off, color: colorByAttorney.get(a.id) ?? null }
   })
 
-  const hasContent = columns.some((c) => c.off || c.cal.windows.length > 0 || c.cal.consults.length > 0)
-
   return (
-    <div className="space-y-4">
-      <CalendarControls
-        attorneys={schedulable}
-        attorneyIds={selectedIds}
-        date={date}
-        today={currentDateInZone(zone)}
-      />
-      <div className="rounded-lg border p-4">
-        {!hasContent ? (
-          <p className="text-muted-foreground py-8 text-center text-sm">
-            No office hours set for the selected {columns.length > 1 ? "attorneys" : "attorney"} on this day.
-          </p>
-        ) : (
-          <DayCalendar
-            columns={columns}
-            typeName={selectedType.name}
-            leads={leadOptions}
-            attorneys={attorneys}
-            consultationTypes={types}
-            defaultTimeZone={tz}
-            canBook={canManage}
-          />
-        )}
-      </div>
-    </div>
+    <CalendarBoard
+      attorneyDays={attorneyDays}
+      initialSelected={initialSelected}
+      date={date}
+      today={currentDateInZone(zone)}
+      tz={zone}
+      slotDuration={selectedType.durationMin}
+      slotTypeName={selectedType.name}
+      nowMs={nowMs}
+      leads={leadOptions}
+      attorneys={attorneys}
+      consultationTypes={types}
+      canBook={canManage}
+    />
   )
 }

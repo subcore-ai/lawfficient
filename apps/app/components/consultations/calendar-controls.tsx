@@ -1,49 +1,58 @@
 "use client"
 
+import * as React from "react"
 import { usePathname, useRouter } from "next/navigation"
-import { Check, ChevronLeft, ChevronRight } from "lucide-react"
+import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react"
 
 import { Button } from "@workspace/ui/components/button"
+import { Checkbox } from "@workspace/ui/components/checkbox"
+import { Input } from "@workspace/ui/components/input"
+import { Popover, PopoverContent, PopoverTrigger } from "@workspace/ui/components/popover"
 import { cn } from "@workspace/ui/lib/utils"
+
+import { MAX_CALENDAR_COLUMNS } from "@/lib/scheduling/day-calendar"
 
 type Option = { id: string; name: string }
 
-// Keep in step with MAX_COLUMNS in the consultations page.
-const MAX_ATTORNEYS = 6
+// Remember the viewed day in a cookie so the server renders it on the next visit (no flash, no client-side
+// re-nav). Calendars are remembered the same way, by CalendarBoard.
+const DATE_COOKIE = "consultations.calendarDate"
 
-// Calendar filters / nav: attorney chips (toggle 1–N columns) + the day. Each change rewrites the URL
-// searchParams; the server re-loads the day. Date math is plain Y-M-D string arithmetic (no zone needed).
-// The consultation type is chosen when booking (in the dialog), not here — slots default to the first type.
+// Calendar filters / nav: a calendars multi-select (search + checkboxes; the selection is owned by
+// CalendarBoard, which filters client-side — toggling never hits the server) + the day. Day changes rewrite
+// ?date= (the server re-loads the day) and mirror to sessionStorage; on a visit with no ?date= we re-apply
+// the remembered day. Date math is plain Y-M-D string arithmetic.
 export function CalendarControls({
   attorneys,
-  attorneyIds,
+  selected,
+  onToggle,
   date,
   today,
 }: {
   attorneys: Option[]
-  attorneyIds: string[]
+  selected: string[]
+  onToggle: (id: string) => void
   date: string
   today: string // firm-tz today, for the Today button
 }) {
   const router = useRouter()
   const pathname = usePathname()
+  const [open, setOpen] = React.useState(false)
+  const [query, setQuery] = React.useState("")
 
-  function go(next: { attorneys?: string[]; date?: string }) {
-    const q = new URLSearchParams()
-    q.set("view", "calendar")
-    q.set("attorneys", (next.attorneys ?? attorneyIds).join(","))
-    q.set("date", next.date ?? date)
-    router.push(`${pathname}?${q.toString()}`)
-  }
+  const goDate = React.useCallback(
+    (d: string) => {
+      const params = new URLSearchParams(window.location.search)
+      params.set("view", "calendar")
+      params.set("date", d)
+      // Remember the day server-side so a later visit with no ?date= still opens here (no flash).
+      document.cookie = `${DATE_COOKIE}=${d}; path=/; max-age=31536000; samesite=lax`
+      router.push(`${pathname}?${params.toString()}`)
+    },
+    [pathname, router],
+  )
 
-  const atCap = attorneyIds.length >= MAX_ATTORNEYS
-
-  function toggleAttorney(id: string) {
-    const has = attorneyIds.includes(id)
-    if (has && attorneyIds.length === 1) return // keep at least one column
-    if (!has && atCap) return // respect the column cap
-    go({ attorneys: has ? attorneyIds.filter((x) => x !== id) : [...attorneyIds, id] })
-  }
+  const atCap = selected.length >= MAX_CALENDAR_COLUMNS
 
   function shift(days: number): string {
     const d = new Date(`${date}T00:00:00Z`)
@@ -59,46 +68,70 @@ export function CalendarControls({
     year: "numeric",
   }).format(new Date(`${date}T12:00:00Z`))
 
+  const q = query.trim().toLowerCase()
+  const filtered = q ? attorneys.filter((a) => a.name.toLowerCase().includes(q)) : attorneys
+  const triggerLabel =
+    selected.length === attorneys.length
+      ? "All calendars"
+      : `${selected.length} calendar${selected.length === 1 ? "" : "s"}`
+
   return (
-    <div className="space-y-3">
+    <div className="flex flex-wrap items-center gap-1">
       {attorneys.length > 1 ? (
-        <div className="flex flex-wrap gap-2">
-          {attorneys.map((a) => {
-            const on = attorneyIds.includes(a.id)
-            return (
-              <button
-                key={a.id}
-                type="button"
-                onClick={() => toggleAttorney(a.id)}
-                aria-pressed={on}
-                disabled={!on && atCap}
-                className={cn(
-                  "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition-colors",
-                  on
-                    ? "border-primary bg-primary/10 text-foreground"
-                    : "text-muted-foreground hover:bg-muted disabled:pointer-events-none disabled:opacity-40",
-                )}
-              >
-                {on ? <Check className="size-3.5" /> : null}
-                {a.name}
-              </button>
-            )
-          })}
-        </div>
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger render={<Button type="button" variant="outline" size="default" className="mr-1 justify-between gap-2" />}>
+            <span className="inline-flex items-center gap-1.5">
+              <CalendarDays className="size-4" /> {triggerLabel}
+            </span>
+            <ChevronDown className="size-4 opacity-60" />
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-64 p-0">
+            <div className="border-b p-2">
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search calendars…"
+                autoComplete="off"
+                className="h-8"
+              />
+            </div>
+            <ul className="max-h-64 overflow-auto p-1">
+              {filtered.length === 0 ? (
+                <li className="text-muted-foreground px-2 py-1.5 text-sm">No calendars found.</li>
+              ) : (
+                filtered.map((a) => {
+                  const on = selected.includes(a.id)
+                  const disabled = (!on && atCap) || (on && selected.length === 1)
+                  return (
+                    <li key={a.id}>
+                      <label
+                        className={cn(
+                          "flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm",
+                          disabled ? "cursor-not-allowed opacity-50" : "hover:bg-muted cursor-pointer",
+                        )}
+                      >
+                        <Checkbox checked={on} disabled={disabled} onCheckedChange={() => onToggle(a.id)} />
+                        <span className="truncate">{a.name}</span>
+                      </label>
+                    </li>
+                  )
+                })
+              )}
+            </ul>
+          </PopoverContent>
+        </Popover>
       ) : null}
 
-      <div className="flex items-center gap-1">
-        <Button variant="outline" size="icon" onClick={() => go({ date: shift(-1) })} aria-label="Previous day">
-          <ChevronLeft className="size-4" />
-        </Button>
-        <Button variant="outline" size="default" onClick={() => go({ date: today })} disabled={date === today}>
-          Today
-        </Button>
-        <Button variant="outline" size="icon" onClick={() => go({ date: shift(1) })} aria-label="Next day">
-          <ChevronRight className="size-4" />
-        </Button>
-        <span className="text-foreground ml-2 inline-block min-w-[9rem] text-sm font-medium">{dateLabel}</span>
-      </div>
+      <Button variant="outline" size="icon" onClick={() => goDate(shift(-1))} aria-label="Previous day">
+        <ChevronLeft className="size-4" />
+      </Button>
+      <Button variant="outline" size="default" onClick={() => goDate(today)} disabled={date === today}>
+        Today
+      </Button>
+      <Button variant="outline" size="icon" onClick={() => goDate(shift(1))} aria-label="Next day">
+        <ChevronRight className="size-4" />
+      </Button>
+      <span className="text-foreground ml-2 inline-block min-w-[9rem] text-sm font-medium">{dateLabel}</span>
     </div>
   )
 }
