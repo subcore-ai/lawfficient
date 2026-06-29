@@ -90,7 +90,48 @@ export function DatePicker({
             }
           }}
         />
+        {/* The native <input type="date"> this replaces could be cleared; offer the same when a day is set. */}
+        {selected ? (
+          <div className="border-t p-1.5">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground w-full"
+              onClick={() => {
+                onChange("")
+                setOpen(false)
+              }}
+            >
+              Clear
+            </Button>
+          </div>
+        ) : null}
       </PopoverContent>
     </Popover>
+  )
+}
+
+// A form-submittable DatePicker for native FormData forms: controlled internally + mirrors its value into a
+// hidden input so `FormData.get(name)` works (the same trick the Base UI Selects use here). Use this inside a
+// `<form>` that reads dates from FormData; use the plain <DatePicker> when you already hold the value in state.
+export function DatePickerField({
+  name,
+  defaultValue = "",
+  ...rest
+}: { name: string; defaultValue?: string | null } & Omit<React.ComponentProps<typeof DatePicker>, "value" | "onChange">) {
+  const [value, setValue] = React.useState(defaultValue ?? "")
+  // Adjust-during-render: if this form is reused for a different entity without unmounting (e.g. the edit
+  // dialog reopened on another row), re-sync to the new server value — useState only seeds on mount.
+  const [prevDefault, setPrevDefault] = React.useState(defaultValue)
+  if (defaultValue !== prevDefault) {
+    setPrevDefault(defaultValue)
+    setValue(defaultValue ?? "")
+  }
+  return (
+    <>
+      <DatePicker value={value} onChange={setValue} {...rest} />
+      <input type="hidden" name={name} value={value} />
+    </>
   )
 }

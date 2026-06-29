@@ -2,9 +2,9 @@
 
 import * as React from "react"
 
-import { Input } from "@workspace/ui/components/input"
 import { toast } from "@workspace/ui/components/sonner"
 
+import { DatePickerField } from "@/components/date-picker"
 import { EditDialogShell } from "@/components/edit-dialog-shell"
 import { Field } from "@/components/form-field"
 import { CASE_STATUS_OPTIONS, SelectField } from "@/components/select-field"
@@ -80,7 +80,7 @@ export function EditCaseDialog({
       <SelectField label="Legal assistant" value={laId} onChange={setLaId} options={LAS} />
       <SelectField label="Attorney" value={attorneyId} onChange={setAttorneyId} options={ATTORNEYS} />
       <Field label="Expected mailing" className="sm:col-span-2">
-        <Input name="expectedMailing" type="date" defaultValue={caseItem.expectedMailing} />
+        <DatePickerField name="expectedMailing" defaultValue={caseItem.expectedMailing} aria-label="Expected mailing" />
       </Field>
     </EditDialogShell>
   )

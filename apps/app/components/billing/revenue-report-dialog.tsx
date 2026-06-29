@@ -14,7 +14,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@workspace/ui/components/dialog"
-import { Input } from "@workspace/ui/components/input"
 import {
   Select,
   SelectContent,
@@ -24,6 +23,7 @@ import {
 } from "@workspace/ui/components/select"
 import { toast } from "@workspace/ui/components/sonner"
 
+import { DatePickerField } from "@/components/date-picker"
 import { Field } from "@/components/form-field"
 
 export function RevenueReportDialog() {
@@ -51,10 +51,10 @@ export function RevenueReportDialog() {
           </DialogHeader>
           <div className="grid gap-4 py-5 sm:grid-cols-2">
             <Field label="From">
-              <Input type="date" defaultValue="2026-06-01" />
+              <DatePickerField name="from" defaultValue="2026-06-01" aria-label="From" />
             </Field>
             <Field label="To">
-              <Input type="date" defaultValue="2026-06-30" />
+              <DatePickerField name="to" defaultValue="2026-06-30" aria-label="To" />
             </Field>
             <Field label="Format" className="sm:col-span-2">
               <Select
