@@ -66,6 +66,10 @@ export function DayCalendar({
   const chainRef = React.useRef<Promise<unknown>>(Promise.resolve())
   // Small activation distance so a plain click still opens the detail dialog (only a real drag moves it).
   const sensors = useSensors(useSensor(PointerSensor, DRAG_ACTIVATION))
+  // Stable id for the DndContext so dnd-kit's aria-describedby is deterministic across SSR + client. Without
+  // an id, dnd-kit falls back to a module-level counter that differs (long-lived server process vs a fresh
+  // client load) → "DndDescribedBy-N" hydration mismatch.
+  const dndId = React.useId()
   if (columns.length === 0) return null
 
   const gridStartMin = Math.min(...columns.map((c) => c.cal.gridStartMin))
@@ -205,7 +209,7 @@ export function DayCalendar({
 
         {/* Attorney columns. Wrapped in a DndContext so a consult block can be dragged vertically to
             reschedule (restrictToVerticalAxis); the column renders the optimistic move from `pending`. */}
-        <DndContext sensors={sensors} modifiers={[restrictToVerticalAxis, restrictToParentElement]} onDragEnd={onDragEnd}>
+        <DndContext id={dndId} sensors={sensors} modifiers={[restrictToVerticalAxis, restrictToParentElement]} onDragEnd={onDragEnd}>
           <div className="absolute inset-y-0 left-12 right-0 flex">
             {columns.map((c) => (
               <div key={c.attorney.id} className="border-border/50 relative flex-1 border-l first:border-l-0">
