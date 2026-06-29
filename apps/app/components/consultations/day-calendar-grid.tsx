@@ -64,6 +64,9 @@ export function DayCalendar({
   const [draining, setDraining] = React.useState(0)
   // Serialize reschedule writes so rapid drags persist in drag order (no last-response-wins race).
   const chainRef = React.useRef<Promise<unknown>>(Promise.resolve())
+  // The latest drag target per consult, so a serialized write that a newer drag has since superseded doesn't
+  // pop a now-stale "Rescheduled to <time>" success toast.
+  const latestTargetRef = React.useRef<Record<string, number>>({})
   // Small activation distance so a plain click still opens the detail dialog (only a real drag moves it).
   const sensors = useSensors(useSensor(PointerSensor, DRAG_ACTIVATION))
   // Stable id for the DndContext so dnd-kit's aria-describedby is deterministic across SSR + client. Without
@@ -115,6 +118,7 @@ export function DayCalendar({
       return
     }
     setPending((prev) => ({ ...prev, [id]: toMin }))
+    latestTargetRef.current[id] = toMin // this drag is now the latest intent for the consult
     setDraining((n) => n + 1)
     // Scope the revert to THIS write's target so an earlier chained failure can't wipe a newer drag's pending.
     const revert = () =>
@@ -131,8 +135,9 @@ export function DayCalendar({
         if (res && "error" in res) {
           toast.error(res.error)
           revert() // spring back
-        } else {
-          // Server confirmed — the time actually changed (not just the optimistic move).
+        } else if (toMin === latestTargetRef.current[id]) {
+          // Server confirmed — toast only if this is still the consult's latest intent, so an earlier write
+          // in a rapid stacked drag doesn't announce a now-stale time.
           toast.success(`Rescheduled to ${formatSlotTime(toMin)}`)
         }
       })
