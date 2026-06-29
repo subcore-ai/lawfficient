@@ -189,6 +189,9 @@ export function ConsultPreviewDialog({
   // picker. Reads from the CURRENTLY selected attorney, since "Edit all fields" can reassign it.
   const attorneyOff = attorney !== UNASSIGNED ? offDatesByAttorney?.[attorney] : undefined
   const disabledDay = attorneyOff?.length ? (d: Date) => isDateOff(attorneyOff, dateToYmd(d)) : undefined
+  // The picker only blocks NEW picks; if the day was already set when the attorney changed (or off-data
+  // loaded), it can still be off — treat that as invalid too so Save can't stay enabled (server re-checks).
+  const dayIsOff = Boolean(day && attorneyOff?.length && isDateOff(attorneyOff, day))
   const dirty =
     !!original &&
     (day !== original.date ||
@@ -384,7 +387,7 @@ export function ConsultPreviewDialog({
               {canManage ? (
                 <div className="flex items-center gap-2">
                   {editable ? (
-                    <Button size="sm" onClick={save} disabled={pending || !ready || !validTime || !dirty}>
+                    <Button size="sm" onClick={save} disabled={pending || !ready || !validTime || dayIsOff || !dirty}>
                       {pending ? "Saving…" : "Save changes"}
                     </Button>
                   ) : null}

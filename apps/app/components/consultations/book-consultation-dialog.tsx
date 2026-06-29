@@ -120,11 +120,14 @@ export function BookConsultationDialog({
   const validTime = Boolean(day) && durationMin >= 5
 
   // Gray out days the chosen attorney is fully off (own time off + firm holidays). Only when an attorney
-  // is selected and we have their ranges; the server still re-checks (0050), this is the friendly guardrail.
+  // is selected and we have their ranges; the server still re-checks (the 0051 trigger) — friendly guardrail.
   const attorneyOff = attorney !== UNASSIGNED ? offDatesByAttorney?.[attorney] : undefined
   const disabledDay = attorneyOff?.length
     ? (d: Date) => isDateOff(attorneyOff, dateToYmd(d))
     : undefined
+  // The picker only blocks NEW picks; if the chosen attorney is off on the already-picked day (e.g. after
+  // switching attorneys), treat it as invalid so submit can't proceed — the server (0051 trigger) re-checks.
+  const dayIsOff = Boolean(day && attorneyOff?.length && isDateOff(attorneyOff, day))
 
   // Picking a type sets the "to" time (start + the type's default length) and its fee — both stay editable.
   // A free type clears the fee + the "already paid" flag.
@@ -302,7 +305,7 @@ export function BookConsultationDialog({
 
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
-            <Button type="submit" disabled={pending || !leadId || !selected || !validTime}>
+            <Button type="submit" disabled={pending || !leadId || !selected || !validTime || dayIsOff}>
               {pending ? "Booking…" : "Book consultation"}
             </Button>
           </DialogFooter>

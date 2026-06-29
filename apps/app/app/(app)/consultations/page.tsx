@@ -103,10 +103,12 @@ export default async function ConsultationsPage({ searchParams }: { searchParams
   const types: ConsultationType[] = typesRes.error ? [] : (typesRes.data ?? []).map(mapConsultationTypeRow)
   const tz = firmRes.data?.timezone ?? null
   // Off-dates for the booking pickers — shared by the header "Book" dialog (shown in both views) and the
-  // calendar's slot/reschedule pickers. (The calendar grid's week-bounded off-days stay in renderCalendar.)
+  // calendar's slot/reschedule pickers. Keyed for every attorney the dialogs can pick (all active, not just
+  // schedulable), so a selectable attorney always has off-date coverage. (The calendar grid's week-bounded
+  // off-days stay in renderCalendar.)
   const offDatesByAttorney = await loadOffDatesByAttorney(
     supabase,
-    allProfiles.filter((p) => p.status === "active" && p.schedulable).map((p) => p.id),
+    attorneys.map((a) => a.id),
     currentDateInZone(tz ?? DEFAULT_TZ),
   )
 

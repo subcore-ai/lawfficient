@@ -116,7 +116,7 @@ export function TimeOffManager({
       {canEdit ? (
         <form onSubmit={onAdd} className="flex flex-wrap items-end gap-3">
           <Field label="From" htmlFor={startId}>
-            <DatePicker id={startId} value={startDate} onChange={setStartDate} aria-label="From" buttonClassName="w-40" />
+            <DatePicker id={startId} value={startDate} onChange={setStartDate} aria-label="From" buttonClassName="w-40" disabledControl={pending} />
           </Field>
           <Field label="To" htmlFor={endId}>
             <DatePicker
@@ -125,6 +125,7 @@ export function TimeOffManager({
               onChange={setEndDate}
               // Can't end before it starts (the action also enforces end >= start).
               disabled={startDate ? (d) => dateToYmd(d) < startDate : undefined}
+              disabledControl={pending}
               aria-label="To"
               buttonClassName="w-40"
             />
