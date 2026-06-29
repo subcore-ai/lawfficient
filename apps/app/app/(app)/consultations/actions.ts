@@ -28,39 +28,21 @@ type DbClient = Awaited<ReturnType<typeof createClient>>
 
 const requireConsultEdit = () => requirePermission("consultations.edit", "consultations")
 
-// Clean action errors for each scheduling rule api_validate_booking raises (as a labeled check_violation).
-// Keeps the in-app create/reschedule path on the SAME rule the public API enforces (migration 0049/0050).
+// The consultations_validate_booking trigger (migration 0051) enforces the office-hours / time-off /
+// holiday / bookable rule ATOMICALLY on insert + slot-changing update, raising a labeled check_violation
+// (errcode 23514) — the SAME api_validate_booking rule the public API runs. Map each label to a clean
+// action error. (No-double-book is the separate 23P01 exclusion-constraint violation.)
 const BOOKING_RULE_ERRORS: Record<string, string> = {
   outside_office_hours: "That time is outside the attorney's office hours.",
   attorney_unavailable: "The attorney is unavailable on that date (time off or a firm holiday).",
   attorney_not_bookable: "That attorney isn't bookable. Mark them schedulable and set their office hours.",
-  lead_not_in_firm: "That lead isn't in your firm.",
 }
 
-// Run the shared booking-rule check (office hours / time off / holidays / attorney bookable) BEFORE the
-// write, so the app can't book a slot the API would reject — one SQL rule, no TS duplication. An
-// unassigned attorney can't be validated against office hours, so skip the check and let the row save
-// unassigned (consistent with the existing "Unassigned" option). Returns a clean error to surface, or
-// null when the slot is valid (or there's nothing to validate).
-async function validateBooking(
-  supabase: DbClient,
-  firmId: string,
-  attorneyId: string | null,
-  startAtIso: string,
-  durationMin: number,
-): Promise<string | null> {
-  if (!firmId) return "Invalid firm context."
-  if (!attorneyId) return null
-  const { error } = await supabase.rpc("api_validate_booking", {
-    p_firm_id: firmId,
-    p_attorney_id: attorneyId,
-    p_start: startAtIso,
-    p_duration_min: durationMin,
-  })
-  if (!error) return null
-  // 23514 = check_violation; the message is the rule label the function raised.
-  if (error.code === "23514") return BOOKING_RULE_ERRORS[error.message] ?? "That time isn't available."
-  return "Couldn't check the attorney's availability."
+// Map a consultation-write error to a clean booking-rule message when it's the trigger's 23514, else null
+// (the caller then handles 23P01 double-book / 23503 FK / generic).
+function bookingRuleError(error: { code?: string; message?: string } | null | undefined): string | null {
+  if (error?.code !== "23514") return null
+  return BOOKING_RULE_ERRORS[error.message ?? ""] ?? "That time isn't available."
 }
 
 async function audit(supabase: DbClient, byUserId: string, id: string, label: string, action: string) {
@@ -188,12 +170,9 @@ export async function createConsultation(formData: FormData): Promise<ActionResu
   if (!startAt) return { error: "Couldn't read the date/time for that time zone." }
 
   const supabase = await createClient()
-  // Same scheduling rule the API enforces (0050): the slot must fit the attorney's office hours and miss
-  // every time-off / holiday. Runs before the write so a bad slot fails cleanly, not as a raw DB error.
-  const ruleError = await validateBooking(supabase, gate.user.firmId, core.value.attorneyId, startAt, core.value.durationMin)
-  if (ruleError) return { error: ruleError }
-
-  // firm_id defaults to current_firm_id(); the composite FKs reject a lead/attorney from another firm.
+  // firm_id defaults to current_firm_id(); the composite FKs reject a lead/attorney from another firm. The
+  // consultations_validate_booking trigger (0051) enforces office hours / time off / holidays atomically on
+  // the insert, raising 23514 on a bad slot — no separate pre-check that could drift from the write.
   // `paid` + `amount` track payment INDEPENDENTLY of the lifecycle `status`, so a booking always starts
   // "scheduled" (the card shows payment separately) — nothing to keep in sync on later edits.
   const { data: inserted, error } = await supabase
@@ -212,6 +191,8 @@ export async function createConsultation(formData: FormData): Promise<ActionResu
     })
     .select("id")
     .single()
+  const ruleError = bookingRuleError(error)
+  if (ruleError) return { error: ruleError }
   if (error?.code === "23503") return { error: "That lead or attorney isn't in your firm." }
   if (error?.code === "23P01") return { error: "That attorney already has a consultation at that time." }
   if (error || !inserted) return { error: "Couldn't book the consultation." }
@@ -236,11 +217,8 @@ export async function updateConsultation(id: string, formData: FormData): Promis
   if (!startAt) return { error: "Couldn't read the date/time for that time zone." }
 
   const supabase = await createClient()
-  // Re-validate the (possibly moved) slot against the same shared rule as create (0050) — a reschedule
-  // must also respect office hours / time off / holidays, not just the no-double-book DB constraint.
-  const ruleError = await validateBooking(supabase, gate.user.firmId, core.value.attorneyId, startAt, core.value.durationMin)
-  if (ruleError) return { error: ruleError }
-
+  // The reschedule re-validates atomically too: the consultations_validate_booking trigger (0051) re-runs
+  // the office-hours / time-off / holiday rule on the slot-changing update, raising 23514 on a bad slot.
   // A single atomic write — only for a NON-terminal consult (a finalized one can't be edited, consistent
   // with reschedule / setStatus). The `.in()` is the atomic guard. `status` is NOT touched here (it's
   // owned by reschedule / setStatus and is independent of `paid`), so there's no second write to diverge.
@@ -260,6 +238,8 @@ export async function updateConsultation(id: string, formData: FormData): Promis
     .in("status", ["scheduled", "paid", "rescheduled"])
     .select("id, lead_id")
     .maybeSingle()
+  const ruleError = bookingRuleError(error)
+  if (ruleError) return { error: ruleError }
   if (error?.code === "23503") return { error: "That attorney isn't in your firm." }
   if (error?.code === "23P01") return { error: "That attorney already has a consultation at that time." }
   if (error) return { error: "Couldn't update the consultation." }
