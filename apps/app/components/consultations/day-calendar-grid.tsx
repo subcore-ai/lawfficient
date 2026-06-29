@@ -26,6 +26,8 @@ export function DayCalendar({
   defaultTimeZone,
   canBook,
   offDatesByAttorney,
+  nowMin,
+  isPastDay,
 }: {
   columns: { attorney: Option; cal: DayCalendarData; off?: OffKind[]; color?: CalendarColor | null }[]
   typeName: string
@@ -36,6 +38,10 @@ export function DayCalendar({
   canBook: boolean
   // Upcoming off-dates per attorney (own time off + firm holidays) for the booking/reschedule pickers.
   offDatesByAttorney: Record<string, OffDateRange[]>
+  // Firm-tz minute-of-day of "now" when the viewed day IS today (else null/undefined); a past date sets
+  // isPastDay. Used to dim the elapsed part of the grid + draw the "now" hairline.
+  nowMin?: number | null
+  isPastDay?: boolean
 }) {
   const [selectedId, setSelectedId] = React.useState<string | null>(null)
   if (columns.length === 0) return null
@@ -43,6 +49,12 @@ export function DayCalendar({
   const gridStartMin = Math.min(...columns.map((c) => c.cal.gridStartMin))
   const gridEndMin = Math.max(...columns.map((c) => c.cal.gridEndMin))
   const gridHeight = (gridEndMin - gridStartMin) * PX_PER_MIN
+
+  // Dim the elapsed part of the grid so shaded office hours that are already past don't read as bookable:
+  // the whole day for a past date, up to "now" for today (with a hairline at "now"). nowMin is null unless
+  // the viewed day is today.
+  const pastBoundaryMin = isPastDay ? gridEndMin : typeof nowMin === "number" ? Math.min(nowMin, gridEndMin) : gridStartMin
+  const showNowLine = !isPastDay && typeof nowMin === "number" && nowMin >= gridStartMin && nowMin <= gridEndMin
 
   const firstHour = Math.ceil(gridStartMin / 60)
   const lastHour = Math.floor(gridEndMin / 60)
@@ -135,6 +147,21 @@ export function DayCalendar({
             </div>
           ))}
         </div>
+
+        {/* Elapsed-time shading + "now" hairline (today / past days only). pointer-events-none so the
+            future slots below stay clickable, and any past consult under it stays clickable too. */}
+        {pastBoundaryMin > gridStartMin ? (
+          <div
+            className="bg-background/60 pointer-events-none absolute left-12 right-0 top-0"
+            style={{ height: (pastBoundaryMin - gridStartMin) * PX_PER_MIN }}
+          />
+        ) : null}
+        {showNowLine ? (
+          <div
+            className="bg-foreground/50 pointer-events-none absolute left-12 right-0 h-px"
+            style={{ top: (nowMin! - gridStartMin) * PX_PER_MIN }}
+          />
+        ) : null}
       </div>
 
       <ConsultPreviewDialog
