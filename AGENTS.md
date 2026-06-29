@@ -88,3 +88,14 @@ Two levels render it:
 - **`<MockTag>` = within-page marker** for a `"partial"` page. Drop it next to a `CardTitle` (or pass `mock` to `KpiCard`) on each section still on mock data; live sections get no tag. The Dashboard is the worked example. (`components/dev/mock-tag.tsx`.)
 
 **When you wire a section to real data:** remove its `<MockTag>`, and when a page's last mock section goes live flip that nav item's `data:` flag to `"live"` (use `"partial"` while a page is still mixed). At launch, delete the `NEXT_PUBLIC_SHOW_DATA_STATUS` flag and the `lib/dev` + `components/dev` helpers.
+
+## Isolating large, independent builds
+For a large, self-contained piece of work that doesn't depend on the current branch's
+in-flight changes (a new API surface, a new module, a migration-bearing feature), prefer
+to build it in an isolated git-worktree subagent instead of inline.
+- Base the worktree on the correct parent branch (whose migrations/state the task needs);
+  verify it (expected migrations present) before spawning — don't assume current HEAD.
+- The subagent runs `bun install` and needs untracked `.env.local` copied in to build.
+- It commits to its branch and reports a summary — it does NOT push or open a PR; surface
+  the work for review first.
+Skip this for small, quick, or tightly-coupled changes — the overhead isn't worth it.

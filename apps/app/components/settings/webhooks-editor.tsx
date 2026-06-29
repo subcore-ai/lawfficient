@@ -46,13 +46,16 @@ export type WebhookEndpointRow = {
 }
 
 // The event catalog the UI offers, with a short human label. Kept in sync with WEBHOOK_EVENT_TYPES
-// (Phase 1 = lead lifecycle).
+// (lead + consultation lifecycle).
 const EVENT_OPTIONS: { value: string; label: string }[] = [
   { value: "lead.created", label: "Lead created" },
   { value: "lead.updated", label: "Lead updated" },
   { value: "lead.status_changed", label: "Lead status changed" },
   { value: "lead.assigned", label: "Lead assigned" },
   { value: "lead.archived", label: "Lead archived" },
+  { value: "consultation.booked", label: "Consultation booked" },
+  { value: "consultation.rescheduled", label: "Consultation rescheduled" },
+  { value: "consultation.canceled", label: "Consultation canceled" },
 ]
 
 function CopyButton({ value, label = "Copy" }: { value: string; label?: string }) {
@@ -352,7 +355,7 @@ export function WebhooksSection({
         </div>
         {endpoints.length === 0 ? (
           <p className="text-muted-foreground rounded-lg border border-dashed p-6 text-center text-sm">
-            No endpoints yet.{canManage ? " Add one to receive lead events." : ""}
+            No endpoints yet.{canManage ? " Add one to receive events." : ""}
           </p>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">
