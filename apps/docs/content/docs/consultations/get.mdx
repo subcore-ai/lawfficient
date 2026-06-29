@@ -1,0 +1,66 @@
+---
+title: Fetch a consultation
+description: GET /api/consultations/{id} — fetch a single consultation by id.
+---
+
+```http
+GET /api/consultations/{id}
+```
+
+Fetches one consultation by its UUID. Requires the `consultations:read` scope.
+
+## Path parameters
+
+| Param | Type | Description |
+| --- | --- | --- |
+| `id` | string | The consultation's UUID. |
+
+## Example
+
+```bash
+curl https://app.lawfficient.com/api/consultations/7c1e2a3f-1b2c-4d5e-8f90-abcdef012345 \
+  -H "Authorization: Bearer $LAWFFICIENT_API_KEY"
+```
+
+```json title="200 OK"
+{
+  "id": "7c1e2a3f-1b2c-4d5e-8f90-abcdef012345",
+  "lead_id": "3f8c1e2a-1b2c-4d5e-8f90-abcdef012345",
+  "attorney_id": "a1b2c3d4-0000-4000-8000-000000000000",
+  "type": "Initial consultation",
+  "status": "scheduled",
+  "start_at": "2026-07-02T15:00:00.000Z",
+  "duration_min": 30,
+  "time_zone": "America/New_York",
+  "paid": false,
+  "amount": null,
+  "outcome": null,
+  "archived": false,
+  "created_at": "2026-06-28T10:00:00.000Z",
+  "data": {}
+}
+```
+
+## The consultation object
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `id` | string | UUID, stable. |
+| `lead_id` | string \| null | The [lead](/docs/leads) this consultation is for. |
+| `attorney_id` | string \| null | The attorney it's booked with. |
+| `type` | string | The consultation type (free text, e.g. `Initial consultation`). |
+| `status` | string | Booking lifecycle stage (`scheduled`, `paid`, `completed`, `rescheduled`, `canceled`, `no_show`). |
+| `start_at` | string | ISO-8601 start instant, in UTC. |
+| `duration_min` | number | Length in minutes. |
+| `time_zone` | string | IANA zone the consultation is shown in (e.g. `America/New_York`). |
+| `paid` | boolean | Payment status — tracked, not charged. |
+| `amount` | number \| null | The charge amount, or `null`. |
+| `outcome` | string \| null | Post-consultation qualification, or `null`. |
+| `archived` | boolean | Whether the consultation is archived. |
+| `created_at` | string | ISO-8601 timestamp. |
+| `data` | object | Practice-specific custom fields (varies per firm). |
+
+<Callout type="info">
+  An id that doesn't exist — or belongs to another firm — returns `404 not_found`. A malformed
+  (non-UUID) id also returns `404`, never a `500`.
+</Callout>
