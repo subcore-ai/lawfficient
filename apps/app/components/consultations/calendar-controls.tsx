@@ -4,6 +4,7 @@ import * as React from "react"
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react"
 
 import { Button } from "@workspace/ui/components/button"
+import { Calendar } from "@workspace/ui/components/calendar"
 import { Checkbox } from "@workspace/ui/components/checkbox"
 import { Input } from "@workspace/ui/components/input"
 import { Popover, PopoverContent, PopoverTrigger } from "@workspace/ui/components/popover"
@@ -32,6 +33,7 @@ export function CalendarControls({
   onGo: (date: string) => void
 }) {
   const [open, setOpen] = React.useState(false)
+  const [pickerOpen, setPickerOpen] = React.useState(false)
   const [query, setQuery] = React.useState("")
 
   const atCap = selected.length >= MAX_CALENDAR_COLUMNS
@@ -41,6 +43,12 @@ export function CalendarControls({
     d.setUTCDate(d.getUTCDate() + days)
     return d.toISOString().slice(0, 10)
   }
+
+  // Parse the YYYY-MM-DD (firm-tz calendar day) into a LOCAL Date for the picker and back, using local
+  // calendar components so the round-trip never shifts a day across time zones.
+  const pickedDate = new Date(Number(date.slice(0, 4)), Number(date.slice(5, 7)) - 1, Number(date.slice(8, 10)))
+  const toYmd = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
 
   const dateLabel = new Intl.DateTimeFormat("en-US", {
     timeZone: "UTC",
@@ -113,7 +121,33 @@ export function CalendarControls({
       <Button variant="outline" size="icon" onClick={() => onGo(shift(1))} aria-label="Next day">
         <ChevronRight className="size-4" />
       </Button>
-      <span className="text-foreground ml-2 inline-block min-w-[9rem] text-sm font-medium">{dateLabel}</span>
+      <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+        <PopoverTrigger
+          render={
+            <Button type="button" variant="outline" size="default" className="ml-1 min-w-[10rem] justify-start gap-2 font-medium" />
+          }
+        >
+          <CalendarDays className="size-4 opacity-60" />
+          {dateLabel}
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-auto p-0">
+          {/* key={date} remounts the calendar when the viewed day changes (prev/next/Today/pick) so it
+              re-applies defaultMonth — react-day-picker only honors defaultMonth on mount, and the popover
+              stays mounted. */}
+          <Calendar
+            key={date}
+            mode="single"
+            selected={pickedDate}
+            defaultMonth={pickedDate}
+            onSelect={(d) => {
+              if (d) {
+                onGo(toYmd(d))
+                setPickerOpen(false)
+              }
+            }}
+          />
+        </PopoverContent>
+      </Popover>
     </div>
   )
 }

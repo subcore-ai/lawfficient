@@ -19,7 +19,6 @@ export function CalendarColumn({
   windows,
   consults,
   slots,
-  off,
   gridStartMin,
   attorneyId,
   typeName,
@@ -34,7 +33,6 @@ export function CalendarColumn({
   windows: CalendarWindow[]
   consults: CalendarConsult[]
   slots: CalendarSlot[]
-  off?: boolean // attorney is on time off this day → "Time off" banner, no slots
   gridStartMin: number
   attorneyId: string
   typeName: string
@@ -74,12 +72,6 @@ export function CalendarColumn({
 
   return (
     <>
-      {off ? (
-        <div className="text-muted-foreground bg-muted/40 absolute inset-x-0.5 top-1 z-10 rounded px-1.5 py-1 text-center text-[11px] font-medium">
-          Time off
-        </div>
-      ) : null}
-
       {/* Office hours shading. */}
       {windows.map((w, i) => (
         <div
