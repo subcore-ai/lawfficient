@@ -214,11 +214,14 @@ async function renderCalendar({
           (e) => (e.attorney_id === a.id || e.attorney_id === null) && e.start_date <= d && e.end_date >= d,
         )
         if (hits.length === 0) return null
-        // A firm-wide holiday (attorney_id NULL) closes everyone — it outranks the attorney's own time off.
-        const kind: OffKind = hits.some((e) => e.attorney_id === null) ? "holiday" : "time_off"
-        return { date: d, kind }
+        // A day can be BOTH a firm-wide holiday (attorney_id NULL, closes everyone) AND the attorney's
+        // own time off — surface both (holiday first), not just one.
+        const kinds: OffKind[] = []
+        if (hits.some((e) => e.attorney_id === null)) kinds.push("holiday")
+        if (hits.some((e) => e.attorney_id === a.id)) kinds.push("time_off")
+        return { date: d, kinds }
       })
-      .filter((o): o is { date: string; kind: OffKind } => o !== null)
+      .filter((o): o is { date: string; kinds: OffKind[] } => o !== null)
     const consults = (weekConsultRes.data ?? [])
       .filter((c) => c.attorney_id === a.id)
       .map((c) => ({

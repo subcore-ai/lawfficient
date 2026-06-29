@@ -34,7 +34,7 @@ export type AttorneyWeek = {
   attorney: Option
   color: CalendarColor | null
   hoursByWeekday: Record<number, { startTime: string; endTime: string }[]>
-  offDays: { date: string; kind: OffKind }[]
+  offDays: { date: string; kinds: OffKind[] }[]
   consults: DayConsult[]
 }
 
@@ -166,8 +166,8 @@ export function CalendarBoard({
   const columns = attorneyWeeks
     .filter((a) => validSelected.includes(a.attorney.id))
     .map((a) => {
-      const off = a.offDays.find((o) => o.date === selectedDate)?.kind
-      const windows = off ? [] : (a.hoursByWeekday[weekday] ?? [])
+      const off = a.offDays.find((o) => o.date === selectedDate)?.kinds ?? []
+      const windows = off.length ? [] : (a.hoursByWeekday[weekday] ?? [])
       return {
         attorney: a.attorney,
         cal: buildDayCalendar({ date: selectedDate, tz, windows, consults: a.consults, durationMin: slotDuration, nowMs: now }),
@@ -176,7 +176,7 @@ export function CalendarBoard({
       }
     })
 
-  const hasContent = columns.some((c) => c.off || c.cal.windows.length > 0 || c.cal.consults.length > 0)
+  const hasContent = columns.some((c) => c.off.length > 0 || c.cal.windows.length > 0 || c.cal.consults.length > 0)
 
   // Firm "today" derived from the ticking clock (not a frozen server snapshot) so the Today control stays
   // correct even if the calendar is left open past midnight.
