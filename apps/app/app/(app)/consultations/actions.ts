@@ -3,8 +3,10 @@
 import { revalidatePath } from "next/cache"
 
 import { requirePermission } from "@/lib/auth/gate"
+import { type OffDateRange } from "@/lib/availability/exceptions"
+import { loadOffDatesByAttorney } from "@/lib/availability/off-dates"
 import { mapConsultationTypeRow, type ConsultationType } from "@/lib/consultations/consultation-types"
-import { formatConsultationWhen, zonedWallTimeToUtcISO } from "@/lib/consultations/time"
+import { currentDateInZone, formatConsultationWhen, zonedWallTimeToUtcISO } from "@/lib/consultations/time"
 import { parseConsultationInput, type ConsultationStatus } from "@/lib/consultations/validation"
 import { recordLeadEvent } from "@/lib/leads/events"
 import { createClient } from "@/lib/supabase/server"
@@ -12,6 +14,7 @@ import { createClient } from "@/lib/supabase/server"
 export type ActionResult = { ok: true } | { error: string }
 
 const PATH = "/consultations"
+const DEFAULT_TZ = "America/New_York"
 
 // The lifecycle moves this action represents (cancel / complete / mark no-show). Scheduling states
 // (`scheduled`/`paid`/`rescheduled`) are reached via create + reschedule, not here.
@@ -104,7 +107,15 @@ export type ConsultationEditData = {
 }
 
 export type LoadConsultationForEdit =
-  | { ok: true; consult: ConsultationEditData; attorneys: { id: string; name: string }[]; consultationTypes: ConsultationType[] }
+  | {
+      ok: true
+      consult: ConsultationEditData
+      attorneys: { id: string; name: string }[]
+      consultationTypes: ConsultationType[]
+      // Per-attorney upcoming off-date ranges (own time off + firm holidays), keyed by attorney id, so the
+      // edit dialog can gray out days the selected attorney is fully off — same UX as Book / reschedule.
+      offDatesByAttorney: Record<string, OffDateRange[]>
+    }
   | { ok: false; error: string }
 
 // Everything the edit dialog needs in one round-trip, so it can be opened from anywhere (calendar, board,
@@ -131,14 +142,25 @@ export async function loadConsultationForEdit(id: string): Promise<LoadConsultat
   const leadId = c.lead_id ?? ""
   // Include the consult's current attorney even if since deactivated, so the edit form keeps + displays it.
   const profileFilter = c.attorney_id ? `status.eq.active,id.eq.${c.attorney_id}` : "status.eq.active"
-  const [staffRes, typesRes, leadRes] = await Promise.all([
+  const [staffRes, typesRes, leadRes, firmRes] = await Promise.all([
     supabase.from("profiles").select("id, name").or(profileFilter).order("name"),
     supabase.from("consultation_types").select("*").eq("is_active", true).order("position").order("created_at"),
     supabase.from("leads").select("first_name, last_name").eq("id", leadId).maybeSingle(),
+    supabase.from("firms").select("timezone").single(),
   ])
   // Don't mask a failed picker-list load as empty options — surface it so the edit UI isn't silently broken.
   if (staffRes.error || typesRes.error) return { ok: false, error: "Couldn't load the consultation." }
   const lead = leadRes.data
+  const attorneys = (staffRes.data ?? []).map((p) => ({ id: p.id, name: p.name }))
+
+  // Upcoming off-dates for every attorney the dialog can pick, keyed by id — so the day picker grays out
+  // days the selected attorney is fully off (own time off + firm holidays). Firm-tz "today" bounds the
+  // query, matching the consultations page. The 0051 trigger still re-checks on save.
+  const offDatesByAttorney = await loadOffDatesByAttorney(
+    supabase,
+    attorneys.map((a) => a.id),
+    currentDateInZone(firmRes.data?.timezone ?? DEFAULT_TZ),
+  )
 
   return {
     ok: true,
@@ -154,8 +176,9 @@ export async function loadConsultationForEdit(id: string): Promise<LoadConsultat
       amount: c.amount,
       paid: c.paid,
     },
-    attorneys: (staffRes.data ?? []).map((p) => ({ id: p.id, name: p.name })),
+    attorneys,
     consultationTypes: typesRes.error ? [] : (typesRes.data ?? []).map(mapConsultationTypeRow),
+    offDatesByAttorney,
   }
 }
 
