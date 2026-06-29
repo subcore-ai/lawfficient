@@ -158,9 +158,12 @@ export function DayCalendar({
         ) : null}
         {showNowLine ? (
           <div
-            className="bg-foreground/50 pointer-events-none absolute left-12 right-0 h-px"
+            className="bg-primary pointer-events-none absolute left-12 right-0 h-px"
             style={{ top: (nowMin! - gridStartMin) * PX_PER_MIN }}
-          />
+          >
+            {/* Dot on the left edge so the line reads as "now", not just another hour line. */}
+            <div className="bg-primary absolute -left-1 -top-1 size-2 rounded-full" />
+          </div>
         ) : null}
       </div>
 
