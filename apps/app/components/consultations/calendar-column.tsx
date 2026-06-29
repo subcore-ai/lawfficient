@@ -1,5 +1,9 @@
 "use client"
 
+import type { CSSProperties } from "react"
+import { useDraggable } from "@dnd-kit/core"
+import { CSS } from "@dnd-kit/utilities"
+
 import { cn } from "@workspace/ui/lib/utils"
 
 import { BookConsultationDialog } from "@/components/consultations/book-consultation-dialog"
@@ -30,6 +34,7 @@ export function CalendarColumn({
   canBook,
   offDatesByAttorney,
   color,
+  pendingMove,
   onSelectConsult,
 }: {
   windows: CalendarWindow[]
@@ -48,6 +53,9 @@ export function CalendarColumn({
   color?: CalendarColor | null // the attorney's calendar color; tints office hours + consults + slots
   // Click a booked consult → the parent opens one shared detail dialog (keeps a single modal across columns).
   onSelectConsult: (c: CalendarConsult) => void
+  // Optimistic drag-reschedule: if this consult is mid-move, render it at the new start-minute until the
+  // server confirms (the parent reverts on failure). null/undefined = no pending move.
+  pendingMove?: { id: string; startMin: number } | null
 }) {
   const top = (min: number) => (min - gridStartMin) * PX_PER_MIN
   const height = (mins: number) => Math.max(mins * PX_PER_MIN, 16)
@@ -136,25 +144,65 @@ export function CalendarColumn({
         )
       })}
 
-      {/* Booked consults — drawn over slots/shading; click opens the shared detail dialog. */}
-      {consults.map((c) => (
-        <button
-          key={c.id}
-          type="button"
-          onClick={() => onSelectConsult(c)}
-          title={`${c.leadName} · ${c.type} · ${formatSlotTime(c.startMin)} – ${formatSlotTime(c.endMin)}`}
-          className="bg-primary/85 text-primary-foreground absolute inset-x-0.5 flex cursor-pointer items-start justify-between gap-1.5 overflow-hidden rounded px-1.5 py-0.5 text-left text-[11px] leading-tight shadow-sm transition-[filter] hover:brightness-95"
-          style={{ top: top(c.startMin), height: height(c.endMin - c.startMin), ...consultTint }}
-        >
-          <span className="min-w-0">
-            <span className="block truncate font-medium">{c.leadName}</span>
-            <span className="block truncate opacity-80">{c.type}</span>
-          </span>
-          <span className="shrink-0 text-[10px] whitespace-nowrap opacity-75 tabular-nums">
-            {formatSlotTime(c.startMin)} – {formatSlotTime(c.endMin)}
-          </span>
-        </button>
-      ))}
+      {/* Booked consults — click opens the detail dialog; drag (when canBook) reschedules vertically. */}
+      {consults.map((c) => {
+        const startMin = pendingMove?.id === c.id ? pendingMove.startMin : c.startMin
+        return (
+          <DraggableConsult
+            key={c.id}
+            consult={c}
+            topPx={top(startMin)}
+            heightPx={height(c.endMin - c.startMin)}
+            tint={consultTint}
+            canDrag={canBook}
+            onSelect={onSelectConsult}
+          />
+        )
+      })}
     </>
+  )
+}
+
+// One booked-consult block: click → detail dialog; drag vertically (when canDrag) → reschedule. Its own
+// component so useDraggable is one hook per block, not a hook called inside the parent's consults.map().
+function DraggableConsult({
+  consult,
+  topPx,
+  heightPx,
+  tint,
+  canDrag,
+  onSelect,
+}: {
+  consult: CalendarConsult
+  topPx: number
+  heightPx: number
+  tint: CSSProperties
+  canDrag: boolean
+  onSelect: (c: CalendarConsult) => void
+}) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: consult.id, disabled: !canDrag })
+  return (
+    <button
+      ref={setNodeRef}
+      type="button"
+      onClick={() => onSelect(consult)}
+      title={`${consult.leadName} · ${consult.type} · ${formatSlotTime(consult.startMin)} – ${formatSlotTime(consult.endMin)}`}
+      className={cn(
+        "bg-primary/85 text-primary-foreground absolute inset-x-0.5 flex touch-none items-start justify-between gap-1.5 overflow-hidden rounded px-1.5 py-0.5 text-left text-[11px] leading-tight shadow-sm transition-[filter] hover:brightness-95",
+        canDrag ? "cursor-grab active:cursor-grabbing" : "cursor-pointer",
+        isDragging && "z-20 opacity-90 shadow-lg",
+      )}
+      style={{ top: topPx, height: heightPx, transform: CSS.Translate.toString(transform), ...tint }}
+      {...attributes}
+      {...listeners}
+    >
+      <span className="min-w-0">
+        <span className="block truncate font-medium">{consult.leadName}</span>
+        <span className="block truncate opacity-80">{consult.type}</span>
+      </span>
+      <span className="shrink-0 text-[10px] whitespace-nowrap opacity-75 tabular-nums">
+        {formatSlotTime(consult.startMin)} – {formatSlotTime(consult.endMin)}
+      </span>
+    </button>
   )
 }
