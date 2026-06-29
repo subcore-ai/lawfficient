@@ -1,6 +1,6 @@
 "use client"
 
-import type { CSSProperties } from "react"
+import { useEffect, useRef, type CSSProperties } from "react"
 import { useDraggable } from "@dnd-kit/core"
 import { CSS } from "@dnd-kit/utilities"
 
@@ -53,9 +53,9 @@ export function CalendarColumn({
   color?: CalendarColor | null // the attorney's calendar color; tints office hours + consults + slots
   // Click a booked consult → the parent opens one shared detail dialog (keeps a single modal across columns).
   onSelectConsult: (c: CalendarConsult) => void
-  // Optimistic drag-reschedule: if this consult is mid-move, render it at the new start-minute until the
-  // server confirms (the parent reverts on failure). null/undefined = no pending move.
-  pendingMove?: { id: string; startMin: number } | null
+  // Optimistic drag-reschedule: per-consult map (consult id → optimistic start-minute) so a consult mid-move
+  // renders at its new start until the server confirms (the parent reverts on failure).
+  pendingMove?: Record<string, number>
 }) {
   const top = (min: number) => (min - gridStartMin) * PX_PER_MIN
   const height = (mins: number) => Math.max(mins * PX_PER_MIN, 16)
@@ -147,7 +147,7 @@ export function CalendarColumn({
       {/* Booked consults — click opens the detail dialog; drag (when canBook) reschedules vertically. */}
       {consults.map((c) => {
         // While a drag is pending, render the block AND its time label at the optimistic start.
-        const startMin = pendingMove?.id === c.id ? pendingMove.startMin : c.startMin
+        const startMin = pendingMove?.[c.id] ?? c.startMin
         const endMin = startMin + (c.endMin - c.startMin)
         // Only non-terminal consults are draggable — rescheduleConsultation rejects finalized ones, so a
         // completed block would just fail with a toast.
@@ -193,11 +193,23 @@ function DraggableConsult({
   onSelect: (c: CalendarConsult) => void
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: consult.id, disabled: !canDrag })
+  // The browser emits a click on pointer-up after a drag; swallow that one so a reschedule doesn't also open
+  // the detail dialog. A plain click (no drag) never sets this, so it still opens normally.
+  const draggedRef = useRef(false)
+  useEffect(() => {
+    if (isDragging) draggedRef.current = true
+  }, [isDragging])
   return (
     <button
       ref={setNodeRef}
       type="button"
-      onClick={() => onSelect(consult)}
+      onClick={() => {
+        if (draggedRef.current) {
+          draggedRef.current = false
+          return
+        }
+        onSelect(consult)
+      }}
       title={`${consult.leadName} · ${consult.type} · ${formatSlotTime(startMin)} – ${formatSlotTime(endMin)}`}
       className={cn(
         "bg-primary/85 text-primary-foreground absolute inset-x-0.5 flex touch-none items-start justify-between gap-1.5 overflow-hidden rounded px-1.5 py-0.5 text-left text-[11px] leading-tight shadow-sm transition-[filter] hover:brightness-95",

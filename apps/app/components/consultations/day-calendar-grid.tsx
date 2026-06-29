@@ -57,8 +57,8 @@ export function DayCalendar({
 }) {
   const [selectedId, setSelectedId] = React.useState<string | null>(null)
   // Drag-to-reschedule state + sensors — declared before the early return so the hooks always run.
-  // `fromMin` = the consult's server start at drag time (for the reconcile); `toMin` = the optimistic new start.
-  const [pending, setPending] = React.useState<{ id: string; toMin: number } | null>(null)
+  // `pending` maps a consult id → its optimistic new start-minute while that reschedule write is in flight.
+  const [pending, setPending] = React.useState<Record<string, number>>({})
   // Serialize reschedule writes so rapid drags persist in drag order (no last-response-wins race).
   const chainRef = React.useRef<Promise<unknown>>(Promise.resolve())
   // Small activation distance so a plain click still opens the detail dialog (only a real drag moves it).
@@ -81,23 +81,23 @@ export function DayCalendar({
 
   // Drag-to-reschedule. Optimistically move the dragged consult while the server write is in flight.
   const tz = defaultTimeZone ?? "America/New_York"
-  // Reconcile by DATA, not columns-reference: the board rebuilds `columns` every render (the 1-minute tick),
-  // so a reference compare would drop the optimistic move spuriously. Clear once the consult's server start
-  // has moved off its original minute (the reschedule landed, or another writer changed it), or it's gone.
-  if (pending) {
-    const live = columns.flatMap((c) => c.cal.consults).find((x) => x.id === pending.id)
-    // Clear once the server data REACHES the optimistic target (the move landed), or the consult is gone.
-    // Checking the target — not merely "moved off the original" — so an intermediate chained reschedule
-    // mid-stack doesn't clear a still-pending later target.
-    if (!live || live.startMin === pending.toMin) setPending(null)
-  }
+  // Reconcile each optimistic move against the latest server DATA (not a columns-reference compare — the
+  // board rebuilds `columns` every 1-minute tick, which would drop the move spuriously). Per-consult (a map)
+  // so concurrent drags on different consults don't clobber each other; keep an entry only while its consult
+  // exists and hasn't yet reached the TARGET minute (checking the target — not "moved off the original" —
+  // keeps an intermediate chained write from clearing a still-pending later target).
+  const survivors = Object.entries(pending).filter(([cid, toMin]) => {
+    const live = columns.flatMap((c) => c.cal.consults).find((x) => x.id === cid)
+    return live !== undefined && live.startMin !== toMin
+  })
+  if (survivors.length !== Object.keys(pending).length) setPending(Object.fromEntries(survivors))
   function onDragEnd(e: DragEndEvent) {
     const id = String(e.active.id)
     const consult = columns.flatMap((c) => c.cal.consults).find((x) => x.id === id)
     if (!consult) return
     // Drag from the ON-SCREEN position (the optimistic one if a move is already pending), not the stale
     // server time, so a second drag mid-flight stacks correctly.
-    const baseMin = pending?.id === id ? pending.toMin : consult.startMin
+    const baseMin = pending[id] ?? consult.startMin
     const toMin = draggedStartMin(baseMin, e.delta.y, PX_PER_MIN)
     if (toMin === baseMin) return // no real move (snapped back to where it already is)
     const startAt = zonedWallTimeToUtcISO(`${date}T${minToHhmm(toMin)}`, tz)
@@ -105,9 +105,15 @@ export function DayCalendar({
       toast.error("That time isn't valid on this day.") // e.g. a nonexistent DST spring-forward wall time
       return
     }
-    setPending({ id, toMin })
-    // Scope the revert to THIS write's target, so an earlier chained failure can't wipe a newer drag's pending.
-    const revert = () => setPending((p) => (p?.id === id && p.toMin === toMin ? null : p))
+    setPending((prev) => ({ ...prev, [id]: toMin }))
+    // Scope the revert to THIS write's target so an earlier chained failure can't wipe a newer drag's pending.
+    const revert = () =>
+      setPending((prev) => {
+        if (prev[id] !== toMin) return prev
+        const rest = { ...prev }
+        delete rest[id]
+        return rest
+      })
     // Serialize through chainRef so rapid drags apply in drag order (the last drag is the final state).
     chainRef.current = chainRef.current
       .then(() => rescheduleConsultation(id, startAt))
@@ -210,7 +216,7 @@ export function DayCalendar({
                   defaultTimeZone={defaultTimeZone}
                   canBook={canBook}
                   offDatesByAttorney={offDatesByAttorney}
-                  pendingMove={pending ? { id: pending.id, startMin: pending.toMin } : null}
+                  pendingMove={pending}
                   onSelectConsult={(consult) => setSelectedId(consult.id)}
                 />
               </div>
