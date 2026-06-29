@@ -47,10 +47,13 @@ export function TimeOffManager({
   // submit (the action reads formData.get("startDate"/"endDate")) and cleared on success.
   const [startDate, setStartDate] = React.useState("")
   const [endDate, setEndDate] = React.useState("")
+  // Validate the range client-side too: the "To" picker disables earlier dates, but picking "To" before
+  // "From" can leave end < start with both set — the action rejects that, this stops it being submitted.
+  const isValidRange = Boolean(startDate && endDate && endDate >= startDate)
 
   function onAdd(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    if (!startDate || !endDate) return
+    if (!isValidRange) return
     const fd = new FormData()
     fd.set("startDate", startDate)
     fd.set("endDate", endDate)
@@ -126,7 +129,7 @@ export function TimeOffManager({
               buttonClassName="w-40"
             />
           </Field>
-          <Button type="submit" disabled={pending || !startDate || !endDate}>
+          <Button type="submit" disabled={pending || !isValidRange}>
             {pending ? "Adding…" : `Add ${noun}`}
           </Button>
         </form>

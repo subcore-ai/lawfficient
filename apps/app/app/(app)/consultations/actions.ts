@@ -49,6 +49,7 @@ async function validateBooking(
   startAtIso: string,
   durationMin: number,
 ): Promise<string | null> {
+  if (!firmId) return "Invalid firm context."
   if (!attorneyId) return null
   const { error } = await supabase.rpc("api_validate_booking", {
     p_firm_id: firmId,
