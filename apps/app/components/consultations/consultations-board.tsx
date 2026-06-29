@@ -89,11 +89,15 @@ function ConsultationCard({ consultation: c, canManage }: { consultation: Consul
         {c.outcome ? <span className="text-muted-foreground truncate">Outcome: {c.outcome}</span> : null}
       </div>
 
-      {canManage ? (
-        <div className="mt-1">
-          <ConsultationActions consultationId={c.id} status={c.status} outcome={c.outcome} />
-        </div>
-      ) : null}
+      <div className="mt-1 flex items-center justify-between gap-2">
+        <Link
+          href={`/consultations/${c.id}`}
+          className="text-muted-foreground hover:text-foreground text-xs hover:underline"
+        >
+          View details
+        </Link>
+        {canManage ? <ConsultationActions consultationId={c.id} status={c.status} outcome={c.outcome} /> : null}
+      </div>
     </div>
   )
 }

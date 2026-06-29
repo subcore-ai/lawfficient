@@ -63,6 +63,7 @@ async function audit(supabase: DbClient, byUserId: string, id: string, label: st
 // page (its consultations card + activity timeline) is revalidated too when a lead is involved.
 function revalidate(leadId?: string | null) {
   revalidatePath(PATH)
+  revalidatePath("/consultations/[id]", "page") // the detail page, so an in-place action there refreshes
   revalidatePath("/")
   if (leadId) revalidatePath(`/leads/${leadId}`)
 }

@@ -376,14 +376,17 @@ export function ConsultPreviewDialog({
             ) : null}
 
             <DialogFooter className="flex-row items-center sm:justify-between">
-              {consult.leadId ? (
-                // render as a Link (an <a>), so tell Base UI it isn't a native <button>.
-                <Button variant="outline" size="sm" nativeButton={false} render={<Link href={`/leads/${consult.leadId}`} />}>
-                  View full case <ArrowUpRight className="size-4" />
+              <div className="flex items-center gap-1.5">
+                {/* render as Links (an <a>), so tell Base UI they aren't native <button>s. */}
+                <Button variant="outline" size="sm" nativeButton={false} render={<Link href={`/consultations/${consult.id}`} />}>
+                  View details
                 </Button>
-              ) : (
-                <span />
-              )}
+                {consult.leadId ? (
+                  <Button variant="ghost" size="sm" nativeButton={false} render={<Link href={`/leads/${consult.leadId}`} />}>
+                    View full case <ArrowUpRight className="size-4" />
+                  </Button>
+                ) : null}
+              </div>
               {canManage ? (
                 <div className="flex items-center gap-2">
                   {editable ? (
