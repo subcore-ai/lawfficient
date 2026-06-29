@@ -77,6 +77,7 @@ export function DashboardView({
   assignees,
   taxonomies,
   upcomingConsultations,
+  upcomingCount,
   canCreateLead,
   canManage,
 }: {
@@ -86,15 +87,11 @@ export function DashboardView({
   assignees: AssigneeOption[]
   taxonomies: FirmTaxonomies
   upcomingConsultations: UpcomingConsultation[]
+  upcomingCount: number
   canCreateLead: boolean
   canManage: boolean
 }) {
-  const { consultations, clients, cases, invoices } = useStore()
-
-  const upcoming = consultations
-    .filter((c) => ["scheduled", "paid", "rescheduled"].includes(c.status))
-    .slice()
-    .sort((a, b) => a.startAt.localeCompare(b.startAt))
+  const { clients, cases, invoices } = useStore()
 
   const overdue = invoices.filter((i) => i.status === "overdue").reduce((sum, i) => sum + i.remaining, 0)
   const redFlags = cases.filter((c) => c.redFlag !== "none").length
@@ -103,7 +100,7 @@ export function DashboardView({
   // they fall back to mock counts (leadKpisMock) like the rest of the dashboard.
   const kpis: { kpi: Kpi; mock?: boolean }[] = [
     { kpi: { label: "Leads in pipeline", value: String(openLeads), delta: 0, hint: "active leads" }, mock: leadKpisMock },
-    { kpi: { label: "Upcoming consultations", value: String(upcoming.length), delta: 20, hint: "scheduled & paid" }, mock: true },
+    { kpi: { label: "Upcoming consultations", value: String(upcomingCount), delta: 0, hint: "scheduled & paid" } },
     { kpi: { label: "Pending retainers (EA out)", value: String(eaOut), delta: 0, hint: "awaiting signature" }, mock: leadKpisMock },
     { kpi: { label: "Retained clients", value: String(clients.length), delta: 9.1, hint: "active engagements" }, mock: true },
     { kpi: { label: "Overdue balance", value: formatCurrency(overdue), delta: 4.2, hint: "across clients" }, mock: true },
