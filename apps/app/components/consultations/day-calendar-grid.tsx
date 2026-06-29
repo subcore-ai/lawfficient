@@ -7,6 +7,7 @@ import { cn } from "@workspace/ui/lib/utils"
 
 import { CalendarColumn, PX_PER_MIN } from "@/components/consultations/calendar-column"
 import { ConsultPreviewDialog } from "@/components/consultations/consult-preview-dialog"
+import type { OffDateRange } from "@/lib/availability/exceptions"
 import type { ConsultationType } from "@/lib/consultations/consultation-types"
 import type { CalendarColor } from "@/lib/scheduling/calendar-colors"
 import { formatHourLabel, type DayCalendar as DayCalendarData, type OffKind } from "@/lib/scheduling/day-calendar"
@@ -24,6 +25,7 @@ export function DayCalendar({
   consultationTypes,
   defaultTimeZone,
   canBook,
+  offDatesByAttorney,
 }: {
   columns: { attorney: Option; cal: DayCalendarData; off?: OffKind[]; color?: CalendarColor | null }[]
   typeName: string
@@ -32,6 +34,8 @@ export function DayCalendar({
   consultationTypes: ConsultationType[]
   defaultTimeZone: string | null
   canBook: boolean
+  // Upcoming off-dates per attorney (own time off + firm holidays) for the booking/reschedule pickers.
+  offDatesByAttorney: Record<string, OffDateRange[]>
 }) {
   const [selectedId, setSelectedId] = React.useState<string | null>(null)
   if (columns.length === 0) return null
@@ -125,6 +129,7 @@ export function DayCalendar({
                 consultationTypes={consultationTypes}
                 defaultTimeZone={defaultTimeZone}
                 canBook={canBook}
+                offDatesByAttorney={offDatesByAttorney}
                 onSelectConsult={(consult) => setSelectedId(consult.id)}
               />
             </div>
@@ -139,6 +144,7 @@ export function DayCalendar({
           if (!o) setSelectedId(null)
         }}
         canManage={canBook}
+        offDatesByAttorney={offDatesByAttorney}
       />
     </div>
   )

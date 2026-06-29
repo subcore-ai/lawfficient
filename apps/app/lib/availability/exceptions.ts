@@ -29,9 +29,13 @@ export function isValidYmd(s: string): boolean {
   return dt.getUTCFullYear() === y && dt.getUTCMonth() === mo - 1 && dt.getUTCDate() === d
 }
 
+// A bare off-date range — the minimal shape isDateOff needs, used to thread an attorney's full-day
+// unavailability (own time off + firm holidays) to the date pickers without fabricating row ids.
+export type OffDateRange = { startDate: string; endDate: string }
+
 // Is `date` (YYYY-MM-DD) inside any exception range? ISO dates compare lexicographically = chronologically,
 // so plain string comparison is correct (no Date/tz needed).
-export function isDateOff(exceptions: { startDate: string; endDate: string }[], date: string): boolean {
+export function isDateOff(exceptions: OffDateRange[], date: string): boolean {
   return exceptions.some((e) => date >= e.startDate && date <= e.endDate)
 }
 

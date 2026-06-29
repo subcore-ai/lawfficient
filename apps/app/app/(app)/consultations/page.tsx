@@ -169,7 +169,8 @@ async function renderCalendar({
   // Look back a day so a consult that STARTED the day before the week but carries into Monday morning still
   // subtracts from its slots. buildDayCalendar shows only same-day-start consults but blocks on all of them.
   const loadFrom = zonedWallTimeToUtcISO(`${addDay(weekStart, -1)}T00:00`, zone)
-  const [availRes, weekConsultRes, offRes] = await Promise.all([
+  const today = currentDateInZone(zone)
+  const [availRes, weekConsultRes, offRes, upcomingOffRes] = await Promise.all([
     supabase
       .from("attorney_availability")
       .select("attorney_id, weekday, start_time, end_time")
@@ -192,11 +193,32 @@ async function renderCalendar({
       .or(`attorney_id.in.(${allIds.join(",")}),attorney_id.is.null`)
       .lte("start_date", weekLast)
       .gte("end_date", weekStart),
+    // Upcoming off-date ranges (not week-bounded), so the book/reschedule date pickers can gray out any
+    // future day the chosen attorney is fully off — the picker can browse to any month, unlike the grid.
+    supabase
+      .from("availability_exceptions")
+      .select("attorney_id, start_date, end_date")
+      .or(`attorney_id.in.(${allIds.join(",")}),attorney_id.is.null`)
+      .gte("end_date", today),
   ])
   // Fail loud: a swallowed error would render as "No office hours" or an empty/wrong slot grid.
   if (availRes.error) throw availRes.error
   if (weekConsultRes.error) throw weekConsultRes.error
   if (offRes.error) throw offRes.error
+  if (upcomingOffRes.error) throw upcomingOffRes.error
+
+  // Per-attorney upcoming off-dates for the pickers: each attorney's OWN ranges + every firm-wide holiday
+  // (attorney_id NULL closes the date for everyone), merged. Keyed by attorney id.
+  const firmHolidayRanges = (upcomingOffRes.data ?? [])
+    .filter((e) => e.attorney_id === null)
+    .map((e) => ({ startDate: e.start_date, endDate: e.end_date }))
+  const offDatesByAttorney: Record<string, { startDate: string; endDate: string }[]> = {}
+  for (const a of schedulable) {
+    const own = (upcomingOffRes.data ?? [])
+      .filter((e) => e.attorney_id === a.id)
+      .map((e) => ({ startDate: e.start_date, endDate: e.end_date }))
+    offDatesByAttorney[a.id] = [...firmHolidayRanges, ...own]
+  }
 
   const nowMs = Date.now()
   // Each schedulable attorney's whole week: office hours by weekday, the week's consults, and which dates are
@@ -252,6 +274,7 @@ async function renderCalendar({
       attorneys={attorneys}
       consultationTypes={types}
       canBook={canManage}
+      offDatesByAttorney={offDatesByAttorney}
     />
   )
 }
