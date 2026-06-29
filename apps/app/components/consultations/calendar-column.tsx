@@ -1,5 +1,9 @@
 "use client"
 
+import { useEffect, useRef, type CSSProperties } from "react"
+import { useDraggable } from "@dnd-kit/core"
+import { CSS } from "@dnd-kit/utilities"
+
 import { cn } from "@workspace/ui/lib/utils"
 
 import { BookConsultationDialog } from "@/components/consultations/book-consultation-dialog"
@@ -30,6 +34,7 @@ export function CalendarColumn({
   canBook,
   offDatesByAttorney,
   color,
+  pendingMove,
   onSelectConsult,
 }: {
   windows: CalendarWindow[]
@@ -48,6 +53,9 @@ export function CalendarColumn({
   color?: CalendarColor | null // the attorney's calendar color; tints office hours + consults + slots
   // Click a booked consult → the parent opens one shared detail dialog (keeps a single modal across columns).
   onSelectConsult: (c: CalendarConsult) => void
+  // Optimistic drag-reschedule: per-consult map (consult id → optimistic start-minute) so a consult mid-move
+  // renders at its new start until the server confirms (the parent reverts on failure).
+  pendingMove?: Record<string, number>
 }) {
   const top = (min: number) => (min - gridStartMin) * PX_PER_MIN
   const height = (mins: number) => Math.max(mins * PX_PER_MIN, 16)
@@ -136,25 +144,97 @@ export function CalendarColumn({
         )
       })}
 
-      {/* Booked consults — drawn over slots/shading; click opens the shared detail dialog. */}
-      {consults.map((c) => (
-        <button
-          key={c.id}
-          type="button"
-          onClick={() => onSelectConsult(c)}
-          title={`${c.leadName} · ${c.type} · ${formatSlotTime(c.startMin)} – ${formatSlotTime(c.endMin)}`}
-          className="bg-primary/85 text-primary-foreground absolute inset-x-0.5 flex cursor-pointer items-start justify-between gap-1.5 overflow-hidden rounded px-1.5 py-0.5 text-left text-[11px] leading-tight shadow-sm transition-[filter] hover:brightness-95"
-          style={{ top: top(c.startMin), height: height(c.endMin - c.startMin), ...consultTint }}
-        >
-          <span className="min-w-0">
-            <span className="block truncate font-medium">{c.leadName}</span>
-            <span className="block truncate opacity-80">{c.type}</span>
-          </span>
-          <span className="shrink-0 text-[10px] whitespace-nowrap opacity-75 tabular-nums">
-            {formatSlotTime(c.startMin)} – {formatSlotTime(c.endMin)}
-          </span>
-        </button>
-      ))}
+      {/* Booked consults — click opens the detail dialog; drag (when canBook) reschedules vertically. */}
+      {consults.map((c) => {
+        // While a drag is pending, render the block AND its time label at the optimistic start.
+        const startMin = pendingMove?.[c.id] ?? c.startMin
+        const endMin = startMin + (c.endMin - c.startMin)
+        // Only non-terminal consults are draggable — rescheduleConsultation rejects finalized ones, so a
+        // completed block would just fail with a toast.
+        const canDrag = canBook && (c.status === "scheduled" || c.status === "paid" || c.status === "rescheduled")
+        return (
+          <DraggableConsult
+            key={c.id}
+            consult={c}
+            startMin={startMin}
+            endMin={endMin}
+            topPx={top(startMin)}
+            heightPx={height(c.endMin - c.startMin)}
+            tint={consultTint}
+            canDrag={canDrag}
+            onSelect={onSelectConsult}
+          />
+        )
+      })}
     </>
+  )
+}
+
+// One booked-consult block: click → detail dialog; drag vertically (when canDrag) → reschedule. Its own
+// component so useDraggable is one hook per block, not a hook called inside the parent's consults.map().
+function DraggableConsult({
+  consult,
+  startMin,
+  endMin,
+  topPx,
+  heightPx,
+  tint,
+  canDrag,
+  onSelect,
+}: {
+  consult: CalendarConsult
+  // Displayed start/end (the optimistic minutes while a drag is pending), for the label + title.
+  startMin: number
+  endMin: number
+  topPx: number
+  heightPx: number
+  tint: CSSProperties
+  canDrag: boolean
+  onSelect: (c: CalendarConsult) => void
+}) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: consult.id, disabled: !canDrag })
+  // The browser emits a click on pointer-up after a drag; swallow that one so a reschedule doesn't also open
+  // the detail dialog. A plain click (no drag) never sets this, so it still opens normally.
+  const draggedRef = useRef(false)
+  useEffect(() => {
+    if (!isDragging) return
+    draggedRef.current = true
+    // When the drag ends, disarm on the next tick: late enough to swallow the click the browser fires on
+    // release, but not left armed forever (which would eat a later genuine click if no click followed).
+    return () => {
+      setTimeout(() => {
+        draggedRef.current = false
+      }, 0)
+    }
+  }, [isDragging])
+  return (
+    <button
+      ref={setNodeRef}
+      type="button"
+      onClick={() => {
+        if (draggedRef.current) {
+          draggedRef.current = false
+          return
+        }
+        onSelect(consult)
+      }}
+      title={`${consult.leadName} · ${consult.type} · ${formatSlotTime(startMin)} – ${formatSlotTime(endMin)}`}
+      className={cn(
+        "bg-primary/85 text-primary-foreground absolute inset-x-0.5 flex touch-none items-start justify-between gap-1.5 overflow-hidden rounded px-1.5 py-0.5 text-left text-[11px] leading-tight shadow-sm transition-[filter] hover:brightness-95",
+        canDrag ? "cursor-grab active:cursor-grabbing" : "cursor-pointer",
+        isDragging && "z-20 opacity-90 shadow-lg",
+      )}
+      style={{ top: topPx, height: heightPx, transform: CSS.Translate.toString(transform), ...tint }}
+      {...attributes}
+      {...listeners}
+    >
+      <span className="min-w-0">
+        <span className="block truncate font-medium">{consult.leadName}</span>
+        <span className="block truncate opacity-80">{consult.type}</span>
+      </span>
+      <span className="shrink-0 text-[10px] whitespace-nowrap opacity-75 tabular-nums">
+        {formatSlotTime(startMin)} – {formatSlotTime(endMin)}
+      </span>
+    </button>
   )
 }

@@ -274,6 +274,39 @@ export async function updateConsultation(id: string, formData: FormData): Promis
   return { ok: true }
 }
 
+// Move a consult to a new start time (calendar drag) — only start_at changes (duration / attorney / fee
+// stay). The consultations_validate_booking trigger (0051) re-checks office hours / overlap / past, so an
+// invalid drop surfaces as an error the caller reverts. Non-terminal only, like updateConsultation.
+export async function rescheduleConsultation(id: string, startAtIso: string): Promise<ActionResult> {
+  const gate = await requireConsultEdit()
+  if (!gate.ok) return { error: gate.error }
+  const ms = Date.parse(startAtIso)
+  if (!Number.isFinite(ms)) return { error: "Couldn't read the new time." }
+  const startAt = new Date(ms).toISOString()
+
+  const supabase = await createClient()
+  const { data: updated, error } = await supabase
+    .from("consultations")
+    .update({ start_at: startAt, last_activity: new Date().toISOString() })
+    .eq("id", id)
+    .in("status", ["scheduled", "paid", "rescheduled"])
+    .select("id, lead_id, type, time_zone")
+    .maybeSingle()
+  const ruleError = bookingRuleError(error)
+  if (ruleError) return { error: ruleError }
+  if (error?.code === "23P01") return { error: "That attorney already has a consultation at that time." }
+  if (error) return { error: "Couldn't reschedule the consultation." }
+  if (!updated) return { error: "This consultation is finalized and can't be moved." }
+
+  await audit(supabase, gate.user.id, id, updated.type, "rescheduled")
+  await recordLeadEvent(
+    updated.lead_id,
+    `Consultation rescheduled — ${updated.type}, ${formatConsultationWhen(startAt, updated.time_zone)}`,
+  )
+  revalidate(updated.lead_id)
+  return { ok: true }
+}
+
 // Cancel / complete / mark no-show — the only transitions this action represents.
 export async function setConsultationStatus(id: string, status: string): Promise<ActionResult> {
   const gate = await requireConsultEdit()

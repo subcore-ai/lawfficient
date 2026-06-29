@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { buildDayCalendar, weekDatesOf, weekStartOf, weekdayOf } from "./day-calendar"
+import { buildDayCalendar, draggedStartMin, minToHhmm, weekDatesOf, weekStartOf, weekdayOf } from "./day-calendar"
 
 describe("weekdayOf", () => {
   test("computes the weekday of a calendar date (0=Sun..6=Sat)", () => {
@@ -25,6 +25,29 @@ describe("weekStartOf / weekDatesOf", () => {
       "2026-07-04",
       "2026-07-05",
     ])
+  })
+})
+
+describe("draggedStartMin", () => {
+  const px = 1.1 // PX_PER_MIN
+  test("snaps a vertical drag to 15-minute steps", () => {
+    expect(draggedStartMin(600, 33, px)).toBe(630) // +30px ≈ +27min → snaps to +30
+    expect(draggedStartMin(600, -33, px)).toBe(570) // up → -30
+    expect(draggedStartMin(600, 8, px)).toBe(600) // ~7min → snaps to 0 (no move)
+    expect(draggedStartMin(600, 17, px)).toBe(615) // ~15min → +15
+  })
+  test("clamps within the day to the last snapped start (00:00 .. 23:45 for 15-min steps)", () => {
+    expect(draggedStartMin(10, -1000, px)).toBe(0)
+    expect(draggedStartMin(1430, 1000, px)).toBe(1425) // 23:45 — last 15-min start before midnight, not 23:59
+  })
+})
+
+describe("minToHhmm", () => {
+  test("formats minutes-of-day as zero-padded 24h HH:MM", () => {
+    expect(minToHhmm(0)).toBe("00:00")
+    expect(minToHhmm(587)).toBe("09:47")
+    expect(minToHhmm(600)).toBe("10:00")
+    expect(minToHhmm(1439)).toBe("23:59")
   })
 })
 

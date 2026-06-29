@@ -216,6 +216,7 @@ export function CalendarBoard({
             defaultTimeZone={tz}
             canBook={canBook}
             offDatesByAttorney={offDatesByAttorney}
+            date={selectedDate}
             nowMin={nowMin}
             isPastDay={isPastDay}
           />

@@ -1,18 +1,27 @@
 "use client"
 
 import * as React from "react"
+import { DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core"
+import { restrictToParentElement, restrictToVerticalAxis } from "@dnd-kit/modifiers"
 import { Building2 } from "lucide-react"
 
+import { toast } from "@workspace/ui/components/sonner"
 import { cn } from "@workspace/ui/lib/utils"
 
+import { rescheduleConsultation } from "@/app/(app)/consultations/actions"
 import { CalendarColumn, PX_PER_MIN } from "@/components/consultations/calendar-column"
 import { ConsultPreviewDialog } from "@/components/consultations/consult-preview-dialog"
 import type { OffDateRange } from "@/lib/availability/exceptions"
 import type { ConsultationType } from "@/lib/consultations/consultation-types"
+import { zonedWallTimeToUtcISO } from "@/lib/consultations/time"
 import type { CalendarColor } from "@/lib/scheduling/calendar-colors"
-import { formatHourLabel, type DayCalendar as DayCalendarData, type OffKind } from "@/lib/scheduling/day-calendar"
+import { draggedStartMin, formatHourLabel, formatSlotTime, minToHhmm, type DayCalendar as DayCalendarData, type OffKind } from "@/lib/scheduling/day-calendar"
 
 type Option = { id: string; name: string }
+
+// Stable sensor options (module-level so the reference can't change on the 1-minute re-render and disturb
+// an in-progress drag).
+const DRAG_ACTIVATION = { activationConstraint: { distance: 6 } }
 
 // The day grid: one shared hour gutter + one CalendarColumn per attorney, all aligned to a shared time
 // range (union of every column's, so columns line up). One column = the single-attorney view; several =
@@ -26,6 +35,7 @@ export function DayCalendar({
   defaultTimeZone,
   canBook,
   offDatesByAttorney,
+  date,
   nowMin,
   isPastDay,
 }: {
@@ -38,12 +48,31 @@ export function DayCalendar({
   canBook: boolean
   // Upcoming off-dates per attorney (own time off + firm holidays) for the booking/reschedule pickers.
   offDatesByAttorney: Record<string, OffDateRange[]>
+  // The viewed day (YYYY-MM-DD), for computing a dragged consult's new start instant.
+  date: string
   // Firm-tz minute-of-day of "now" when the viewed day IS today (else null/undefined); a past date sets
   // isPastDay. Used to dim the elapsed part of the grid + draw the "now" hairline.
   nowMin?: number | null
   isPastDay?: boolean
 }) {
   const [selectedId, setSelectedId] = React.useState<string | null>(null)
+  // Drag-to-reschedule state + sensors — declared before the early return so the hooks always run.
+  // `pending` maps a consult id → its optimistic new start-minute while that reschedule write is in flight.
+  const [pending, setPending] = React.useState<Record<string, number>>({})
+  // Count of in-flight reschedule writes. While > 0 we hold every optimistic move (skip the reconcile), so a
+  // rapid drag back to the original (A→B→A) isn't dropped before the queued writes drain + flicker through B.
+  const [draining, setDraining] = React.useState(0)
+  // Serialize reschedule writes so rapid drags persist in drag order (no last-response-wins race).
+  const chainRef = React.useRef<Promise<unknown>>(Promise.resolve())
+  // The latest drag target per consult, so a serialized write that a newer drag has since superseded doesn't
+  // pop a now-stale "Rescheduled to <time>" success toast.
+  const latestTargetRef = React.useRef<Record<string, number>>({})
+  // Small activation distance so a plain click still opens the detail dialog (only a real drag moves it).
+  const sensors = useSensors(useSensor(PointerSensor, DRAG_ACTIVATION))
+  // Stable id for the DndContext so dnd-kit's aria-describedby is deterministic across SSR + client. Without
+  // an id, dnd-kit falls back to a module-level counter that differs (long-lived server process vs a fresh
+  // client load) → "DndDescribedBy-N" hydration mismatch.
+  const dndId = React.useId()
   if (columns.length === 0) return null
 
   const gridStartMin = Math.min(...columns.map((c) => c.cal.gridStartMin))
@@ -60,9 +89,80 @@ export function DayCalendar({
   const lastHour = Math.floor(gridEndMin / 60)
   const hours = Array.from({ length: lastHour - firstHour + 1 }, (_, i) => firstHour + i)
 
+  // Drag-to-reschedule. Optimistically move the dragged consult while the server write is in flight.
+  const tz = defaultTimeZone ?? "America/New_York"
+  // Reconcile each optimistic move against the latest server DATA (not a columns-reference compare — the
+  // board rebuilds `columns` every 1-minute tick, which would drop the move spuriously). Per-consult (a map)
+  // so concurrent drags on different consults don't clobber each other; keep an entry only while its consult
+  // exists and hasn't yet reached the TARGET minute (checking the target — not "moved off the original" —
+  // keeps an intermediate chained write from clearing a still-pending later target).
+  if (draining === 0) {
+    const survivors = Object.entries(pending).filter(([cid, toMin]) => {
+      const live = columns.flatMap((c) => c.cal.consults).find((x) => x.id === cid)
+      return live !== undefined && live.startMin !== toMin
+    })
+    if (survivors.length !== Object.keys(pending).length) setPending(Object.fromEntries(survivors))
+  }
+  function onDragEnd(e: DragEndEvent) {
+    const id = String(e.active.id)
+    const consult = columns.flatMap((c) => c.cal.consults).find((x) => x.id === id)
+    if (!consult) return
+    // Drag from the ON-SCREEN position (the optimistic one if a move is already pending), not the stale
+    // server time, so a second drag mid-flight stacks correctly.
+    const baseMin = pending[id] ?? consult.startMin
+    const toMin = draggedStartMin(baseMin, e.delta.y, PX_PER_MIN)
+    if (toMin === baseMin) return // no real move (snapped back to where it already is)
+    const startAt = zonedWallTimeToUtcISO(`${date}T${minToHhmm(toMin)}`, tz)
+    if (!startAt) {
+      toast.error("That time isn't valid on this day.") // e.g. a nonexistent DST spring-forward wall time
+      return
+    }
+    setPending((prev) => ({ ...prev, [id]: toMin }))
+    latestTargetRef.current[id] = toMin // this drag is now the latest intent for the consult
+    setDraining((n) => n + 1)
+    // Scope the revert to THIS write's target so an earlier chained failure can't wipe a newer drag's pending.
+    const revert = () =>
+      setPending((prev) => {
+        if (prev[id] !== toMin) return prev
+        const rest = { ...prev }
+        delete rest[id]
+        return rest
+      })
+    // Serialize through chainRef so rapid drags apply in drag order (the last drag is the final state).
+    chainRef.current = chainRef.current
+      .then(() => rescheduleConsultation(id, startAt))
+      .then((res) => {
+        if (res && "error" in res) {
+          toast.error(res.error)
+          revert() // spring back
+        } else if (toMin === latestTargetRef.current[id]) {
+          // Server confirmed — toast only if this is still the consult's latest intent, so an earlier write
+          // in a rapid stacked drag doesn't announce a now-stale time.
+          toast.success(`Rescheduled to ${formatSlotTime(toMin)}`)
+        }
+      })
+      .catch(() => {
+        toast.error("Couldn't reschedule — please try again.")
+        revert()
+      })
+      .finally(() => setDraining((n) => n - 1))
+  }
+
   // One dialog for the whole grid, keyed by id — the live consult is derived from the columns, so after a
   // reschedule / cancel / delete revalidate it stays in sync (and closes if the consult is gone).
-  const selected = columns.flatMap((c) => c.cal.consults).find((c) => c.id === selectedId) ?? null
+  const selectedBase = columns.flatMap((c) => c.cal.consults).find((c) => c.id === selectedId) ?? null
+  // While a drag for the open consult is still pending, show the optimistic time in the detail dialog too, so
+  // it matches the moved block instead of the not-yet-revalidated server time (it self-corrects on revalidate).
+  const selectedPendingMin = selectedBase ? pending[selectedBase.id] : undefined
+  const selected =
+    selectedBase && selectedPendingMin !== undefined
+      ? {
+          ...selectedBase,
+          startMin: selectedPendingMin,
+          endMin: selectedPendingMin + (selectedBase.endMin - selectedBase.startMin),
+          startAt: zonedWallTimeToUtcISO(`${date}T${minToHhmm(selectedPendingMin)}`, tz) ?? selectedBase.startAt,
+        }
+      : selectedBase
   // Drop a stale id during render once its consult vanishes (canceled / deleted, or the day changed), so it
   // can't silently reopen the dialog if that consult later reappears (e.g. navigate away + back).
   if (selectedId !== null && selected === null) setSelectedId(null)
@@ -124,29 +224,33 @@ export function DayCalendar({
           </div>
         ))}
 
-        {/* Attorney columns, right of the label gutter. */}
-        <div className="absolute inset-y-0 left-12 right-0 flex">
-          {columns.map((c) => (
-            <div key={c.attorney.id} className="border-border/50 relative flex-1 border-l first:border-l-0">
-              <CalendarColumn
-                windows={c.cal.windows}
-                consults={c.cal.consults}
-                slots={c.cal.slots}
-                color={c.color}
-                gridStartMin={gridStartMin}
-                attorneyId={c.attorney.id}
-                typeName={typeName}
-                leads={leads}
-                attorneys={attorneys}
-                consultationTypes={consultationTypes}
-                defaultTimeZone={defaultTimeZone}
-                canBook={canBook}
-                offDatesByAttorney={offDatesByAttorney}
-                onSelectConsult={(consult) => setSelectedId(consult.id)}
-              />
-            </div>
-          ))}
-        </div>
+        {/* Attorney columns. Wrapped in a DndContext so a consult block can be dragged vertically to
+            reschedule (restrictToVerticalAxis); the column renders the optimistic move from `pending`. */}
+        <DndContext id={dndId} sensors={sensors} modifiers={[restrictToVerticalAxis, restrictToParentElement]} onDragEnd={onDragEnd}>
+          <div className="absolute inset-y-0 left-12 right-0 flex">
+            {columns.map((c) => (
+              <div key={c.attorney.id} className="border-border/50 relative flex-1 border-l first:border-l-0">
+                <CalendarColumn
+                  windows={c.cal.windows}
+                  consults={c.cal.consults}
+                  slots={c.cal.slots}
+                  color={c.color}
+                  gridStartMin={gridStartMin}
+                  attorneyId={c.attorney.id}
+                  typeName={typeName}
+                  leads={leads}
+                  attorneys={attorneys}
+                  consultationTypes={consultationTypes}
+                  defaultTimeZone={defaultTimeZone}
+                  canBook={canBook}
+                  offDatesByAttorney={offDatesByAttorney}
+                  pendingMove={pending}
+                  onSelectConsult={(consult) => setSelectedId(consult.id)}
+                />
+              </div>
+            ))}
+          </div>
+        </DndContext>
 
         {/* Elapsed-time shading + "now" hairline (today / past days only). pointer-events-none so the
             future slots below stay clickable, and any past consult under it stays clickable too. */}

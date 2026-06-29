@@ -99,6 +99,23 @@ export function weekDatesOf(date: string): string[] {
   return Array.from({ length: 7 }, (_, i) => addDays(start, i))
 }
 
+// Drag-to-reschedule math. A vertical drag of `deltaY` px → a new start-minute-of-day, snapped to `snapMin`
+// (default 15). `pxPerMin` is the column's vertical scale. Clamped to >= 0. Pure — unit-tested.
+export function draggedStartMin(currentStartMin: number, deltaY: number, pxPerMin: number, snapMin = 15): number {
+  const deltaMin = Math.round(deltaY / pxPerMin / snapMin) * snapMin
+  // Clamp within the day to the last SNAPPED start (one snap-slot before midnight, e.g. 23:45 for 15-min
+  // steps) — not 23:59 — so an extreme drag still lands on a grid line, and minToHhmm never wraps past midnight.
+  const maxStart = 24 * 60 - snapMin
+  return Math.min(maxStart, Math.max(0, currentStartMin + deltaMin))
+}
+
+// Minutes-of-day → "HH:MM" (24h, zero-padded), for building a wall-time string to convert to UTC.
+export function minToHhmm(min: number): string {
+  const h = Math.floor(min / 60) % 24
+  const m = ((min % 60) + 60) % 60
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`
+}
+
 export function buildDayCalendar(opts: {
   date: string // YYYY-MM-DD
   tz: string
