@@ -277,7 +277,17 @@ export async function updateConsultationViaApi(
     return { ok: false, status: 422, code: "invalid_request", message: "Nothing to update." }
   }
 
-  // attorney_id, when provided, must be a uuid or null (it hits the uuid column inside the RPC).
+  // An explicit attorney_id: null (unassign) isn't supported — a booked consult always has an attorney —
+  // so reject it rather than silently dropping it to "leave unchanged" (patch.attorneyId ?? undefined).
+  if (has("attorney_id") && body.attorney_id === null) {
+    return {
+      ok: false,
+      status: 422,
+      code: "invalid_request",
+      message: "attorney_id can't be cleared; reassign to another attorney instead.",
+    }
+  }
+  // attorney_id, when provided, must be a uuid (it hits the uuid column inside the RPC).
   if (patch.attorneyId && !isUuid(patch.attorneyId)) {
     return { ok: false, status: 422, code: "invalid_request", message: "attorney_id must be a UUID." }
   }
