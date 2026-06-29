@@ -7,7 +7,7 @@ description: PATCH /api/consultations/{id} — move a consultation to a new slot
 PATCH /api/consultations/{id}
 ```
 
-Reschedules a consultation, cancels it, or both are separate operations on the same endpoint.
+Reschedules a consultation or cancels it — two separate operations on the same endpoint that can't be combined in one request.
 Requires `consultations:write`. Only the fields you send change. Returns the updated consultation and
 fires the matching [webhooks](/docs/webhooks). Only a **non-terminal** consultation can change — a
 finalized (canceled / completed / no-show) consultation, or one from another firm, returns `404`.
@@ -37,9 +37,11 @@ like a [booking](/docs/consultations/book). Reschedule and cancel can't be combi
 nothing to change is a `422`.
 
 <Callout type="info">
-  Unlike [booking](/docs/consultations/book), a PATCH needs no `Idempotency-Key` — it's naturally
-  idempotent. Applying the same reschedule or cancel again lands the consultation in the same state.
-  (A cancel of an already-finalized consultation returns `404`, since it's no longer changeable.)
+  A PATCH carries no `Idempotency-Key` (unlike [booking](/docs/consultations/book), which creates a new
+  resource). A **reschedule** is safe to repeat — re-sending the same slot is a no-op. A **cancel** is
+  not a clean replay, though: once canceled the consultation is terminal, so a second cancel returns
+  `404`. If a cancel response is lost, confirm the state with a [GET](/docs/consultations/get) before
+  retrying.
 </Callout>
 
 ## Events
