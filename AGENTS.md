@@ -91,11 +91,23 @@ Two levels render it:
 
 ## Isolating large, independent builds
 For a large, self-contained piece of work that doesn't depend on the current branch's
-in-flight changes (a new API surface, a new module, a migration-bearing feature), prefer
-to build it in an isolated git-worktree subagent instead of inline.
+in-flight changes (a new API surface, a new module, a migration-bearing feature), it can be
+worth building in an isolated git-worktree subagent instead of inline.
 - Base the worktree on the correct parent branch (whose migrations/state the task needs);
   verify it (expected migrations present) before spawning — don't assume current HEAD.
 - The subagent runs `bun install` and needs untracked `.env.local` copied in to build.
 - It commits to its branch and reports a summary — it does NOT push or open a PR; surface
   the work for review first.
-Skip this for small, quick, or tightly-coupled changes — the overhead isn't worth it.
+
+A subagent offloads the *writing*, not the *reviewing* — you still read it, integrate it
+(cherry-pick, gates, git surgery), and own code you didn't author. So it earns its overhead
+for **breadth** (a wide, mechanical sweep), **parallelism** (independent builds at once), or
+relieving a **full main-thread context** — not merely because a task is "large." Default to
+building **inline** when the work is:
+- small, quick, or tightly coupled to the current branch;
+- **security-sensitive or subtle** — auth, RLS, migrations with tricky grants, idempotency,
+  concurrency — where you'll deeply review it regardless, and authoring catches subtleties that
+  reviewing a summary misses;
+- iterative or exploratory, where a round-trip per change is slower than just doing it.
+
+When in doubt, inline.
