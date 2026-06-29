@@ -1,0 +1,4 @@
+{
+  "title": "Consultations",
+  "pages": ["index", "list", "get", "book", "update"]
+}

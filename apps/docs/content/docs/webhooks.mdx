@@ -9,7 +9,7 @@ Webhooks are the **outbound** mirror of the read API: instead of polling, you gi
 
 ## Events
 
-Event types are named `resource.action`. Today the lead lifecycle is covered:
+Event types are named `resource.action`. Today the lead and consultation lifecycles are covered:
 
 | Event | Fires when |
 | --- | --- |
@@ -18,6 +18,9 @@ Event types are named `resource.action`. Today the lead lifecycle is covered:
 | `lead.status_changed` | A lead moves to a different pipeline status. |
 | `lead.assigned` | A lead's assignee changes. |
 | `lead.archived` | A lead is archived. |
+| `consultation.booked` | A consultation is booked. |
+| `consultation.rescheduled` | A consultation is moved to a new slot. |
+| `consultation.canceled` | A consultation is canceled. |
 
 Each endpoint subscribes to specific events, or to `*` for all of them. The catalog grows as more
 of the app is exposed.
@@ -25,7 +28,8 @@ of the app is exposed.
 ## Payload
 
 A `POST` with a JSON envelope. `data` is the resource in the **same shape the API returns** — a
-`lead.*` event carries the [lead object](/docs/leads/get) verbatim.
+`lead.*` event carries the [lead object](/docs/leads/get) verbatim, and a `consultation.*` event
+carries the [consultation object](/docs/consultations/get).
 
 ```json
 {

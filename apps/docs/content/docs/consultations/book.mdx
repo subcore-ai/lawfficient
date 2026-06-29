@@ -1,0 +1,102 @@
+---
+title: Book a consultation
+description: POST /api/consultations — book a consultation into an attorney's free slot.
+---
+
+```http
+POST /api/consultations
+```
+
+Books a consultation (scope `consultations:write`). The payload is validated, the requested time is
+checked against the attorney's office hours and time-off for that day, and the database guarantees
+the slot isn't already taken. The booked consultation is returned in full with status `scheduled`,
+and a [`consultation.booked`](/docs/webhooks) webhook fires.
+
+## Request body
+
+JSON. `lead_id`, `attorney_id`, `type`, `start_at`, and `duration_min` are required. The API books a
+real slot, so both the lead and the attorney are mandatory — an attorney is needed to validate office
+hours.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `lead_id` | string | Required. The [lead](/docs/leads) (UUID) this consultation is for. |
+| `attorney_id` | string | Required. A schedulable, active attorney (UUID) in your firm. |
+| `type` | string | Required. The consultation type (free text, e.g. `Initial consultation`). |
+| `start_at` | string | Required. ISO-8601 start instant, interpreted as **UTC**. |
+| `duration_min` | number | Required. Length in minutes, 5–1440. |
+| `time_zone` | string | Optional IANA zone the consultation is shown in. Defaults to `America/New_York`. |
+| `paid` | boolean | Optional payment status (tracked, not charged). Defaults to `false`. |
+| `amount` | number \| null | Optional charge amount; non-negative, or `null`. |
+| `data` | object | Optional practice-specific fields. |
+
+<Callout type="info">
+  `start_at` is a UTC instant, not a wall-clock time — the API is machine-to-machine, so there's no
+  time-zone conversion on the way in. `time_zone` only sets how the consultation is **displayed** in
+  the app. Office-hours and time-off validation compares the resulting local time against the
+  attorney's schedule.
+</Callout>
+
+## Idempotency
+
+Send an `Idempotency-Key` header to make a booking safe to retry — a repeat with the **same** key
+returns the original consultation instead of booking a second. Use a fresh unique value (e.g. a UUID)
+per logical booking.
+
+```http
+Idempotency-Key: 9d2b7c1e-5a4b-4c3d-8e2f-1a2b3c4d5e6f
+```
+
+## Example
+
+```bash
+curl https://app.lawfficient.com/api/consultations \
+  -H "Authorization: Bearer $LAWFFICIENT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: 9d2b7c1e-5a4b-4c3d-8e2f-1a2b3c4d5e6f" \
+  -d '{
+    "lead_id": "3f8c1e2a-1b2c-4d5e-8f90-abcdef012345",
+    "attorney_id": "a1b2c3d4-0000-4000-8000-000000000000",
+    "type": "Initial consultation",
+    "start_at": "2026-07-02T15:00:00.000Z",
+    "duration_min": 30,
+    "time_zone": "America/New_York"
+  }'
+```
+
+```json title="201 Created"
+{
+  "id": "7c1e2a3f-1b2c-4d5e-8f90-abcdef012345",
+  "lead_id": "3f8c1e2a-1b2c-4d5e-8f90-abcdef012345",
+  "attorney_id": "a1b2c3d4-0000-4000-8000-000000000000",
+  "type": "Initial consultation",
+  "status": "scheduled",
+  "start_at": "2026-07-02T15:00:00.000Z",
+  "duration_min": 30,
+  "time_zone": "America/New_York",
+  "paid": false,
+  "amount": null,
+  "outcome": null,
+  "archived": false,
+  "created_at": "2026-06-28T10:00:00.000Z",
+  "data": {}
+}
+```
+
+## Errors
+
+Errors use the [error envelope](/docs/errors):
+
+| `code` | Status | When |
+| --- | --- | --- |
+| `invalid_request` | 422 | A missing/invalid field, a non-UUID `lead_id`/`attorney_id`, or a lead/attorney that isn't a bookable member of your firm. |
+| `outside_office_hours` | 422 | The time falls outside the attorney's office hours. |
+| `attorney_unavailable` | 422 | The attorney has time off (or a holiday) on that date. |
+| `slot_unavailable` | 409 | The attorney is already booked for an overlapping slot. |
+| `insufficient_scope` | 403 | The key lacks `consultations:write`. |
+
+<Callout type="info">
+  Office-hours and time-off rejections are a `422` (the *request* is well-formed but the slot isn't
+  bookable), while an overlap with an existing consultation is a `409`. Branch on the `code`, not the
+  status, to tell a closed-hours slot from a double-book.
+</Callout>

@@ -1,0 +1,105 @@
+---
+title: Reschedule or cancel a consultation
+description: PATCH /api/consultations/{id} — move a consultation to a new slot, or cancel it.
+---
+
+```http
+PATCH /api/consultations/{id}
+```
+
+Reschedules a consultation or cancels it — two separate operations on the same endpoint that can't be combined in one request.
+Requires `consultations:write`. Only the fields you send change. Returns the updated consultation and
+fires the matching [webhooks](/docs/webhooks). Only a **non-terminal** consultation can change — a
+finalized (canceled / completed / no-show) consultation, or one from another firm, returns `404`.
+
+## Path parameters
+
+| Param | Type | Description |
+| --- | --- | --- |
+| `id` | string | The consultation's UUID. |
+
+## Request body
+
+JSON. Send slot fields to **reschedule**, or `status: "canceled"` to **cancel** — not both in one
+request.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `start_at` | string | New ISO-8601 start instant (UTC). |
+| `duration_min` | number | New length in minutes, 5–1440. |
+| `attorney_id` | string | Reassign to another attorney (UUID). Can't be cleared. |
+| `time_zone` | string | Update the display time zone (IANA). |
+| `status` | string | Set to `"canceled"` to cancel. No other value is accepted. |
+
+Sending any of `start_at`, `duration_min`, `attorney_id`, or `time_zone` is a **reschedule**: the new
+slot is re-validated against the attorney's office hours, time-off, and the no-double-book guard, just
+like a [booking](/docs/consultations/book). Reschedule and cancel can't be combined, and a body with
+nothing to change is a `422`.
+
+<Callout type="info">
+  A PATCH carries no `Idempotency-Key` (unlike [booking](/docs/consultations/book), which creates a new
+  resource). A **reschedule** is safe to repeat — re-sending the same slot is a no-op. A **cancel** is
+  not a clean replay, though: once canceled the consultation is terminal, so a second cancel returns
+  `404`. If a cancel response is lost, confirm the state with a [GET](/docs/consultations/get) before
+  retrying.
+</Callout>
+
+## Events
+
+The response is the updated consultation, and the change maps to webhooks:
+
+| Changed | Event |
+| --- | --- |
+| a slot field (reschedule) | `consultation.rescheduled` |
+| `status: "canceled"` (cancel) | `consultation.canceled` |
+
+## Example
+
+Reschedule to a new time and attorney:
+
+```bash
+curl -X PATCH https://app.lawfficient.com/api/consultations/7c1e2a3f-1b2c-4d5e-8f90-abcdef012345 \
+  -H "Authorization: Bearer $LAWFFICIENT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "start_at": "2026-07-03T16:00:00.000Z", "attorney_id": "b2c3d4e5-0000-4000-8000-000000000000" }'
+```
+
+```json title="200 OK"
+{
+  "id": "7c1e2a3f-1b2c-4d5e-8f90-abcdef012345",
+  "lead_id": "3f8c1e2a-1b2c-4d5e-8f90-abcdef012345",
+  "attorney_id": "b2c3d4e5-0000-4000-8000-000000000000",
+  "type": "Initial consultation",
+  "status": "rescheduled",
+  "start_at": "2026-07-03T16:00:00.000Z",
+  "duration_min": 30,
+  "time_zone": "America/New_York",
+  "paid": false,
+  "amount": null,
+  "outcome": null,
+  "archived": false,
+  "created_at": "2026-06-28T10:00:00.000Z",
+  "data": {}
+}
+```
+
+Cancel it:
+
+```bash
+curl -X PATCH https://app.lawfficient.com/api/consultations/7c1e2a3f-1b2c-4d5e-8f90-abcdef012345 \
+  -H "Authorization: Bearer $LAWFFICIENT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "status": "canceled" }'
+```
+
+## Errors
+
+Errors use the [error envelope](/docs/errors):
+
+| `code` | Status | When |
+| --- | --- | --- |
+| `invalid_request` | 422 | An invalid field, `attorney_id` cleared or not a UUID, reschedule combined with cancel, a `status` other than `canceled`, or an empty change. |
+| `outside_office_hours` | 422 | A rescheduled time falls outside the attorney's office hours. |
+| `attorney_unavailable` | 422 | The attorney has time off (or a holiday) on the new date. |
+| `slot_unavailable` | 409 | The new slot overlaps an existing consultation. |
+| `not_found` | 404 | No such consultation for this firm, or it's already finalized. |

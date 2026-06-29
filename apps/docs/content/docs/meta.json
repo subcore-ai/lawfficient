@@ -1,5 +1,5 @@
 {
   "title": "Lawfficient API",
   "root": true,
-  "pages": ["index", "authentication", "versioning", "pagination", "errors", "rate-limits", "leads", "webhooks"]
+  "pages": ["index", "authentication", "versioning", "pagination", "errors", "rate-limits", "leads", "consultations", "webhooks"]
 }

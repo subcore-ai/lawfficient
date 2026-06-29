@@ -1,0 +1,76 @@
+---
+title: Consultations
+description: The consultation object and the endpoints that work with it.
+---
+
+A **consultation** is a scheduled meeting between a [lead](/docs/leads) and an attorney — an intake
+call, a strategy session, whatever your firm books. Each one lands in an attorney's calendar at a
+real time, validated against that attorney's office hours and time-off so two consultations never
+collide.
+
+## Endpoints
+
+| Method | Path | Scope | Description |
+| --- | --- | --- | --- |
+| `GET` | [`/api/consultations`](/docs/consultations/list) | `consultations:read` | List consultations (filtered, paginated) |
+| `GET` | [`/api/consultations/{id}`](/docs/consultations/get) | `consultations:read` | Fetch a single consultation |
+| `POST` | [`/api/consultations`](/docs/consultations/book) | `consultations:write` | Book a consultation |
+| `PATCH` | [`/api/consultations/{id}`](/docs/consultations/update) | `consultations:write` | Reschedule or cancel a consultation |
+
+## The consultation object
+
+```json
+{
+  "id": "7c1e2a3f-1b2c-4d5e-8f90-abcdef012345",
+  "lead_id": "3f8c1e2a-1b2c-4d5e-8f90-abcdef012345",
+  "attorney_id": "a1b2c3d4-0000-4000-8000-000000000000",
+  "type": "Initial consultation",
+  "status": "scheduled",
+  "start_at": "2026-07-02T15:00:00.000Z",
+  "duration_min": 30,
+  "time_zone": "America/New_York",
+  "paid": false,
+  "amount": null,
+  "outcome": null,
+  "archived": false,
+  "created_at": "2026-06-28T10:00:00.000Z",
+  "data": { "matter": "Family" }
+}
+```
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `id` | string | UUID, stable. |
+| `lead_id` | string \| null | The [lead](/docs/leads) this consultation is for. |
+| `attorney_id` | string \| null | The attorney it's booked with. |
+| `type` | string | The consultation type (free text, e.g. `Initial consultation`). |
+| `status` | string | Booking lifecycle stage — see below. |
+| `start_at` | string | ISO-8601 start instant, in UTC. |
+| `duration_min` | number | Length in minutes. |
+| `time_zone` | string | IANA zone the consultation is shown in (e.g. `America/New_York`). |
+| `paid` | boolean | Payment status — tracked, not charged. |
+| `amount` | number \| null | The charge amount, or `null`. |
+| `outcome` | string \| null | Post-consultation qualification, or `null`. |
+| `archived` | boolean | Whether the consultation is archived. |
+| `created_at` | string | ISO-8601 timestamp. |
+| `data` | object | Practice-specific custom fields (varies per firm). |
+
+## Status
+
+`status` is a fixed booking lifecycle — the same set for every firm, so you can branch on it
+directly:
+
+| Status | Meaning |
+| --- | --- |
+| `scheduled` | Booked and upcoming. |
+| `paid` | Marked paid. |
+| `completed` | The consultation happened. |
+| `rescheduled` | Moved to a new time. |
+| `canceled` | Called off. |
+| `no_show` | The lead didn't attend. |
+
+<Callout type="info">
+  Through the API you book (`scheduled`), reschedule, and cancel. The other statuses — `paid`,
+  `completed`, `no_show` — are set inside the app as the consultation plays out, and you'll see them
+  on [read](/docs/consultations/get).
+</Callout>
