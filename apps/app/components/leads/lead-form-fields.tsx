@@ -12,6 +12,7 @@ import {
 } from "@workspace/ui/components/select"
 import { Textarea } from "@workspace/ui/components/textarea"
 
+import { DatePickerField } from "@/components/date-picker"
 import { Field } from "@/components/form-field"
 import { TaxonomySelect } from "@/components/taxonomy-select"
 import type { AssigneeOption, LeadView } from "@/lib/leads/queries"
@@ -172,7 +173,7 @@ export function LeadFormFields({
         <Input name="gender" defaultValue={lead?.data.gender} placeholder="—" />
       </Field>
       <Field label="Date of birth">
-        <Input name="dob" type="date" defaultValue={lead?.data.dob} />
+        <DatePickerField name="dob" defaultValue={lead?.data.dob} aria-label="Date of birth" />
       </Field>
 
       <Field label="Referral source" className="sm:col-span-2">

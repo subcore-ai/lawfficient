@@ -5,6 +5,7 @@ import * as React from "react"
 import { Input } from "@workspace/ui/components/input"
 import { toast } from "@workspace/ui/components/sonner"
 
+import { DatePickerField } from "@/components/date-picker"
 import { EditDialogShell } from "@/components/edit-dialog-shell"
 import { Field } from "@/components/form-field"
 import { INVOICE_STATUS_OPTIONS, PAYMENT_TYPE_OPTIONS, SelectField } from "@/components/select-field"
@@ -62,7 +63,7 @@ export function EditInvoiceDialog({
         <Input name="paid" type="number" min={0} step={50} defaultValue={invoice.paid} />
       </Field>
       <Field label="Due date" className="sm:col-span-2">
-        <Input name="dueAt" type="date" defaultValue={invoice.dueAt} />
+        <DatePickerField name="dueAt" defaultValue={invoice.dueAt} aria-label="Due date" />
       </Field>
     </EditDialogShell>
   )

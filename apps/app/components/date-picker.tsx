@@ -94,3 +94,20 @@ export function DatePicker({
     </Popover>
   )
 }
+
+// A form-submittable DatePicker for native FormData forms: controlled internally + mirrors its value into a
+// hidden input so `FormData.get(name)` works (the same trick the Base UI Selects use here). Use this inside a
+// `<form>` that reads dates from FormData; use the plain <DatePicker> when you already hold the value in state.
+export function DatePickerField({
+  name,
+  defaultValue = "",
+  ...rest
+}: { name: string; defaultValue?: string } & Omit<React.ComponentProps<typeof DatePicker>, "value" | "onChange">) {
+  const [value, setValue] = React.useState(defaultValue)
+  return (
+    <>
+      <DatePicker value={value} onChange={setValue} {...rest} />
+      <input type="hidden" name={name} value={value} />
+    </>
+  )
+}
