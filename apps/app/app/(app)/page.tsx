@@ -1,6 +1,7 @@
-import { DashboardView } from "@/components/dashboard-view"
+import { DashboardView, type UpcomingConsultation } from "@/components/dashboard-view"
 import { LEADS } from "@/data"
 import { getCurrentUser } from "@/lib/auth/session"
+import { mapConsultationRow, partitionConsultations } from "@/lib/consultations/queries"
 import type { AssigneeOption } from "@/lib/leads/queries"
 import {
   getFirmStaff,
@@ -20,8 +21,38 @@ type Loaded = {
   leadKpisMock: boolean
   assignees: AssigneeOption[]
   taxonomies: FirmTaxonomies
+  upcomingConsultations: UpcomingConsultation[]
   canCreateLead: boolean
   canManage: boolean
+}
+
+// Real upcoming consultations for the dashboard list (next 5). RLS scopes to the firm and to viewers
+// with consultations.view — without that permission the select returns nothing, so the list is empty.
+async function loadUpcomingConsultations(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+): Promise<UpcomingConsultation[]> {
+  const [consultRes, leadsRes, profilesRes] = await Promise.all([
+    supabase.from("consultations").select("*").eq("archived", false),
+    supabase.from("leads").select("id, first_name, last_name"),
+    supabase.from("profiles").select("id, name"),
+  ])
+  if (consultRes.error) throw consultRes.error
+  if (leadsRes.error) throw leadsRes.error
+  if (profilesRes.error) throw profilesRes.error
+
+  const leadNames = new Map((leadsRes.data ?? []).map((l) => [l.id, `${l.first_name} ${l.last_name}`.trim()]))
+  const profileNames = new Map((profilesRes.data ?? []).map((p) => [p.id, p.name]))
+  const views = (consultRes.data ?? []).map((r) => mapConsultationRow(r, leadNames, profileNames))
+  const { upcoming } = partitionConsultations(views, new Date().toISOString())
+  return upcoming.slice(0, 5).map((c) => ({
+    id: c.id,
+    leadId: c.leadId,
+    leadName: c.leadName,
+    attorneyName: c.attorneyName,
+    status: c.status,
+    startAt: c.startAt,
+    timeZone: c.timeZone,
+  }))
 }
 
 const MOCK_TERMINAL = ["retained", "lost", "not_qualified"]
@@ -41,6 +72,7 @@ async function load(): Promise<Loaded> {
       leadKpisMock: true,
       assignees: [],
       taxonomies: groupTaxonomies([]),
+      upcomingConsultations: [],
       canCreateLead: false,
       canManage: false,
     }
@@ -48,11 +80,12 @@ async function load(): Promise<Loaded> {
   const canCreateLead = me.permissions?.includes("leads.edit") ?? false
   const canManage = me.permissions?.includes("settings.manage") ?? false
 
-  // Assignees, taxonomies, and pipeline statuses from the per-firm cache (all cache hits).
-  const [staff, taxRows, statuses] = await Promise.all([
+  // Assignees, taxonomies, pipeline statuses (per-firm cache), and the real upcoming-consultations list.
+  const [staff, taxRows, statuses, upcomingConsultations] = await Promise.all([
     getFirmStaff(me.firmId),
     getFirmTaxonomyRows(me.firmId),
     getFirmStatusRows(me.firmId),
+    loadUpcomingConsultations(supabase),
   ])
   const assignees = staff
     .filter((p) => p.status === "active")
@@ -62,7 +95,7 @@ async function load(): Promise<Loaded> {
   // The lead KPIs need leads.view. For roles without it (QA lead, creative writer, file clerk)
   // keep them on the mock counts like the rest of the dashboard, rather than a misleading 0.
   if (!(me.permissions?.includes("leads.view") ?? false)) {
-    return { ...mockLeadCounts(), leadKpisMock: true, assignees, taxonomies, canCreateLead, canManage }
+    return { ...mockLeadCounts(), leadKpisMock: true, assignees, taxonomies, upcomingConsultations, canCreateLead, canManage }
   }
 
   const openIds = statuses.filter((s) => !s.is_terminal).map((s) => s.id)
@@ -76,11 +109,11 @@ async function load(): Promise<Loaded> {
   if (openRes.error) throw openRes.error
   if (eaRes.error) throw eaRes.error
 
-  return { openLeads: openRes.count ?? 0, eaOut: eaRes.count ?? 0, leadKpisMock: false, assignees, taxonomies, canCreateLead, canManage }
+  return { openLeads: openRes.count ?? 0, eaOut: eaRes.count ?? 0, leadKpisMock: false, assignees, taxonomies, upcomingConsultations, canCreateLead, canManage }
 }
 
 export default async function DashboardPage() {
-  const { openLeads, eaOut, leadKpisMock, assignees, taxonomies, canCreateLead, canManage } = await load()
+  const { openLeads, eaOut, leadKpisMock, assignees, taxonomies, upcomingConsultations, canCreateLead, canManage } = await load()
   return (
     <DashboardView
       openLeads={openLeads}
@@ -88,6 +121,7 @@ export default async function DashboardPage() {
       leadKpisMock={leadKpisMock}
       assignees={assignees}
       taxonomies={taxonomies}
+      upcomingConsultations={upcomingConsultations}
       canCreateLead={canCreateLead}
       canManage={canManage}
     />

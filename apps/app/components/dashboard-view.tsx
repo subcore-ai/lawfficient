@@ -29,6 +29,9 @@ import { NewLeadDialog } from "@/components/leads/new-lead-dialog"
 import { PageHeader } from "@/components/page-header"
 import { StatusPill } from "@/components/status-pill"
 import { ToastButton } from "@/components/toast-button"
+import { consultationStatusMeta } from "@/lib/consultations/queries"
+import { formatConsultationWhen } from "@/lib/consultations/time"
+import type { ConsultationStatus } from "@/lib/consultations/validation"
 import type { FirmTaxonomies } from "@/lib/taxonomies/queries"
 import {
   ACTIVITY,
@@ -42,8 +45,19 @@ import {
 import { useStore } from "@/data/store"
 import type { Activity, Kpi } from "@/data/types"
 import type { AssigneeOption } from "@/lib/leads/queries"
-import { formatCurrency, formatDateTime } from "@/lib/format"
-import { consultationStatusBadge, deadlineBadge } from "@/lib/status"
+import { formatCurrency } from "@/lib/format"
+import { deadlineBadge } from "@/lib/status"
+
+// One real upcoming consultation, shaped for the dashboard list (loaded server-side in the RSC page).
+export type UpcomingConsultation = {
+  id: string
+  leadId: string | null
+  leadName: string
+  attorneyName: string | null
+  status: ConsultationStatus
+  startAt: string
+  timeZone: string
+}
 
 const ACTIVITY_ICON: Record<Activity["kind"], React.ComponentType<{ className?: string }>> = {
   lead: Users,
@@ -62,6 +76,7 @@ export function DashboardView({
   leadKpisMock,
   assignees,
   taxonomies,
+  upcomingConsultations,
   canCreateLead,
   canManage,
 }: {
@@ -70,6 +85,7 @@ export function DashboardView({
   leadKpisMock: boolean
   assignees: AssigneeOption[]
   taxonomies: FirmTaxonomies
+  upcomingConsultations: UpcomingConsultation[]
   canCreateLead: boolean
   canManage: boolean
 }) {
@@ -170,30 +186,32 @@ export function DashboardView({
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               Upcoming consultations
-              <MockTag />
             </CardTitle>
             <CardAction>
-              <Link href="/consultations" className="text-muted-foreground hover:text-foreground text-xs font-medium">
+              <Link href="/consultations?view=list" className="text-muted-foreground hover:text-foreground text-xs font-medium">
                 View all
               </Link>
             </CardAction>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
-            {upcoming.length === 0 ? (
+            {upcomingConsultations.length === 0 ? (
               <p className="text-muted-foreground text-sm">No upcoming consultations.</p>
             ) : (
-              upcoming.slice(0, 5).map((c) => (
-                <div key={c.id} className="flex items-center gap-3">
-                  <UserAvatar name={staffName(c.attorneyId)} className="size-8" />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{c.leadName}</p>
-                    <p className="text-muted-foreground truncate text-xs">
-                      {staffName(c.attorneyId)} · {formatDateTime(c.startAt)}
-                    </p>
+              upcomingConsultations.map((c) => {
+                const meta = consultationStatusMeta(c.status)
+                return (
+                  <div key={c.id} className="flex items-center gap-3">
+                    <UserAvatar name={c.attorneyName ?? "Unassigned"} className="size-8" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{c.leadName}</p>
+                      <p className="text-muted-foreground truncate text-xs">
+                        {c.attorneyName ?? "Unassigned"} · {formatConsultationWhen(c.startAt, c.timeZone)}
+                      </p>
+                    </div>
+                    <StatusPill label={meta.label} tone={meta.tone} />
                   </div>
-                  <StatusPill {...consultationStatusBadge(c.status)} />
-                </div>
-              ))
+                )
+              })
             )}
           </CardContent>
         </Card>
