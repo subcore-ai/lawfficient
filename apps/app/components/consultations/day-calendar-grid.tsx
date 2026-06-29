@@ -19,6 +19,10 @@ import { draggedStartMin, formatHourLabel, minToHhmm, type DayCalendar as DayCal
 
 type Option = { id: string; name: string }
 
+// Stable sensor options (module-level so the reference can't change on the 1-minute re-render and disturb
+// an in-progress drag).
+const DRAG_ACTIVATION = { activationConstraint: { distance: 6 } }
+
 // The day grid: one shared hour gutter + one CalendarColumn per attorney, all aligned to a shared time
 // range (union of every column's, so columns line up). One column = the single-attorney view; several =
 // the multi-attorney view (Phase 4).
@@ -56,7 +60,7 @@ export function DayCalendar({
   // `fromMin` = the consult's server start at drag time (for the reconcile); `toMin` = the optimistic new start.
   const [pending, setPending] = React.useState<{ id: string; fromMin: number; toMin: number } | null>(null)
   // Small activation distance so a plain click still opens the detail dialog (only a real drag moves it).
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
+  const sensors = useSensors(useSensor(PointerSensor, DRAG_ACTIVATION))
   if (columns.length === 0) return null
 
   const gridStartMin = Math.min(...columns.map((c) => c.cal.gridStartMin))

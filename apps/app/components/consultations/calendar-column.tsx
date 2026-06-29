@@ -146,11 +146,15 @@ export function CalendarColumn({
 
       {/* Booked consults — click opens the detail dialog; drag (when canBook) reschedules vertically. */}
       {consults.map((c) => {
+        // While a drag is pending, render the block AND its time label at the optimistic start.
         const startMin = pendingMove?.id === c.id ? pendingMove.startMin : c.startMin
+        const endMin = startMin + (c.endMin - c.startMin)
         return (
           <DraggableConsult
             key={c.id}
             consult={c}
+            startMin={startMin}
+            endMin={endMin}
             topPx={top(startMin)}
             heightPx={height(c.endMin - c.startMin)}
             tint={consultTint}
@@ -167,6 +171,8 @@ export function CalendarColumn({
 // component so useDraggable is one hook per block, not a hook called inside the parent's consults.map().
 function DraggableConsult({
   consult,
+  startMin,
+  endMin,
   topPx,
   heightPx,
   tint,
@@ -174,6 +180,9 @@ function DraggableConsult({
   onSelect,
 }: {
   consult: CalendarConsult
+  // Displayed start/end (the optimistic minutes while a drag is pending), for the label + title.
+  startMin: number
+  endMin: number
   topPx: number
   heightPx: number
   tint: CSSProperties
@@ -186,7 +195,7 @@ function DraggableConsult({
       ref={setNodeRef}
       type="button"
       onClick={() => onSelect(consult)}
-      title={`${consult.leadName} · ${consult.type} · ${formatSlotTime(consult.startMin)} – ${formatSlotTime(consult.endMin)}`}
+      title={`${consult.leadName} · ${consult.type} · ${formatSlotTime(startMin)} – ${formatSlotTime(endMin)}`}
       className={cn(
         "bg-primary/85 text-primary-foreground absolute inset-x-0.5 flex touch-none items-start justify-between gap-1.5 overflow-hidden rounded px-1.5 py-0.5 text-left text-[11px] leading-tight shadow-sm transition-[filter] hover:brightness-95",
         canDrag ? "cursor-grab active:cursor-grabbing" : "cursor-pointer",
@@ -201,7 +210,7 @@ function DraggableConsult({
         <span className="block truncate opacity-80">{consult.type}</span>
       </span>
       <span className="shrink-0 text-[10px] whitespace-nowrap opacity-75 tabular-nums">
-        {formatSlotTime(consult.startMin)} – {formatSlotTime(consult.endMin)}
+        {formatSlotTime(startMin)} – {formatSlotTime(endMin)}
       </span>
     </button>
   )
