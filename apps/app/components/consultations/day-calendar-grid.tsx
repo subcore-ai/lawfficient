@@ -15,7 +15,7 @@ import type { OffDateRange } from "@/lib/availability/exceptions"
 import type { ConsultationType } from "@/lib/consultations/consultation-types"
 import { zonedWallTimeToUtcISO } from "@/lib/consultations/time"
 import type { CalendarColor } from "@/lib/scheduling/calendar-colors"
-import { draggedStartMin, formatHourLabel, minToHhmm, type DayCalendar as DayCalendarData, type OffKind } from "@/lib/scheduling/day-calendar"
+import { draggedStartMin, formatHourLabel, formatSlotTime, minToHhmm, type DayCalendar as DayCalendarData, type OffKind } from "@/lib/scheduling/day-calendar"
 
 type Option = { id: string; name: string }
 
@@ -111,6 +111,9 @@ export function DayCalendar({
         if (res && "error" in res) {
           toast.error(res.error)
           revert() // spring back
+        } else {
+          // Server confirmed — the time actually changed (not just the optimistic move).
+          toast.success(`Rescheduled to ${formatSlotTime(toMin)}`)
         }
       })
       .catch(() => {
