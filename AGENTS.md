@@ -106,7 +106,7 @@ relieving a **full main-thread context** — not merely because a task is "large
 building **inline** when the work is:
 - small, quick, or tightly coupled to the current branch;
 - **security-sensitive or subtle** — auth, RLS, migrations with tricky grants, idempotency,
-  concurrency — where you'll deep-review it regardless, and authoring catches subtleties that
+  concurrency — where you'll deeply review it regardless, and authoring catches subtleties that
   reviewing a summary misses;
 - iterative or exploratory, where a round-trip per change is slower than just doing it.
 
