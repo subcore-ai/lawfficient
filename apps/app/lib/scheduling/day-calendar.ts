@@ -103,7 +103,9 @@ export function weekDatesOf(date: string): string[] {
 // (default 15). `pxPerMin` is the column's vertical scale. Clamped to >= 0. Pure — unit-tested.
 export function draggedStartMin(currentStartMin: number, deltaY: number, pxPerMin: number, snapMin = 15): number {
   const deltaMin = Math.round(deltaY / pxPerMin / snapMin) * snapMin
-  return Math.max(0, currentStartMin + deltaMin)
+  // Clamp within the same day [0, 1439] — a vertical drag reschedules within the day, and minToHhmm assumes
+  // an in-day minute (no midnight wrap).
+  return Math.min(24 * 60 - 1, Math.max(0, currentStartMin + deltaMin))
 }
 
 // Minutes-of-day → "HH:MM" (24h, zero-padded), for building a wall-time string to convert to UTC.

@@ -36,8 +36,9 @@ describe("draggedStartMin", () => {
     expect(draggedStartMin(600, 8, px)).toBe(600) // ~7min → snaps to 0 (no move)
     expect(draggedStartMin(600, 17, px)).toBe(615) // ~15min → +15
   })
-  test("clamps to >= 0 (never before midnight)", () => {
+  test("clamps within the day (never before midnight or past it)", () => {
     expect(draggedStartMin(10, -1000, px)).toBe(0)
+    expect(draggedStartMin(1430, 1000, px)).toBe(1439)
   })
 })
 

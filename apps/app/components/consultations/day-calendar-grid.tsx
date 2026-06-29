@@ -53,8 +53,8 @@ export function DayCalendar({
 }) {
   const [selectedId, setSelectedId] = React.useState<string | null>(null)
   // Drag-to-reschedule state + sensors — declared before the early return so the hooks always run.
-  const [pending, setPending] = React.useState<{ id: string; startMin: number } | null>(null)
-  const [lastColumns, setLastColumns] = React.useState(columns)
+  // `fromMin` = the consult's server start at drag time (for the reconcile); `toMin` = the optimistic new start.
+  const [pending, setPending] = React.useState<{ id: string; fromMin: number; toMin: number } | null>(null)
   // Small activation distance so a plain click still opens the detail dialog (only a real drag moves it).
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
   if (columns.length === 0) return null
@@ -73,29 +73,39 @@ export function DayCalendar({
   const lastHour = Math.floor(gridEndMin / 60)
   const hours = Array.from({ length: lastHour - firstHour + 1 }, (_, i) => firstHour + i)
 
-  // Drag-to-reschedule. Optimistically move the dragged consult to its new start-minute while the server
-  // write is in flight; on failure revert + toast. A successful write revalidates → new `columns` arrive →
-  // the reconcile drops the optimistic move (the block is already at the server position).
+  // Drag-to-reschedule. Optimistically move the dragged consult while the server write is in flight.
   const tz = defaultTimeZone ?? "America/New_York"
-  if (lastColumns !== columns) {
-    setLastColumns(columns)
-    setPending(null)
+  // Reconcile by DATA, not columns-reference: the board rebuilds `columns` every render (the 1-minute tick),
+  // so a reference compare would drop the optimistic move spuriously. Clear once the consult's server start
+  // has moved off its original minute (the reschedule landed, or another writer changed it), or it's gone.
+  if (pending) {
+    const live = columns.flatMap((c) => c.cal.consults).find((x) => x.id === pending.id)
+    if (!live || live.startMin !== pending.fromMin) setPending(null)
   }
   function onDragEnd(e: DragEndEvent) {
     const id = String(e.active.id)
     const consult = columns.flatMap((c) => c.cal.consults).find((x) => x.id === id)
     if (!consult) return
-    const newStartMin = draggedStartMin(consult.startMin, e.delta.y, PX_PER_MIN)
-    if (newStartMin === consult.startMin) return // no real move (or snapped back to where it started)
-    const startAt = zonedWallTimeToUtcISO(`${date}T${minToHhmm(newStartMin)}`, tz)
+    // Drag from the ON-SCREEN position (the optimistic one if a move is already pending), not the stale
+    // server time, so a second drag mid-flight stacks correctly.
+    const baseMin = pending?.id === id ? pending.toMin : consult.startMin
+    const toMin = draggedStartMin(baseMin, e.delta.y, PX_PER_MIN)
+    if (toMin === baseMin) return // no real move (snapped back to where it already is)
+    const startAt = zonedWallTimeToUtcISO(`${date}T${minToHhmm(toMin)}`, tz)
     if (!startAt) return
-    setPending({ id, startMin: newStartMin })
-    void rescheduleConsultation(id, startAt).then((res) => {
-      if (res && "error" in res) {
-        toast.error(res.error)
-        setPending(null) // spring back
-      }
-    })
+    setPending({ id, fromMin: consult.startMin, toMin })
+    const revert = () => setPending((p) => (p?.id === id ? null : p))
+    void rescheduleConsultation(id, startAt)
+      .then((res) => {
+        if (res && "error" in res) {
+          toast.error(res.error)
+          revert() // spring back
+        }
+      })
+      .catch(() => {
+        toast.error("Couldn't reschedule — please try again.")
+        revert()
+      })
   }
 
   // One dialog for the whole grid, keyed by id — the live consult is derived from the columns, so after a
@@ -182,7 +192,7 @@ export function DayCalendar({
                   defaultTimeZone={defaultTimeZone}
                   canBook={canBook}
                   offDatesByAttorney={offDatesByAttorney}
-                  pendingMove={pending}
+                  pendingMove={pending ? { id: pending.id, startMin: pending.toMin } : null}
                   onSelectConsult={(consult) => setSelectedId(consult.id)}
                 />
               </div>
