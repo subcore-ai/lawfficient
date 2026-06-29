@@ -184,7 +184,12 @@ export function CalendarBoard({
 
   // Firm "today" derived from the ticking clock (not a frozen server snapshot) so the Today control stays
   // correct even if the calendar is left open past midnight.
-  const today = utcToZonedInput(new Date(now).toISOString(), tz).slice(0, 10)
+  const nowInput = utcToZonedInput(new Date(now).toISOString(), tz) // "YYYY-MM-DDTHH:MM" in the firm tz
+  const today = nowInput.slice(0, 10)
+  // Past-time shading for the grid: `nowMin` = firm-tz minute-of-day of "now" when the viewed day IS today
+  // (the grid dims up to it + draws a "now" line); a date before today is entirely past.
+  const isPastDay = selectedDate < today
+  const nowMin = selectedDate === today ? Number(nowInput.slice(11, 13)) * 60 + Number(nowInput.slice(14, 16)) : null
 
   return (
     <div className="space-y-4">
@@ -211,6 +216,8 @@ export function CalendarBoard({
             defaultTimeZone={tz}
             canBook={canBook}
             offDatesByAttorney={offDatesByAttorney}
+            nowMin={nowMin}
+            isPastDay={isPastDay}
           />
         )}
       </div>
