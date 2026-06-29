@@ -23,6 +23,7 @@ import {
   setConsultationStatus,
   updateConsultation,
 } from "@/app/(app)/consultations/actions"
+import { DatePicker } from "@/components/date-picker"
 import { Field } from "@/components/form-field"
 import type { ConsultationType } from "@/lib/consultations/consultation-types"
 import { addMinutesToTime, minutesBetween, splitWall, utcToZonedInput } from "@/lib/consultations/time"
@@ -246,7 +247,7 @@ export function EditConsultationDialog({
 
               <div className="grid grid-cols-3 gap-3 sm:col-span-2">
                 <Field label="Day" htmlFor={dayId}>
-                  <Input id={dayId} type="date" required value={day} onChange={(e) => setDay(e.target.value)} />
+                  <DatePicker id={dayId} value={day} onChange={setDay} aria-label="Day" />
                 </Field>
                 <Field label="From" htmlFor={fromId}>
                   <Input id={fromId} type="time" required value={fromTime} onChange={(e) => onFromChange(e.target.value)} />

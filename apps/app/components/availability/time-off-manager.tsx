@@ -4,12 +4,17 @@ import * as React from "react"
 import { Trash2 } from "lucide-react"
 
 import { Button } from "@workspace/ui/components/button"
-import { Input } from "@workspace/ui/components/input"
 import { toast } from "@workspace/ui/components/sonner"
 
 import { addFirmHoliday, addTimeOff, removeTimeOff } from "@/app/(app)/settings/scheduling/actions"
+import { DatePicker } from "@/components/date-picker"
 import { Field } from "@/components/form-field"
 import type { TimeOff } from "@/lib/availability/exceptions"
+
+// A LOCAL Date → "YYYY-MM-DD" (local components, so a calendar day isn't shifted by the viewer's zone).
+function dateToYmd(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+}
 
 function fmtDate(d: string): string {
   // Noon UTC + UTC formatter so a YYYY-MM-DD never slips a day across the viewer's zone.
@@ -38,11 +43,20 @@ export function TimeOffManager({
   const startId = React.useId()
   const endId = React.useId()
   const [pending, startTransition] = React.useTransition()
-  const formRef = React.useRef<HTMLFormElement>(null)
+  // Controlled, since <DatePicker> isn't a native form input — the dates are gathered into FormData on
+  // submit (the action reads formData.get("startDate"/"endDate")) and cleared on success.
+  const [startDate, setStartDate] = React.useState("")
+  const [endDate, setEndDate] = React.useState("")
+  // Validate the range client-side too: the "To" picker disables earlier dates, but picking "To" before
+  // "From" can leave end < start with both set — the action rejects that, this stops it being submitted.
+  const isValidRange = Boolean(startDate && endDate && endDate >= startDate)
 
   function onAdd(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    const fd = new FormData(e.currentTarget)
+    if (!isValidRange) return
+    const fd = new FormData()
+    fd.set("startDate", startDate)
+    fd.set("endDate", endDate)
     startTransition(async () => {
       try {
         const res = attorneyId === null ? await addFirmHoliday(fd) : await addTimeOff(attorneyId, fd)
@@ -51,7 +65,8 @@ export function TimeOffManager({
           return
         }
         toast.success(`${Noun} added`)
-        formRef.current?.reset()
+        setStartDate("")
+        setEndDate("")
       } catch {
         toast.error("Something went wrong. Please try again.")
       }
@@ -99,14 +114,23 @@ export function TimeOffManager({
       )}
 
       {canEdit ? (
-        <form ref={formRef} onSubmit={onAdd} className="flex flex-wrap items-end gap-3">
+        <form onSubmit={onAdd} className="flex flex-wrap items-end gap-3">
           <Field label="From" htmlFor={startId}>
-            <Input id={startId} name="startDate" type="date" required className="w-40" />
+            <DatePicker id={startId} value={startDate} onChange={setStartDate} aria-label="From" buttonClassName="w-40" disabledControl={pending} />
           </Field>
           <Field label="To" htmlFor={endId}>
-            <Input id={endId} name="endDate" type="date" required className="w-40" />
+            <DatePicker
+              id={endId}
+              value={endDate}
+              onChange={setEndDate}
+              // Can't end before it starts (the action also enforces end >= start).
+              disabled={startDate ? (d) => dateToYmd(d) < startDate : undefined}
+              disabledControl={pending}
+              aria-label="To"
+              buttonClassName="w-40"
+            />
           </Field>
-          <Button type="submit" disabled={pending}>
+          <Button type="submit" disabled={pending || !isValidRange}>
             {pending ? "Adding…" : `Add ${noun}`}
           </Button>
         </form>

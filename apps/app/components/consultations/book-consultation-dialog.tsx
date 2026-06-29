@@ -28,12 +28,19 @@ import { toast } from "@workspace/ui/components/sonner"
 
 import { createConsultation } from "@/app/(app)/consultations/actions"
 import { Combobox } from "@/components/combobox"
+import { DatePicker } from "@/components/date-picker"
 import { Field } from "@/components/form-field"
+import { isDateOff, type OffDateRange } from "@/lib/availability/exceptions"
 import type { ConsultationType } from "@/lib/consultations/consultation-types"
 import { addMinutesToTime, minutesBetween, splitWall } from "@/lib/consultations/time"
 import { FIRM_TIMEZONES } from "@/lib/firm/timezones"
 
 type Option = { id: string; name: string }
+
+// A LOCAL Date → "YYYY-MM-DD" (local components, so the calendar day isn't shifted by the viewer's zone).
+function dateToYmd(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+}
 
 const UNASSIGNED = "__none__"
 const DEFAULT_TZ = "America/New_York"
@@ -50,6 +57,7 @@ export function BookConsultationDialog({
   prefillAttorneyId,
   prefillType,
   trigger,
+  offDatesByAttorney,
 }: {
   leads: Option[]
   attorneys: Option[]
@@ -60,6 +68,9 @@ export function BookConsultationDialog({
   label?: string
   // The firm's configured zone, used as the picker's default.
   defaultTimeZone?: string | null
+  // Per-attorney off-date ranges (the attorney's own time off + firm-wide holidays), so the day picker can
+  // gray out days the chosen attorney is fully off. Keyed by attorney id; absent = no off-days known.
+  offDatesByAttorney?: Record<string, OffDateRange[]>
   // Calendar click-to-book: pre-fill the slot's start (datetime-local wall string), attorney, and type.
   prefillStart?: string
   // The slot's exact UTC instant — booked directly when "When" is left unedited (DST-fallback-safe).
@@ -107,6 +118,16 @@ export function BookConsultationDialog({
   const typeDuration = selected?.durationMin ?? 30
   const durationMin = fromTime && toTime ? minutesBetween(fromTime, toTime) : 0
   const validTime = Boolean(day) && durationMin >= 5
+
+  // Gray out days the chosen attorney is fully off (own time off + firm holidays). Only when an attorney
+  // is selected and we have their ranges; the server still re-checks (the 0051 trigger) — friendly guardrail.
+  const attorneyOff = attorney !== UNASSIGNED ? offDatesByAttorney?.[attorney] : undefined
+  const disabledDay = attorneyOff?.length
+    ? (d: Date) => isDateOff(attorneyOff, dateToYmd(d))
+    : undefined
+  // The picker only blocks NEW picks; if the chosen attorney is off on the already-picked day (e.g. after
+  // switching attorneys), treat it as invalid so submit can't proceed — the server (0051 trigger) re-checks.
+  const dayIsOff = Boolean(day && attorneyOff?.length && isDateOff(attorneyOff, day))
 
   // Picking a type sets the "to" time (start + the type's default length) and its fee — both stay editable.
   // A free type clears the fee + the "already paid" flag.
@@ -239,7 +260,7 @@ export function BookConsultationDialog({
             </Field>
             <div className="grid grid-cols-3 gap-3 sm:col-span-2">
               <Field label="Day" htmlFor={dayId}>
-                <Input id={dayId} type="date" required value={day} onChange={(e) => setDay(e.target.value)} />
+                <DatePicker id={dayId} value={day} onChange={setDay} disabled={disabledDay} aria-label="Day" />
               </Field>
               <Field label="From" htmlFor={fromId}>
                 <Input id={fromId} type="time" required value={fromTime} onChange={(e) => onFromChange(e.target.value)} />
@@ -284,7 +305,7 @@ export function BookConsultationDialog({
 
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
-            <Button type="submit" disabled={pending || !leadId || !selected || !validTime}>
+            <Button type="submit" disabled={pending || !leadId || !selected || !validTime || dayIsOff}>
               {pending ? "Booking…" : "Book consultation"}
             </Button>
           </DialogFooter>

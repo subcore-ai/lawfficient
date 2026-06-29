@@ -21,7 +21,9 @@ import { toast } from "@workspace/ui/components/sonner"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { ConsultationActions } from "@/components/consultations/consultation-actions"
+import { DatePicker } from "@/components/date-picker"
 import { loadConsultationForEdit, updateConsultation } from "@/app/(app)/consultations/actions"
+import { isDateOff, type OffDateRange } from "@/lib/availability/exceptions"
 import type { ConsultationType } from "@/lib/consultations/consultation-types"
 import { consultationStatusMeta } from "@/lib/consultations/queries"
 import { addMinutesToTime, formatConsultationWhen, minutesBetween, splitWall, utcToZonedInput } from "@/lib/consultations/time"
@@ -36,6 +38,11 @@ const UNASSIGNED = "__none__"
 // picker icon only appears on hover).
 const INLINE =
   "border-input/0 hover:border-input focus:border-input focus:bg-muted/40 -mx-1 rounded border bg-transparent px-1 py-0.5 transition-colors outline-none [&::-webkit-calendar-picker-indicator]:opacity-0 hover:[&::-webkit-calendar-picker-indicator]:opacity-60 focus:[&::-webkit-calendar-picker-indicator]:opacity-60"
+
+// A LOCAL Date → "YYYY-MM-DD" (local components, so the calendar day isn't shifted by the viewer's zone).
+function dateToYmd(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+}
 
 // Compact human duration, e.g. 85 → "1h 25m", 30 → "30m", 60 → "1h".
 function formatDuration(min: number): string {
@@ -57,11 +64,15 @@ export function ConsultPreviewDialog({
   open,
   onOpenChange,
   canManage,
+  offDatesByAttorney,
 }: {
   consult: CalendarConsult | null
   open: boolean
   onOpenChange: (o: boolean) => void
   canManage: boolean
+  // Per-attorney off-date ranges (own time off + firm holidays), so rescheduling can gray out days the
+  // selected attorney is fully off (the attorney can be reassigned here). Server re-checks (0050).
+  offDatesByAttorney?: Record<string, OffDateRange[]>
 }) {
   const amountId = React.useId()
   const paidId = React.useId()
@@ -174,6 +185,13 @@ export function ConsultPreviewDialog({
   const typeDuration = selected?.durationMin ?? 30
   const durationMin = fromTime && toTime ? minutesBetween(fromTime, toTime) : 0
   const validTime = Boolean(day) && durationMin >= 5
+  // Gray out the selected attorney's full days off (own time off + firm holidays) in the reschedule date
+  // picker. Reads from the CURRENTLY selected attorney, since "Edit all fields" can reassign it.
+  const attorneyOff = attorney !== UNASSIGNED ? offDatesByAttorney?.[attorney] : undefined
+  const disabledDay = attorneyOff?.length ? (d: Date) => isDateOff(attorneyOff, dateToYmd(d)) : undefined
+  // The picker only blocks NEW picks; if the day was already set when the attorney changed (or off-data
+  // loaded), it can still be off — treat that as invalid too so Save can't stay enabled (server re-checks).
+  const dayIsOff = Boolean(day && attorneyOff?.length && isDateOff(attorneyOff, day))
   const dirty =
     !!original &&
     (day !== original.date ||
@@ -241,7 +259,13 @@ export function ConsultPreviewDialog({
                 {editable ? (
                   <>
                     <div>
-                      <input type="date" value={day} onChange={(e) => setDay(e.target.value)} className={cn(INLINE)} aria-label="Date" />
+                      <DatePicker
+                        value={day}
+                        onChange={setDay}
+                        disabled={disabledDay}
+                        aria-label="Date"
+                        buttonClassName="h-7 w-auto px-2 text-sm font-normal"
+                      />
                     </div>
                     <div className="flex items-center gap-1.5">
                       {/* Hide the picker indicator on the time inputs so the box hugs the text and the dash
@@ -363,7 +387,7 @@ export function ConsultPreviewDialog({
               {canManage ? (
                 <div className="flex items-center gap-2">
                   {editable ? (
-                    <Button size="sm" onClick={save} disabled={pending || !ready || !validTime || !dirty}>
+                    <Button size="sm" onClick={save} disabled={pending || !ready || !validTime || dayIsOff || !dirty}>
                       {pending ? "Saving…" : "Save changes"}
                     </Button>
                   ) : null}

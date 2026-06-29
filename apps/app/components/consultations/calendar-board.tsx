@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 
 import { CalendarControls } from "@/components/consultations/calendar-controls"
 import { DayCalendar } from "@/components/consultations/day-calendar-grid"
+import type { OffDateRange } from "@/lib/availability/exceptions"
 import type { ConsultationType } from "@/lib/consultations/consultation-types"
 import { utcToZonedInput } from "@/lib/consultations/time"
 import type { ConsultationStatus } from "@/lib/consultations/validation"
@@ -60,6 +61,7 @@ export function CalendarBoard({
   attorneys,
   consultationTypes,
   canBook,
+  offDatesByAttorney,
 }: {
   attorneyWeeks: AttorneyWeek[]
   weekDates: string[]
@@ -73,6 +75,8 @@ export function CalendarBoard({
   attorneys: Option[]
   consultationTypes: ConsultationType[]
   canBook: boolean
+  // Upcoming off-dates per attorney (own time off + firm holidays) for the booking/reschedule date pickers.
+  offDatesByAttorney: Record<string, OffDateRange[]>
 }) {
   const router = useRouter()
   const [selected, setSelected] = React.useState<string[]>(initialSelected)
@@ -206,6 +210,7 @@ export function CalendarBoard({
             consultationTypes={consultationTypes}
             defaultTimeZone={tz}
             canBook={canBook}
+            offDatesByAttorney={offDatesByAttorney}
           />
         )}
       </div>

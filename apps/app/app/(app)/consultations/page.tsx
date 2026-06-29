@@ -37,6 +37,34 @@ function isValidYmd(s: string): boolean {
   return dt.getUTCFullYear() === y && dt.getUTCMonth() === mo - 1 && dt.getUTCDate() === d
 }
 
+// Upcoming off-date ranges per attorney (their own time off + every firm-wide holiday, which closes the
+// date for all), keyed by attorney id. Feeds the booking date pickers so they gray out days an attorney is
+// fully off. One query; shared by the header "Book" dialog (both views) and the calendar's pickers.
+async function loadOffDatesByAttorney(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  attorneyIds: string[],
+  today: string,
+): Promise<Record<string, { startDate: string; endDate: string }[]>> {
+  const byAttorney: Record<string, { startDate: string; endDate: string }[]> = {}
+  if (attorneyIds.length === 0) return byAttorney
+  const { data, error } = await supabase
+    .from("availability_exceptions")
+    .select("attorney_id, start_date, end_date")
+    .or(`attorney_id.in.(${attorneyIds.join(",")}),attorney_id.is.null`)
+    .gte("end_date", today)
+  if (error) throw error
+  const firmHolidays = (data ?? [])
+    .filter((e) => e.attorney_id === null)
+    .map((e) => ({ startDate: e.start_date, endDate: e.end_date }))
+  for (const id of attorneyIds) {
+    const own = (data ?? [])
+      .filter((e) => e.attorney_id === id)
+      .map((e) => ({ startDate: e.start_date, endDate: e.end_date }))
+    byAttorney[id] = [...firmHolidays, ...own]
+  }
+  return byAttorney
+}
+
 type Search = Record<string, string | string[] | undefined>
 
 export default async function ConsultationsPage({ searchParams }: { searchParams: Promise<Search> }) {
@@ -74,6 +102,15 @@ export default async function ConsultationsPage({ searchParams }: { searchParams
   const attorneys = allProfiles.filter((p) => p.status === "active").map((p) => ({ id: p.id, name: p.name }))
   const types: ConsultationType[] = typesRes.error ? [] : (typesRes.data ?? []).map(mapConsultationTypeRow)
   const tz = firmRes.data?.timezone ?? null
+  // Off-dates for the booking pickers — shared by the header "Book" dialog (shown in both views) and the
+  // calendar's slot/reschedule pickers. Keyed for every attorney the dialogs can pick (all active, not just
+  // schedulable), so a selectable attorney always has off-date coverage. (The calendar grid's week-bounded
+  // off-days stay in renderCalendar.)
+  const offDatesByAttorney = await loadOffDatesByAttorney(
+    supabase,
+    attorneys.map((a) => a.id),
+    currentDateInZone(tz ?? DEFAULT_TZ),
+  )
 
   // The status board (list view) is the full consult list's only consumer — load it lazily so the
   // calendar view doesn't pay for an unfiltered scan + mapping it never renders.
@@ -90,14 +127,14 @@ export default async function ConsultationsPage({ searchParams }: { searchParams
     <>
       <PageHeader title="Consultations" description="Book and manage consultations across attorney calendars.">
         {canManage ? (
-          <BookConsultationDialog leads={leadOptions} attorneys={attorneys} consultationTypes={types} defaultTimeZone={tz} />
+          <BookConsultationDialog leads={leadOptions} attorneys={attorneys} consultationTypes={types} defaultTimeZone={tz} offDatesByAttorney={offDatesByAttorney} />
         ) : null}
       </PageHeader>
 
       <CalendarViewToggle view={view} />
 
       {view === "calendar"
-        ? await renderCalendar({ sp, supabase, allProfiles, leadNames, leadOptions, attorneys, types, tz, canManage })
+        ? await renderCalendar({ sp, supabase, allProfiles, leadNames, leadOptions, attorneys, types, tz, canManage, offDatesByAttorney })
         : board}
     </>
   )
@@ -115,6 +152,7 @@ async function renderCalendar({
   types,
   tz,
   canManage,
+  offDatesByAttorney,
 }: {
   sp: Search
   supabase: Awaited<ReturnType<typeof createClient>>
@@ -125,6 +163,7 @@ async function renderCalendar({
   types: ConsultationType[]
   tz: string | null
   canManage: boolean
+  offDatesByAttorney: Record<string, { startDate: string; endDate: string }[]>
 }) {
   const zone = tz ?? DEFAULT_TZ
   const schedulable = allProfiles.filter((p) => p.status === "active" && p.schedulable).map((p) => ({ id: p.id, name: p.name }))
@@ -252,6 +291,7 @@ async function renderCalendar({
       attorneys={attorneys}
       consultationTypes={types}
       canBook={canManage}
+      offDatesByAttorney={offDatesByAttorney}
     />
   )
 }

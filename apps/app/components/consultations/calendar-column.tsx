@@ -3,6 +3,7 @@
 import { cn } from "@workspace/ui/lib/utils"
 
 import { BookConsultationDialog } from "@/components/consultations/book-consultation-dialog"
+import type { OffDateRange } from "@/lib/availability/exceptions"
 import type { ConsultationType } from "@/lib/consultations/consultation-types"
 import type { CalendarColor } from "@/lib/scheduling/calendar-colors"
 import { formatSlotTime, type CalendarConsult, type CalendarSlot, type CalendarWindow } from "@/lib/scheduling/day-calendar"
@@ -27,6 +28,7 @@ export function CalendarColumn({
   consultationTypes,
   defaultTimeZone,
   canBook,
+  offDatesByAttorney,
   color,
   onSelectConsult,
 }: {
@@ -41,6 +43,8 @@ export function CalendarColumn({
   consultationTypes: ConsultationType[]
   defaultTimeZone: string | null
   canBook: boolean
+  // Upcoming off-dates per attorney (own time off + firm holidays) for the booking date picker.
+  offDatesByAttorney: Record<string, OffDateRange[]>
   color?: CalendarColor | null // the attorney's calendar color; tints office hours + consults + slots
   // Click a booked consult → the parent opens one shared detail dialog (keeps a single modal across columns).
   onSelectConsult: (c: CalendarConsult) => void
@@ -110,6 +114,7 @@ export function CalendarColumn({
             attorneys={attorneys}
             consultationTypes={consultationTypes}
             defaultTimeZone={defaultTimeZone}
+            offDatesByAttorney={offDatesByAttorney}
             prefillStart={s.startInput}
             prefillStartIso={new Date(s.startMs).toISOString()}
             prefillAttorneyId={attorneyId}
