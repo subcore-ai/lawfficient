@@ -197,7 +197,15 @@ function DraggableConsult({
   // the detail dialog. A plain click (no drag) never sets this, so it still opens normally.
   const draggedRef = useRef(false)
   useEffect(() => {
-    if (isDragging) draggedRef.current = true
+    if (!isDragging) return
+    draggedRef.current = true
+    // When the drag ends, disarm on the next tick: late enough to swallow the click the browser fires on
+    // release, but not left armed forever (which would eat a later genuine click if no click followed).
+    return () => {
+      setTimeout(() => {
+        draggedRef.current = false
+      }, 0)
+    }
   }, [isDragging])
   return (
     <button

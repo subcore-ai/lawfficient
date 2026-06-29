@@ -36,9 +36,9 @@ describe("draggedStartMin", () => {
     expect(draggedStartMin(600, 8, px)).toBe(600) // ~7min → snaps to 0 (no move)
     expect(draggedStartMin(600, 17, px)).toBe(615) // ~15min → +15
   })
-  test("clamps within the day (never before midnight or past it)", () => {
+  test("clamps within the day to the last snapped start (00:00 .. 23:45 for 15-min steps)", () => {
     expect(draggedStartMin(10, -1000, px)).toBe(0)
-    expect(draggedStartMin(1430, 1000, px)).toBe(1439)
+    expect(draggedStartMin(1430, 1000, px)).toBe(1425) // 23:45 — last 15-min start before midnight, not 23:59
   })
 })
 

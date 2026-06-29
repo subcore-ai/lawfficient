@@ -59,6 +59,9 @@ export function DayCalendar({
   // Drag-to-reschedule state + sensors — declared before the early return so the hooks always run.
   // `pending` maps a consult id → its optimistic new start-minute while that reschedule write is in flight.
   const [pending, setPending] = React.useState<Record<string, number>>({})
+  // Count of in-flight reschedule writes. While > 0 we hold every optimistic move (skip the reconcile), so a
+  // rapid drag back to the original (A→B→A) isn't dropped before the queued writes drain + flicker through B.
+  const [draining, setDraining] = React.useState(0)
   // Serialize reschedule writes so rapid drags persist in drag order (no last-response-wins race).
   const chainRef = React.useRef<Promise<unknown>>(Promise.resolve())
   // Small activation distance so a plain click still opens the detail dialog (only a real drag moves it).
@@ -86,11 +89,13 @@ export function DayCalendar({
   // so concurrent drags on different consults don't clobber each other; keep an entry only while its consult
   // exists and hasn't yet reached the TARGET minute (checking the target — not "moved off the original" —
   // keeps an intermediate chained write from clearing a still-pending later target).
-  const survivors = Object.entries(pending).filter(([cid, toMin]) => {
-    const live = columns.flatMap((c) => c.cal.consults).find((x) => x.id === cid)
-    return live !== undefined && live.startMin !== toMin
-  })
-  if (survivors.length !== Object.keys(pending).length) setPending(Object.fromEntries(survivors))
+  if (draining === 0) {
+    const survivors = Object.entries(pending).filter(([cid, toMin]) => {
+      const live = columns.flatMap((c) => c.cal.consults).find((x) => x.id === cid)
+      return live !== undefined && live.startMin !== toMin
+    })
+    if (survivors.length !== Object.keys(pending).length) setPending(Object.fromEntries(survivors))
+  }
   function onDragEnd(e: DragEndEvent) {
     const id = String(e.active.id)
     const consult = columns.flatMap((c) => c.cal.consults).find((x) => x.id === id)
@@ -106,6 +111,7 @@ export function DayCalendar({
       return
     }
     setPending((prev) => ({ ...prev, [id]: toMin }))
+    setDraining((n) => n + 1)
     // Scope the revert to THIS write's target so an earlier chained failure can't wipe a newer drag's pending.
     const revert = () =>
       setPending((prev) => {
@@ -130,6 +136,7 @@ export function DayCalendar({
         toast.error("Couldn't reschedule — please try again.")
         revert()
       })
+      .finally(() => setDraining((n) => n - 1))
   }
 
   // One dialog for the whole grid, keyed by id — the live consult is derived from the columns, so after a

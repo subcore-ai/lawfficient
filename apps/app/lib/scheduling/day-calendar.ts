@@ -103,9 +103,10 @@ export function weekDatesOf(date: string): string[] {
 // (default 15). `pxPerMin` is the column's vertical scale. Clamped to >= 0. Pure — unit-tested.
 export function draggedStartMin(currentStartMin: number, deltaY: number, pxPerMin: number, snapMin = 15): number {
   const deltaMin = Math.round(deltaY / pxPerMin / snapMin) * snapMin
-  // Clamp within the same day [0, 1439] — a vertical drag reschedules within the day, and minToHhmm assumes
-  // an in-day minute (no midnight wrap).
-  return Math.min(24 * 60 - 1, Math.max(0, currentStartMin + deltaMin))
+  // Clamp within the day to the last SNAPPED start (one snap-slot before midnight, e.g. 23:45 for 15-min
+  // steps) — not 23:59 — so an extreme drag still lands on a grid line, and minToHhmm never wraps past midnight.
+  const maxStart = 24 * 60 - snapMin
+  return Math.min(maxStart, Math.max(0, currentStartMin + deltaMin))
 }
 
 // Minutes-of-day → "HH:MM" (24h, zero-padded), for building a wall-time string to convert to UTC.
