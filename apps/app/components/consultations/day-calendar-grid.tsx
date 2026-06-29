@@ -3,6 +3,8 @@
 import * as React from "react"
 import { Building2 } from "lucide-react"
 
+import { cn } from "@workspace/ui/lib/utils"
+
 import { CalendarColumn, PX_PER_MIN } from "@/components/consultations/calendar-column"
 import { ConsultPreviewDialog } from "@/components/consultations/consult-preview-dialog"
 import type { ConsultationType } from "@/lib/consultations/consultation-types"
@@ -70,7 +72,14 @@ export function DayCalendar({
           {columns.map((c) => (
             <div key={c.attorney.id} className="min-w-0 flex-1 px-0.5">
               {c.off ? (
-                <div className="flex items-center justify-center gap-1 rounded border border-red-500/30 bg-red-500/15 px-1.5 py-1 text-center text-[11px] font-medium text-red-700 dark:text-red-300">
+                <div
+                  className={cn(
+                    "flex items-center justify-center gap-1 rounded border px-1.5 py-1 text-center text-[11px] font-medium",
+                    c.off === "holiday"
+                      ? "border-red-500/30 bg-red-500/15 text-red-700 dark:text-red-300"
+                      : "border-border bg-muted/60 text-muted-foreground",
+                  )}
+                >
                   {c.off === "holiday" ? (
                     <>
                       <Building2 className="size-3 shrink-0" />

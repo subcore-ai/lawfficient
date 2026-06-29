@@ -131,7 +131,11 @@ export function CalendarControls({
           {dateLabel}
         </PopoverTrigger>
         <PopoverContent align="start" className="w-auto p-0">
+          {/* key={date} remounts the calendar when the viewed day changes (prev/next/Today/pick) so it
+              re-applies defaultMonth — react-day-picker only honors defaultMonth on mount, and the popover
+              stays mounted. */}
           <Calendar
+            key={date}
             mode="single"
             selected={pickedDate}
             defaultMonth={pickedDate}
@@ -141,7 +145,6 @@ export function CalendarControls({
                 setPickerOpen(false)
               }
             }}
-            autoFocus
           />
         </PopoverContent>
       </Popover>
