@@ -59,6 +59,8 @@ export function DayCalendar({
   // Drag-to-reschedule state + sensors — declared before the early return so the hooks always run.
   // `fromMin` = the consult's server start at drag time (for the reconcile); `toMin` = the optimistic new start.
   const [pending, setPending] = React.useState<{ id: string; fromMin: number; toMin: number } | null>(null)
+  // Serialize reschedule writes so rapid drags persist in drag order (no last-response-wins race).
+  const chainRef = React.useRef<Promise<unknown>>(Promise.resolve())
   // Small activation distance so a plain click still opens the detail dialog (only a real drag moves it).
   const sensors = useSensors(useSensor(PointerSensor, DRAG_ACTIVATION))
   if (columns.length === 0) return null
@@ -96,10 +98,15 @@ export function DayCalendar({
     const toMin = draggedStartMin(baseMin, e.delta.y, PX_PER_MIN)
     if (toMin === baseMin) return // no real move (snapped back to where it already is)
     const startAt = zonedWallTimeToUtcISO(`${date}T${minToHhmm(toMin)}`, tz)
-    if (!startAt) return
+    if (!startAt) {
+      toast.error("That time isn't valid on this day.") // e.g. a nonexistent DST spring-forward wall time
+      return
+    }
     setPending({ id, fromMin: consult.startMin, toMin })
     const revert = () => setPending((p) => (p?.id === id ? null : p))
-    void rescheduleConsultation(id, startAt)
+    // Serialize through chainRef so rapid drags apply in drag order (the last drag is the final state).
+    chainRef.current = chainRef.current
+      .then(() => rescheduleConsultation(id, startAt))
       .then((res) => {
         if (res && "error" in res) {
           toast.error(res.error)
