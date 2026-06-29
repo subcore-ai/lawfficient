@@ -150,7 +150,19 @@ export function DayCalendar({
 
   // One dialog for the whole grid, keyed by id — the live consult is derived from the columns, so after a
   // reschedule / cancel / delete revalidate it stays in sync (and closes if the consult is gone).
-  const selected = columns.flatMap((c) => c.cal.consults).find((c) => c.id === selectedId) ?? null
+  const selectedBase = columns.flatMap((c) => c.cal.consults).find((c) => c.id === selectedId) ?? null
+  // While a drag for the open consult is still pending, show the optimistic time in the detail dialog too, so
+  // it matches the moved block instead of the not-yet-revalidated server time (it self-corrects on revalidate).
+  const selectedPendingMin = selectedBase ? pending[selectedBase.id] : undefined
+  const selected =
+    selectedBase && selectedPendingMin !== undefined
+      ? {
+          ...selectedBase,
+          startMin: selectedPendingMin,
+          endMin: selectedPendingMin + (selectedBase.endMin - selectedBase.startMin),
+          startAt: zonedWallTimeToUtcISO(`${date}T${minToHhmm(selectedPendingMin)}`, tz) ?? selectedBase.startAt,
+        }
+      : selectedBase
   // Drop a stale id during render once its consult vanishes (canceled / deleted, or the day changed), so it
   // can't silently reopen the dialog if that consult later reappears (e.g. navigate away + back).
   if (selectedId !== null && selected === null) setSelectedId(null)
