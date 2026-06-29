@@ -58,7 +58,7 @@ export function DayCalendar({
   const [selectedId, setSelectedId] = React.useState<string | null>(null)
   // Drag-to-reschedule state + sensors — declared before the early return so the hooks always run.
   // `fromMin` = the consult's server start at drag time (for the reconcile); `toMin` = the optimistic new start.
-  const [pending, setPending] = React.useState<{ id: string; fromMin: number; toMin: number } | null>(null)
+  const [pending, setPending] = React.useState<{ id: string; toMin: number } | null>(null)
   // Serialize reschedule writes so rapid drags persist in drag order (no last-response-wins race).
   const chainRef = React.useRef<Promise<unknown>>(Promise.resolve())
   // Small activation distance so a plain click still opens the detail dialog (only a real drag moves it).
@@ -86,7 +86,10 @@ export function DayCalendar({
   // has moved off its original minute (the reschedule landed, or another writer changed it), or it's gone.
   if (pending) {
     const live = columns.flatMap((c) => c.cal.consults).find((x) => x.id === pending.id)
-    if (!live || live.startMin !== pending.fromMin) setPending(null)
+    // Clear once the server data REACHES the optimistic target (the move landed), or the consult is gone.
+    // Checking the target — not merely "moved off the original" — so an intermediate chained reschedule
+    // mid-stack doesn't clear a still-pending later target.
+    if (!live || live.startMin === pending.toMin) setPending(null)
   }
   function onDragEnd(e: DragEndEvent) {
     const id = String(e.active.id)
@@ -102,8 +105,9 @@ export function DayCalendar({
       toast.error("That time isn't valid on this day.") // e.g. a nonexistent DST spring-forward wall time
       return
     }
-    setPending({ id, fromMin: consult.startMin, toMin })
-    const revert = () => setPending((p) => (p?.id === id ? null : p))
+    setPending({ id, toMin })
+    // Scope the revert to THIS write's target, so an earlier chained failure can't wipe a newer drag's pending.
+    const revert = () => setPending((p) => (p?.id === id && p.toMin === toMin ? null : p))
     // Serialize through chainRef so rapid drags apply in drag order (the last drag is the final state).
     chainRef.current = chainRef.current
       .then(() => rescheduleConsultation(id, startAt))

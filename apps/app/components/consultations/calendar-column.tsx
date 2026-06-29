@@ -149,6 +149,9 @@ export function CalendarColumn({
         // While a drag is pending, render the block AND its time label at the optimistic start.
         const startMin = pendingMove?.id === c.id ? pendingMove.startMin : c.startMin
         const endMin = startMin + (c.endMin - c.startMin)
+        // Only non-terminal consults are draggable — rescheduleConsultation rejects finalized ones, so a
+        // completed block would just fail with a toast.
+        const canDrag = canBook && (c.status === "scheduled" || c.status === "paid" || c.status === "rescheduled")
         return (
           <DraggableConsult
             key={c.id}
@@ -158,7 +161,7 @@ export function CalendarColumn({
             topPx={top(startMin)}
             heightPx={height(c.endMin - c.startMin)}
             tint={consultTint}
-            canDrag={canBook}
+            canDrag={canDrag}
             onSelect={onSelectConsult}
           />
         )
