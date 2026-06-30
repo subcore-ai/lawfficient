@@ -140,7 +140,7 @@ _Added 2026-06-29 (gap audit; the basic `/consultations/[id]` page shipped in #9
 - **UC13 qualification + notes UI (highest value).** Post-consult capture: qualified / not-qualified /
   future-hire (+ date), assign a follow-up staff member, case type, and a free-form notes timeline. The
   schema is already prepped (migration `0038`: notes `entity_type='consultation'` + RLS) and the
-  `notes-timeline` / `note-composer` components exist (used on leads) but aren't wired. The new detail page
+  `NotesTimeline` / `NoteComposer` components exist (used on leads) but aren't wired. The new detail page
   is its home. **Blocked on the team's precise requirements** + likely a small migration (qualification
   result / follow-up assignee — decide: store on the lead vs the consult). This is what actually "finishes"
   the consult → qualify → client-handoff flow.
@@ -165,14 +165,14 @@ _Added 2026-06-29 (gap audit, specs 12 + 23)._
 **What:**
 - **Duplicate / similar-lead flagging (FR-leads-12).** Ingestion is idempotent on `(firm, source,
   externalId)`, but there's no fuzzy dedup (name / DOB / etc.) or a UI to resolve flagged near-duplicates.
-- **Tier-1 ingestion: per-source field-mapping editor (+ event replay).** A `/settings/sources/{id}/mapping`
+- **Tier-1 ingestion: per-source field-mapping editor (+ event replay).** A `/settings/sources/[id]/mapping`
   UI so a new source's field layout is onboarded without a code deploy, plus replaying raw `webhook_events`
   after a mapping change. (Tier-0 webhook is built.)
 - **CSV / batch import.** The `ImportLeadsDialog` shell exists but is wired to the mock store; needs a real
   batch endpoint + wiring.
 - **Lead → client "conversion" reconciliation (decision needed).** The mock `ConvertLeadDialog` is a vestige
   of the old two-table model. In the settled one-record model (lead↔client is one contact + status),
-  "convert" should be a status change + hand-off to an **AR/retention module that doesn't exist yet**.
+  "convert" should be a status change + hand-off to a **retention / accounts-receivable (AR) module that doesn't exist yet**.
   Decide: delete the vestige now, and/or define the retention hand-off. Don't wire it as-is.
 - **Advanced filters.** Add case type / language / location / date-range to the leads list (today: status /
   source / assignee / search).
