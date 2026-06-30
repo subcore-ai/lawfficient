@@ -129,3 +129,61 @@ core "see availability, book a free slot, don't double-book, mark days off" valu
 aren't table-stakes for v1.
 
 **Priority:** **Medium.** Partial-day overrides + booking rules are the next-most-useful.
+
+---
+
+## Consultations — module gaps after the basic detail page (#96)
+
+_Added 2026-06-29 (gap audit; the basic `/consultations/[id]` page shipped in #96)._
+
+**What — in priority order:**
+- **UC13 qualification + notes UI (highest value).** Post-consult capture: qualified / not-qualified /
+  future-hire (+ date), assign a follow-up staff member, case type, and a free-form notes timeline. The
+  schema is already prepped (migration `0038`: notes `entity_type='consultation'` + RLS) and the
+  `notes-timeline` / `note-composer` components exist (used on leads) but aren't wired. The new detail page
+  is its home. **Blocked on the team's precise requirements** + likely a small migration (qualification
+  result / follow-up assignee — decide: store on the lead vs the consult). This is what actually "finishes"
+  the consult → qualify → client-handoff flow.
+- **Link the lead-detail consult rows to `/consultations/[id]`.** The list board + calendar dialog link to
+  the detail page (#96); the lead detail page's own consultation rows don't yet. Small follow-on.
+- **Cancellation-count guard (UC12b).** "3rd cancellation blocks re-booking without admin approval" — needs
+  a per-lead counter + the booking guard. Unbuilt.
+
+**Belongs to other (unbuilt) modules — pointers, not consultations work:**
+- **Payment processing** (Make Payment / split / receipt) → **Billing**. v1 is track-only (`paid` +
+  `amount`, both built).
+- **Confirmation + reminder emails** → **Communications** (spec 19).
+
+**Priority:** UC13 notes/qualification is **High** once requirements land; the rest **Low–Medium**.
+
+---
+
+## Leads — CRM + ingestion gaps
+
+_Added 2026-06-29 (gap audit, specs 12 + 23)._
+
+**What:**
+- **Duplicate / similar-lead flagging (FR-leads-12).** Ingestion is idempotent on `(firm, source,
+  externalId)`, but there's no fuzzy dedup (name / DOB / etc.) or a UI to resolve flagged near-duplicates.
+- **Tier-1 ingestion: per-source field-mapping editor (+ event replay).** A `/settings/sources/{id}/mapping`
+  UI so a new source's field layout is onboarded without a code deploy, plus replaying raw `webhook_events`
+  after a mapping change. (Tier-0 webhook is built.)
+- **CSV / batch import.** The `ImportLeadsDialog` shell exists but is wired to the mock store; needs a real
+  batch endpoint + wiring.
+- **Lead → client "conversion" reconciliation (decision needed).** The mock `ConvertLeadDialog` is a vestige
+  of the old two-table model. In the settled one-record model (lead↔client is one contact + status),
+  "convert" should be a status change + hand-off to an **AR/retention module that doesn't exist yet**.
+  Decide: delete the vestige now, and/or define the retention hand-off. Don't wire it as-is.
+- **Advanced filters.** Add case type / language / location / date-range to the leads list (today: status /
+  source / assignee / search).
+
+**Integration / channel-dependent (pointers):**
+- **Caller resolution (`GET /api/leads/resolve`) + call-disposition logging** → the phone/RingCentral
+  integration (integrations deferred for v1).
+- **Public hosted lead form** → a capture channel; the embeddable webhook covers programmatic capture today.
+  Product decision whether v1 needs a hosted form.
+
+**Note:** the `updateLead` jsonb read-modify-write race is tracked separately above.
+
+**Priority:** dedup + Tier-1 mapping are the highest-leverage; CSV import + filters are quick wins;
+conversion needs a product decision first.
