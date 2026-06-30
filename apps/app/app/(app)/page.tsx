@@ -1,6 +1,7 @@
-import { DashboardView } from "@/components/dashboard-view"
+import { DashboardView, type UpcomingConsultation } from "@/components/dashboard-view"
 import { LEADS } from "@/data"
 import { getCurrentUser } from "@/lib/auth/session"
+import { mapConsultationRow } from "@/lib/consultations/queries"
 import type { AssigneeOption } from "@/lib/leads/queries"
 import {
   getFirmStaff,
@@ -20,8 +21,66 @@ type Loaded = {
   leadKpisMock: boolean
   assignees: AssigneeOption[]
   taxonomies: FirmTaxonomies
+  upcomingConsultations: UpcomingConsultation[]
+  upcomingCount: number
   canCreateLead: boolean
   canManage: boolean
+}
+
+// Real upcoming consultations for the dashboard: the next-5 list + the full upcoming count (for the KPI).
+// Bounded in SQL (NOT "load every consult + slice in memory", which PostgREST's row cap would truncate):
+// upcoming = non-terminal status AND start_at >= now, ordered soonest-first. RLS scopes to the firm and to
+// viewers with consultations.view — without it both queries return empty, so the list is [] and the count 0.
+async function loadUpcomingConsultations(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+): Promise<{ items: UpcomingConsultation[]; count: number }> {
+  const nowIso = new Date().toISOString()
+  const TERMINAL = "(completed,canceled,no_show)" // statuses that are never "upcoming"
+  const [listRes, countRes] = await Promise.all([
+    supabase
+      .from("consultations")
+      .select("*")
+      .eq("archived", false)
+      .not("status", "in", TERMINAL)
+      .gte("start_at", nowIso)
+      .order("start_at", { ascending: true })
+      .limit(5),
+    supabase
+      .from("consultations")
+      .select("id", { count: "exact", head: true })
+      .eq("archived", false)
+      .not("status", "in", TERMINAL)
+      .gte("start_at", nowIso),
+  ])
+  if (listRes.error) throw listRes.error
+  if (countRes.error) throw countRes.error
+
+  // Resolve names only for the (≤5) rows shown — fetch just their leads + attorneys, not the whole tables.
+  const rows = listRes.data ?? []
+  const leadIds = [...new Set(rows.map((r) => r.lead_id).filter((x): x is string => x !== null))]
+  const attorneyIds = [...new Set(rows.map((r) => r.attorney_id).filter((x): x is string => x !== null))]
+  const [leadsRes, profilesRes] = await Promise.all([
+    leadIds.length ? supabase.from("leads").select("id, first_name, last_name").in("id", leadIds) : null,
+    attorneyIds.length ? supabase.from("profiles").select("id, name").in("id", attorneyIds) : null,
+  ])
+  if (leadsRes?.error) throw leadsRes.error
+  if (profilesRes?.error) throw profilesRes.error
+
+  const leadNames = new Map((leadsRes?.data ?? []).map((l) => [l.id, `${l.first_name} ${l.last_name}`.trim()]))
+  const profileNames = new Map((profilesRes?.data ?? []).map((p) => [p.id, p.name]))
+  const items = rows.map((r) => {
+    const c = mapConsultationRow(r, leadNames, profileNames)
+    return {
+      id: c.id,
+      leadId: c.leadId,
+      leadName: c.leadName,
+      attorneyName: c.attorneyName,
+      status: c.status,
+      startAt: c.startAt,
+      timeZone: c.timeZone,
+    }
+  })
+  return { items, count: countRes.count ?? 0 }
 }
 
 const MOCK_TERMINAL = ["retained", "lost", "not_qualified"]
@@ -41,6 +100,8 @@ async function load(): Promise<Loaded> {
       leadKpisMock: true,
       assignees: [],
       taxonomies: groupTaxonomies([]),
+      upcomingConsultations: [],
+      upcomingCount: 0,
       canCreateLead: false,
       canManage: false,
     }
@@ -48,12 +109,15 @@ async function load(): Promise<Loaded> {
   const canCreateLead = me.permissions?.includes("leads.edit") ?? false
   const canManage = me.permissions?.includes("settings.manage") ?? false
 
-  // Assignees, taxonomies, and pipeline statuses from the per-firm cache (all cache hits).
-  const [staff, taxRows, statuses] = await Promise.all([
+  // Assignees, taxonomies, pipeline statuses (per-firm cache), and the real upcoming-consultations list.
+  const [staff, taxRows, statuses, upcomingData] = await Promise.all([
     getFirmStaff(me.firmId),
     getFirmTaxonomyRows(me.firmId),
     getFirmStatusRows(me.firmId),
+    loadUpcomingConsultations(supabase),
   ])
+  const upcomingConsultations = upcomingData.items
+  const upcomingCount = upcomingData.count
   const assignees = staff
     .filter((p) => p.status === "active")
     .map((p) => ({ id: p.id, name: p.name }))
@@ -62,7 +126,7 @@ async function load(): Promise<Loaded> {
   // The lead KPIs need leads.view. For roles without it (QA lead, creative writer, file clerk)
   // keep them on the mock counts like the rest of the dashboard, rather than a misleading 0.
   if (!(me.permissions?.includes("leads.view") ?? false)) {
-    return { ...mockLeadCounts(), leadKpisMock: true, assignees, taxonomies, canCreateLead, canManage }
+    return { ...mockLeadCounts(), leadKpisMock: true, assignees, taxonomies, upcomingConsultations, upcomingCount, canCreateLead, canManage }
   }
 
   const openIds = statuses.filter((s) => !s.is_terminal).map((s) => s.id)
@@ -76,11 +140,11 @@ async function load(): Promise<Loaded> {
   if (openRes.error) throw openRes.error
   if (eaRes.error) throw eaRes.error
 
-  return { openLeads: openRes.count ?? 0, eaOut: eaRes.count ?? 0, leadKpisMock: false, assignees, taxonomies, canCreateLead, canManage }
+  return { openLeads: openRes.count ?? 0, eaOut: eaRes.count ?? 0, leadKpisMock: false, assignees, taxonomies, upcomingConsultations, upcomingCount, canCreateLead, canManage }
 }
 
 export default async function DashboardPage() {
-  const { openLeads, eaOut, leadKpisMock, assignees, taxonomies, canCreateLead, canManage } = await load()
+  const { openLeads, eaOut, leadKpisMock, assignees, taxonomies, upcomingConsultations, upcomingCount, canCreateLead, canManage } = await load()
   return (
     <DashboardView
       openLeads={openLeads}
@@ -88,6 +152,8 @@ export default async function DashboardPage() {
       leadKpisMock={leadKpisMock}
       assignees={assignees}
       taxonomies={taxonomies}
+      upcomingConsultations={upcomingConsultations}
+      upcomingCount={upcomingCount}
       canCreateLead={canCreateLead}
       canManage={canManage}
     />

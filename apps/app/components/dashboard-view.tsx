@@ -29,6 +29,9 @@ import { NewLeadDialog } from "@/components/leads/new-lead-dialog"
 import { PageHeader } from "@/components/page-header"
 import { StatusPill } from "@/components/status-pill"
 import { ToastButton } from "@/components/toast-button"
+import { consultationStatusMeta } from "@/lib/consultations/queries"
+import { formatConsultationWhen } from "@/lib/consultations/time"
+import type { ConsultationStatus } from "@/lib/consultations/validation"
 import type { FirmTaxonomies } from "@/lib/taxonomies/queries"
 import {
   ACTIVITY,
@@ -42,8 +45,19 @@ import {
 import { useStore } from "@/data/store"
 import type { Activity, Kpi } from "@/data/types"
 import type { AssigneeOption } from "@/lib/leads/queries"
-import { formatCurrency, formatDateTime } from "@/lib/format"
-import { consultationStatusBadge, deadlineBadge } from "@/lib/status"
+import { formatCurrency } from "@/lib/format"
+import { deadlineBadge } from "@/lib/status"
+
+// One real upcoming consultation, shaped for the dashboard list (loaded server-side in the RSC page).
+export type UpcomingConsultation = {
+  id: string
+  leadId: string | null
+  leadName: string
+  attorneyName: string | null
+  status: ConsultationStatus
+  startAt: string
+  timeZone: string
+}
 
 const ACTIVITY_ICON: Record<Activity["kind"], React.ComponentType<{ className?: string }>> = {
   lead: Users,
@@ -62,6 +76,8 @@ export function DashboardView({
   leadKpisMock,
   assignees,
   taxonomies,
+  upcomingConsultations,
+  upcomingCount,
   canCreateLead,
   canManage,
 }: {
@@ -70,15 +86,12 @@ export function DashboardView({
   leadKpisMock: boolean
   assignees: AssigneeOption[]
   taxonomies: FirmTaxonomies
+  upcomingConsultations: UpcomingConsultation[]
+  upcomingCount: number
   canCreateLead: boolean
   canManage: boolean
 }) {
-  const { consultations, clients, cases, invoices } = useStore()
-
-  const upcoming = consultations
-    .filter((c) => ["scheduled", "paid", "rescheduled"].includes(c.status))
-    .slice()
-    .sort((a, b) => a.startAt.localeCompare(b.startAt))
+  const { clients, cases, invoices } = useStore()
 
   const overdue = invoices.filter((i) => i.status === "overdue").reduce((sum, i) => sum + i.remaining, 0)
   const redFlags = cases.filter((c) => c.redFlag !== "none").length
@@ -87,7 +100,7 @@ export function DashboardView({
   // they fall back to mock counts (leadKpisMock) like the rest of the dashboard.
   const kpis: { kpi: Kpi; mock?: boolean }[] = [
     { kpi: { label: "Leads in pipeline", value: String(openLeads), delta: 0, hint: "active leads" }, mock: leadKpisMock },
-    { kpi: { label: "Upcoming consultations", value: String(upcoming.length), delta: 20, hint: "scheduled & paid" }, mock: true },
+    { kpi: { label: "Upcoming consultations", value: String(upcomingCount), delta: 0, hint: "scheduled & paid" } },
     { kpi: { label: "Pending retainers (EA out)", value: String(eaOut), delta: 0, hint: "awaiting signature" }, mock: leadKpisMock },
     { kpi: { label: "Retained clients", value: String(clients.length), delta: 9.1, hint: "active engagements" }, mock: true },
     { kpi: { label: "Overdue balance", value: formatCurrency(overdue), delta: 4.2, hint: "across clients" }, mock: true },
@@ -170,30 +183,32 @@ export function DashboardView({
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               Upcoming consultations
-              <MockTag />
             </CardTitle>
             <CardAction>
-              <Link href="/consultations" className="text-muted-foreground hover:text-foreground text-xs font-medium">
+              <Link href="/consultations?view=list" className="text-muted-foreground hover:text-foreground text-xs font-medium">
                 View all
               </Link>
             </CardAction>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
-            {upcoming.length === 0 ? (
+            {upcomingConsultations.length === 0 ? (
               <p className="text-muted-foreground text-sm">No upcoming consultations.</p>
             ) : (
-              upcoming.slice(0, 5).map((c) => (
-                <div key={c.id} className="flex items-center gap-3">
-                  <UserAvatar name={staffName(c.attorneyId)} className="size-8" />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{c.leadName}</p>
-                    <p className="text-muted-foreground truncate text-xs">
-                      {staffName(c.attorneyId)} · {formatDateTime(c.startAt)}
-                    </p>
+              upcomingConsultations.map((c) => {
+                const meta = consultationStatusMeta(c.status)
+                return (
+                  <div key={c.id} className="flex items-center gap-3">
+                    <UserAvatar name={c.attorneyName ?? "Unassigned"} className="size-8" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{c.leadName}</p>
+                      <p className="text-muted-foreground truncate text-xs">
+                        {c.attorneyName ?? "Unassigned"} · {formatConsultationWhen(c.startAt, c.timeZone)}
+                      </p>
+                    </div>
+                    <StatusPill label={meta.label} tone={meta.tone} />
                   </div>
-                  <StatusPill {...consultationStatusBadge(c.status)} />
-                </div>
-              ))
+                )
+              })
             )}
           </CardContent>
         </Card>
