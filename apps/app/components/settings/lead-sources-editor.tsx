@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Activity, Copy, KeyRound, Plus, Trash2 } from "lucide-react"
+import { Activity, KeyRound, Plus, Trash2 } from "lucide-react"
 
 import { Button } from "@workspace/ui/components/button"
 import {
@@ -31,6 +31,7 @@ import {
   setDefaultAssignee,
   setSourceEnabled,
 } from "@/app/(app)/settings/integrations/actions"
+import { CopyButton } from "@/components/copy-button"
 import { Field } from "@/components/form-field"
 import { InlineSelect } from "@/components/inline-select"
 import { StatusPill } from "@/components/status-pill"
@@ -54,24 +55,6 @@ const UNASSIGNED = "__none__"
 // The fields a firm maps their source to inside Zapier (the canonical contract).
 const CONTRACT_FIELDS =
   "externalId, firstName, lastName, email, phone, caseType, hierarchy, qualification, preferredLanguage, countryOfOrigin, city, state, zip, gender, dob, referralSource, notes"
-
-function CopyButton({ value, label = "Copy" }: { value: string; label?: string }) {
-  return (
-    <Button
-      type="button"
-      variant="outline"
-      size="sm"
-      onClick={() => {
-        navigator.clipboard.writeText(value).then(
-          () => toast.success("Copied"),
-          () => toast.error("Couldn't copy")
-        )
-      }}
-    >
-      <Copy className="size-3.5" /> {label}
-    </Button>
-  )
-}
 
 // Shown ONCE after create/rotate — the raw key is never stored or shown again.
 function KeyRevealDialog({

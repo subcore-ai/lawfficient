@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Activity, Copy, Plus, Trash2, Webhook } from "lucide-react"
+import { Activity, Plus, Trash2, Webhook } from "lucide-react"
 
 import { Button } from "@workspace/ui/components/button"
 import { Checkbox } from "@workspace/ui/components/checkbox"
@@ -23,6 +23,7 @@ import {
   deleteWebhookEndpoint,
   setWebhookEndpointEnabled,
 } from "@/app/(app)/settings/integrations/webhooks-actions"
+import { CopyButton } from "@/components/copy-button"
 import { Field } from "@/components/form-field"
 import { StatusPill } from "@/components/status-pill"
 import { formatDateTime } from "@/lib/format"
@@ -57,24 +58,6 @@ const EVENT_OPTIONS: { value: string; label: string }[] = [
   { value: "consultation.rescheduled", label: "Consultation rescheduled" },
   { value: "consultation.canceled", label: "Consultation canceled" },
 ]
-
-function CopyButton({ value, label = "Copy" }: { value: string; label?: string }) {
-  return (
-    <Button
-      type="button"
-      variant="outline"
-      size="sm"
-      onClick={() => {
-        navigator.clipboard.writeText(value).then(
-          () => toast.success("Copied"),
-          () => toast.error("Couldn't copy")
-        )
-      }}
-    >
-      <Copy className="size-3.5" /> {label}
-    </Button>
-  )
-}
 
 // Shown ONCE after create — the raw signing secret is never stored readably or shown again.
 function SecretRevealDialog({ secret, onClose }: { secret: string | null; onClose: () => void }) {

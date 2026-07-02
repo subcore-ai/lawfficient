@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Copy, KeyRound, Plus, Trash2 } from "lucide-react"
+import { KeyRound, Plus, Trash2 } from "lucide-react"
 
 import { Button } from "@workspace/ui/components/button"
 import { Checkbox } from "@workspace/ui/components/checkbox"
@@ -19,6 +19,7 @@ import { Input } from "@workspace/ui/components/input"
 import { toast } from "@workspace/ui/components/sonner"
 
 import { createApiKey, deleteApiKey, setApiKeyEnabled } from "@/app/(app)/settings/integrations/actions"
+import { CopyButton } from "@/components/copy-button"
 import { Field } from "@/components/form-field"
 import { StatusPill } from "@/components/status-pill"
 import { API_SCOPES, type ApiScope } from "@/lib/api/scopes"
@@ -47,29 +48,6 @@ const DEFAULT_SCOPES: Record<ApiScope, boolean> = {
   "leads:write": false,
   "consultations:read": true,
   "consultations:write": false,
-}
-
-function CopyButton({ value, label = "Copy" }: { value: string; label?: string }) {
-  return (
-    <Button
-      type="button"
-      variant="outline"
-      size="sm"
-      onClick={() => {
-        // navigator.clipboard is undefined in non-secure contexts / older browsers — guard it.
-        if (!navigator.clipboard) {
-          toast.error("Copying isn't available here — select the text and copy manually.")
-          return
-        }
-        navigator.clipboard.writeText(value).then(
-          () => toast.success("Copied"),
-          () => toast.error("Couldn't copy"),
-        )
-      }}
-    >
-      <Copy className="size-3.5" /> {label}
-    </Button>
-  )
 }
 
 // Shown ONCE after create — the raw key is never stored or shown again.
