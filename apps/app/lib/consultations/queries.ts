@@ -1,6 +1,7 @@
 // Pure read helpers for consultations (mirrors lib/leads/queries.ts): row → view with names resolved
 // from a profiles/leads name map, plus the upcoming/past partition the list page renders. Kept pure so
 // they're unit-tested without a DB.
+import { jsonRecord } from "@/lib/json"
 import type { Database, Json } from "@/lib/supabase/database.types"
 import type { Tone } from "@/components/status-pill"
 import type { ConsultationStatus } from "./validation"
@@ -40,10 +41,6 @@ export function consultationStatusMeta(status: ConsultationStatus): { label: str
   return STATUS_META[status]
 }
 
-function asData(value: Json): Record<string, Json> {
-  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, Json>) : {}
-}
-
 // Resolve names from maps (leadId → name, profileId → name), like the lead page resolves assignees.
 export function mapConsultationRow(
   row: ConsultationRow,
@@ -67,7 +64,7 @@ export function mapConsultationRow(
     bookedById: row.booked_by_id,
     archived: row.archived,
     createdAt: row.created_at,
-    data: asData(row.data),
+    data: jsonRecord(row.data),
   }
 }
 

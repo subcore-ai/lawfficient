@@ -11,10 +11,10 @@ import {
   type LeadDataInput,
   type LeadVocab,
 } from "@/lib/leads/data-schema"
+import { jsonRecord } from "@/lib/json"
 import { recordLeadEvent } from "@/lib/leads/events"
 import { emitLeadEvents } from "@/lib/leads/mutations"
 import { parseLeadInput } from "@/lib/leads/validation"
-import type { Json } from "@/lib/supabase/database.types"
 import { createClient } from "@/lib/supabase/server"
 import { groupTaxonomies, toLeadVocab } from "@/lib/taxonomies/queries"
 import type { WebhookEventType } from "@/lib/webhooks/events"
@@ -353,12 +353,7 @@ export async function setLeadQualification(
     .single()
   if (readErr || !existing) return { error: "Couldn't update the lead." }
 
-  const raw =
-    existing.data &&
-    typeof existing.data === "object" &&
-    !Array.isArray(existing.data)
-      ? (existing.data as Record<string, Json>)
-      : {}
+  const raw = jsonRecord(existing.data)
   const currentQual =
     typeof raw.qualification === "string" ? raw.qualification : ""
   const next = value.trim()

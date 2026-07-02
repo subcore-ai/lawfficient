@@ -4,6 +4,7 @@
 // before persisting. The constrained fields (case type / hierarchy / qualification) are now
 // firm-defined (see firm_taxonomies), so their vocabulary is PASSED IN rather than hard-coded —
 // keeping these functions pure + unit-testable. Dependency-free.
+import { jsonRecord } from "@/lib/json"
 import type { Json } from "@/lib/supabase/database.types"
 
 export type LeadData = {
@@ -108,10 +109,7 @@ export function mergeLeadData(
   existing: Json | null | undefined,
   formValue: Record<string, string>
 ): Record<string, Json> {
-  const base: Record<string, Json> =
-    existing && typeof existing === "object" && !Array.isArray(existing)
-      ? { ...(existing as Record<string, Json>) }
-      : {}
+  const base: Record<string, Json> = { ...jsonRecord(existing) }
   for (const key of LEAD_DATA_KEYS) delete base[key]
   return { ...base, ...formValue }
 }

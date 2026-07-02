@@ -1,5 +1,6 @@
 // DB operations for ingestion, all via the service-role admin client (the webhook has no user
 // session, so RLS doesn't apply — every write sets firm_id EXPLICITLY from the resolved key).
+import { jsonRecord } from "@/lib/json"
 import type { Json } from "@/lib/supabase/database.types"
 import { createAdminClient } from "@/lib/supabase/admin"
 
@@ -68,10 +69,6 @@ type UpsertArgs = {
 
 export type UpsertResult = { leadId: string; created: boolean }
 
-function asObject(value: Json | null | undefined): Record<string, Json> {
-  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, Json>) : {}
-}
-
 type CorePatch = { first_name?: string; last_name?: string; email?: string; phone?: string }
 
 // On an idempotent re-delivery, overwrite ONLY the core columns the payload actually carries — an
@@ -119,7 +116,7 @@ export async function upsertLead(admin: Admin, args: UpsertArgs): Promise<Upsert
       .from("leads")
       .update({
         ...coreUpdatePatch(args.core),
-        data: { ...asObject(existingData), ...args.data },
+        data: { ...jsonRecord(existingData), ...args.data },
         last_activity: new Date().toISOString(),
       })
       .eq("id", id)
