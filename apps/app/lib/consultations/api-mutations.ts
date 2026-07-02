@@ -12,6 +12,7 @@ import { getApiConsultationById } from "@/lib/api/consultations-query"
 import type { ApiConsultation } from "@/lib/api/consultations"
 import { tenantScoped } from "@/lib/api/tenant-db"
 import { isUuid } from "@/lib/api/validation"
+import { jsonRecord } from "@/lib/json"
 import { createAdminClient } from "@/lib/supabase/admin"
 import type { Database, Json } from "@/lib/supabase/database.types"
 import { emitEvent } from "@/lib/webhooks/emit"
@@ -75,7 +76,7 @@ function serializeRpcRow(row: BookedRow, firmId: string): ApiConsultation {
     archived: row.archived,
     created_at: row.created_at,
     // jsonb arrives as Json; the public shape is an object map (a primitive/array/null → {}).
-    data: row.data && typeof row.data === "object" && !Array.isArray(row.data) ? (row.data as Record<string, Json>) : {},
+    data: jsonRecord(row.data),
   }
 }
 

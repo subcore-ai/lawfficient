@@ -20,6 +20,7 @@ import { getApiLeadById } from "@/lib/api/leads-query"
 import { serializeLead, type ApiLead } from "@/lib/api/leads"
 import { tenantScoped } from "@/lib/api/tenant-db"
 import { isUuid } from "@/lib/api/validation"
+import { jsonRecord } from "@/lib/json"
 import { createAdminClient } from "@/lib/supabase/admin"
 import type { Database, Json } from "@/lib/supabase/database.types"
 import { groupTaxonomies, toLeadVocabAll } from "@/lib/taxonomies/queries"
@@ -315,10 +316,7 @@ export async function updateLeadViaApi(
     // PARTIAL merge: overlay only the provided + valid keys onto the EXISTING data, preserving both
     // unmentioned managed fields and any ingestion-set extras. (mergeLeadData drops ALL managed keys
     // first — right for the full-form Server Action, but it would wipe fields a partial PATCH omits.)
-    const existingData =
-      existing.data && typeof existing.data === "object" && !Array.isArray(existing.data)
-        ? (existing.data as Record<string, Json>)
-        : {}
+    const existingData = jsonRecord(existing.data)
     // Only write when a provided value actually differs from what's stored — a same-value `data`
     // resend is a no-op (no write, no last_activity bump, no event).
     if (Object.entries(built.value).some(([k, v]) => existingData[k] !== v)) {
