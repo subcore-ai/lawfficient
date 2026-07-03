@@ -7,7 +7,7 @@ import { getCurrentUser } from "@/lib/auth/session"
 import type { NoteEntityType } from "@/lib/notes/queries"
 import { createClient } from "@/lib/supabase/server"
 
-export type ActionResult = { ok: true } | { error: string }
+import type { ActionResult } from "@/lib/actions/result"
 
 type NotesClient = Awaited<ReturnType<typeof createClient>>
 

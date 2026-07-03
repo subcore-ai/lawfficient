@@ -30,9 +30,9 @@ import {
   editNote,
   setNoteHidden,
   setNoteResolved,
-  type ActionResult,
 } from "@/lib/notes/actions"
 import { LocalTime } from "@/components/local-time"
+import type { ActionResult } from "@/lib/actions/result"
 import { partitionNotes, type NoteView } from "@/lib/notes/queries"
 
 type Filter = "all" | "note" | "event"

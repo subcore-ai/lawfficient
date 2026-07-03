@@ -19,7 +19,7 @@ import { createClient } from "@/lib/supabase/server"
 import { groupTaxonomies, toLeadVocab } from "@/lib/taxonomies/queries"
 import type { WebhookEventType } from "@/lib/webhooks/events"
 
-export type ActionResult = { ok: true } | { error: string }
+import type { ActionResult } from "@/lib/actions/result"
 
 const LEADS_PATH = "/leads"
 

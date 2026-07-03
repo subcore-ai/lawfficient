@@ -10,7 +10,7 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { parseInviteInput, parseRole } from "@/lib/users/validation"
 
-export type ActionResult = { ok: true } | { error: string }
+import type { ActionResult } from "@/lib/actions/result"
 
 const USERS_PATH = "/settings/users"
 

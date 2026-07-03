@@ -8,7 +8,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 import { TAXONOMY_CATEGORIES, type TaxonomyCategory } from "@/lib/taxonomies/queries"
 
-export type ActionResult = { ok: true } | { error: string }
+import type { ActionResult } from "@/lib/actions/result"
 // Inline create returns the new id + label so the dropdown can auto-select it.
 export type CreateResult = { ok: true; id: string; label: string } | { error: string }
 

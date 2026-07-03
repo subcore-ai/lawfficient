@@ -9,7 +9,7 @@ import { WEBHOOK_EVENT_TYPES, type WebhookEventType } from "@/lib/webhooks/event
 import { generateSecret } from "@/lib/webhooks/secret"
 import { isSafeWebhookUrl } from "@/lib/webhooks/url"
 
-export type ActionResult = { ok: true } | { error: string }
+import type { ActionResult } from "@/lib/actions/result"
 // create returns the raw signing secret ONCE (it's never stored readably) so the UI can show it.
 export type SecretResult = { ok: true; secret: string } | { error: string }
 

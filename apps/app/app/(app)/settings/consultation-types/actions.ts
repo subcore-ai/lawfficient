@@ -6,7 +6,7 @@ import { getCurrentUser, type CurrentUser } from "@/lib/auth/session"
 import { parseConsultationTypeInput } from "@/lib/consultations/consultation-types"
 import { createClient } from "@/lib/supabase/server"
 
-export type ActionResult = { ok: true } | { error: string }
+import type { ActionResult } from "@/lib/actions/result"
 
 const PATH = "/settings/consultation-types"
 

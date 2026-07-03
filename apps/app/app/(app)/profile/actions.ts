@@ -9,7 +9,7 @@ import { staffTag } from "@/lib/reference"
 import { AVATAR_BUCKET } from "@/lib/supabase/avatars"
 import { createClient } from "@/lib/supabase/server"
 
-export type ActionResult = { ok: true } | { error: string }
+import type { ActionResult } from "@/lib/actions/result"
 type NameResult = { ok: true; changed: boolean } | { error: string }
 
 const PROFILE_PATH = "/profile"

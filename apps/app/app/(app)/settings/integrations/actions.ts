@@ -7,7 +7,7 @@ import { requirePermission } from "@/lib/auth/gate"
 import { generateKey } from "@/lib/ingest/keys"
 import { createClient } from "@/lib/supabase/server"
 
-export type ActionResult = { ok: true } | { error: string }
+import type { ActionResult } from "@/lib/actions/result"
 // create/rotate return the raw key ONCE (it's never stored) so the UI can show it.
 export type KeyResult = { ok: true; rawKey: string; sourceKey: string } | { error: string }
 

@@ -9,7 +9,7 @@ import { isValidColorKey } from "@/lib/scheduling/calendar-colors"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 
-export type ActionResult = { ok: true } | { error: string }
+import type { ActionResult } from "@/lib/actions/result"
 
 const PATH = "/settings/scheduling"
 const MY_PATH = "/profile/office-hours"

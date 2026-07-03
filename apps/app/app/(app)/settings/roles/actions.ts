@@ -6,7 +6,7 @@ import { requirePermission } from "@/lib/auth/gate"
 import { ALL_PERMISSIONS, type AppPermission } from "@/lib/rbac/permissions"
 import { createClient } from "@/lib/supabase/server"
 
-export type ActionResult = { ok: true } | { error: string }
+import type { ActionResult } from "@/lib/actions/result"
 
 const ROLES_PATH = "/settings/roles"
 
