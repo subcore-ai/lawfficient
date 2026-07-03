@@ -43,6 +43,14 @@ export function decodeCursor(raw: string | null): Cursor | null {
   return { createdAt, id }
 }
 
+// PostgREST `.or()` expression selecting rows strictly AFTER `cursor` in (created_at desc, id desc)
+// keyset order — the tie-safe half of a cursor page. Both parts are validated at decode time
+// (decodeCursor: `createdAt` is an ISO instant, `id` a UUID), so they're safe to embed in the raw
+// filter. Successive PostgREST `.or()` groups AND together, so this composes with other filters.
+export function keysetAfter(cursor: Cursor): string {
+  return `created_at.lt.${cursor.createdAt},and(created_at.eq.${cursor.createdAt},id.lt.${cursor.id})`
+}
+
 export type Page<T> = { data: T[]; next_cursor: string | null }
 
 // Shape a fetched window into the response envelope. The handler fetches `limit + 1` rows to
