@@ -25,6 +25,7 @@ import {
 import { toast } from "@workspace/ui/components/sonner"
 
 import { Field } from "@/components/form-field"
+import { CASE_TYPE_OPTIONS } from "@/components/select-field"
 import { CASE_TYPES } from "@/data"
 import { useStore } from "@/data/store"
 import type { CaseType, DocItem } from "@/data/types"
@@ -143,7 +144,7 @@ export function UploadDocumentDialog({
               <Select
                 value={caseType}
                 onValueChange={(v) => setCaseType(v ?? defaultCaseType)}
-                items={CASE_TYPES.map((t) => ({ value: t, label: t }))}
+                items={CASE_TYPE_OPTIONS}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Case type" />

@@ -7,8 +7,8 @@ import { toast } from "@workspace/ui/components/sonner"
 
 import { EditDialogShell } from "@/components/edit-dialog-shell"
 import { Field } from "@/components/form-field"
-import { CLIENT_STATUS_OPTIONS, SelectField } from "@/components/select-field"
-import { CASE_TYPES, STAFF } from "@/data"
+import { CASE_TYPE_OPTIONS, CLIENT_STATUS_OPTIONS, SelectField } from "@/components/select-field"
+import { STAFF } from "@/data"
 import { useStore } from "@/data/store"
 import type { CaseType, Client, ClientStatus } from "@/data/types"
 
@@ -16,7 +16,6 @@ const LAS = STAFF.filter((u) => u.role === "legal_assistant" || u.role === "la_l
   value: u.id,
   label: u.name,
 }))
-const CASE_TYPE_OPTIONS = CASE_TYPES.map((t) => ({ value: t, label: t }))
 const PAYMENT_STATUS_OPTIONS = [
   { value: "current", label: "Current" },
   { value: "overdue", label: "Overdue" },

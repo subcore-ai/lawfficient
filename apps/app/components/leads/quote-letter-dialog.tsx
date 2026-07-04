@@ -28,6 +28,7 @@ import { toast } from "@workspace/ui/components/sonner"
 import { Textarea } from "@workspace/ui/components/textarea"
 
 import { Field } from "@/components/form-field"
+import { CASE_TYPE_OPTIONS } from "@/components/select-field"
 import { CASE_TYPES } from "@/data"
 import type { Lead } from "@/data/types"
 
@@ -63,7 +64,7 @@ export function QuoteLetterDialog({ lead }: { lead: Lead }) {
                 <Select
                   value={caseType}
                   onValueChange={(v) => setCaseType(v ?? "VAWA (AOS)")}
-                  items={CASE_TYPES.map((t) => ({ value: t, label: t }))}
+                  items={CASE_TYPE_OPTIONS}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Case type" />
