@@ -5,7 +5,7 @@
 // corrupt cursor paging. Results are mapped through the shared LeadView mapper and the shared
 // serializer, so the public shape never diverges from the board's.
 import { mapLeadRow, mapLeadStatus, type LeadStatusView } from "@/lib/leads/queries"
-import { buildPage, type Cursor, type Page } from "./pagination"
+import { buildPage, keysetAfter, type Cursor, type Page } from "./pagination"
 import { serializeLead, type ApiLead } from "./leads"
 import type { TenantDb } from "./tenant-db"
 import { isUuid } from "./validation"
@@ -71,13 +71,9 @@ export async function getApiLeadsPage(
     }
   }
 
-  // Keyset: rows strictly "after" the cursor in (created_at desc, id desc) order. Successive
-  // PostgREST .or() groups AND together, so this composes with the text search above.
-  if (cursor) {
-    query = query.or(
-      `created_at.lt.${cursor.createdAt},and(created_at.eq.${cursor.createdAt},id.lt.${cursor.id})`,
-    )
-  }
+  // Keyset: rows strictly "after" the cursor in (created_at desc, id desc) order. Composes with
+  // the text search above (successive PostgREST .or() groups AND together).
+  if (cursor) query = query.or(keysetAfter(cursor))
 
   const { data, error } = await query
   if (error) throw error

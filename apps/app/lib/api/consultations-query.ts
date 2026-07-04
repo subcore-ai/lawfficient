@@ -10,7 +10,7 @@ import {
 } from "@/lib/consultations/queries"
 import { CONSULTATION_STATUSES, type ConsultationStatus } from "@/lib/consultations/validation"
 import { serializeConsultation, type ApiConsultation } from "./consultations"
-import { buildPage, type Cursor, type Page } from "./pagination"
+import { buildPage, keysetAfter, type Cursor, type Page } from "./pagination"
 import type { TenantDb } from "./tenant-db"
 import { isUuid } from "./validation"
 
@@ -78,9 +78,7 @@ export async function getApiConsultationsPage(
     if (!isUuid(cursor.id) || /[(),]/.test(cursor.createdAt) || Number.isNaN(Date.parse(cursor.createdAt))) {
       return { data: [], next_cursor: null }
     }
-    query = query.or(
-      `created_at.lt.${cursor.createdAt},and(created_at.eq.${cursor.createdAt},id.lt.${cursor.id})`,
-    )
+    query = query.or(keysetAfter(cursor))
   }
 
   const { data, error } = await query
