@@ -1,6 +1,7 @@
 // Pure, dependency-free validation for the user-management actions. Kept separate
 // from actions.ts (which is "use server" + DB) so it can be unit-tested directly.
 import type { Role } from "@/data/types"
+import { isValidEmail } from "@/lib/validation"
 
 export const STAFF_ROLES: Role[] = [
   "admin",
@@ -22,13 +23,6 @@ export function parseRole(value: unknown): Role | null {
 
 export function normalizeEmail(value: unknown): string {
   return typeof value === "string" ? value.trim().toLowerCase() : ""
-}
-
-// Pragmatic shape check — Supabase Auth is the real validator; this just catches
-// obvious mistakes before we spend an admin API call on them.
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-export function isValidEmail(value: string): boolean {
-  return EMAIL_RE.test(value)
 }
 
 export type InviteInput = { name: string; email: string; role: Role }

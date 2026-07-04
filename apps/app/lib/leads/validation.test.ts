@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { isValidEmail, LEAD_SOURCES, parseLeadInput, parseLeadPatch } from "./validation"
+import { LEAD_SOURCES, parseLeadInput, parseLeadPatch } from "./validation"
 
 describe("parseLeadInput", () => {
   const base = { firstName: "Ada", lastName: "Lovelace", phone: "555-0100", source: "Website" }
@@ -112,15 +112,9 @@ describe("parseLeadPatch", () => {
   })
 })
 
-describe("LEAD_SOURCES / isValidEmail", () => {
+describe("LEAD_SOURCES", () => {
   test("sources are the picker vocabulary (free text in the DB)", () => {
     expect(LEAD_SOURCES).toContain("WhatsApp")
     expect(LEAD_SOURCES.length).toBe(6)
-  })
-
-  test("email regex catches obvious mistakes", () => {
-    expect(isValidEmail("a@b.co")).toBe(true)
-    expect(isValidEmail("nope")).toBe(false)
-    expect(isValidEmail("a@b")).toBe(false)
   })
 })
