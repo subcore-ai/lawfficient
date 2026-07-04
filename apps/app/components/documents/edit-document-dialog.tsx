@@ -8,16 +8,14 @@ import { toast } from "@workspace/ui/components/sonner"
 import { EditDialogShell } from "@/components/edit-dialog-shell"
 import { Field } from "@/components/form-field"
 import {
+  CASE_TYPE_OPTIONS,
   DOC_CATEGORY_OPTIONS,
   DOC_STATUS_OPTIONS,
   DOC_TYPE_OPTIONS,
   SelectField,
 } from "@/components/select-field"
-import { CASE_TYPES } from "@/data"
 import { useStore } from "@/data/store"
 import type { CaseType, DocItem } from "@/data/types"
-
-const CASE_TYPE_OPTIONS = CASE_TYPES.map((t) => ({ value: t, label: t }))
 
 export function EditDocumentDialog({
   document,

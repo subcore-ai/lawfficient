@@ -7,8 +7,8 @@ import { toast } from "@workspace/ui/components/sonner"
 import { DatePickerField } from "@/components/date-picker"
 import { EditDialogShell } from "@/components/edit-dialog-shell"
 import { Field } from "@/components/form-field"
-import { CASE_STATUS_OPTIONS, SelectField } from "@/components/select-field"
-import { CASE_TYPES, STAFF } from "@/data"
+import { CASE_STATUS_OPTIONS, CASE_TYPE_OPTIONS, SelectField } from "@/components/select-field"
+import { STAFF } from "@/data"
 import { useStore } from "@/data/store"
 import type { CaseStatus, CaseType, ImmigrationCase } from "@/data/types"
 
@@ -17,7 +17,6 @@ const LAS = STAFF.filter((u) => u.role === "legal_assistant" || u.role === "la_l
   value: u.id,
   label: u.name,
 }))
-const CASE_TYPE_OPTIONS = CASE_TYPES.map((t) => ({ value: t, label: t }))
 const DIFFICULTY_OPTIONS = [
   { value: "1", label: "Level 1" },
   { value: "2", label: "Level 2" },

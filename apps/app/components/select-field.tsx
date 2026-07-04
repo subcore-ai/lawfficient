@@ -9,6 +9,7 @@ import {
 } from "@workspace/ui/components/select"
 
 import { Field } from "@/components/form-field"
+import { CASE_TYPES } from "@/data/types"
 
 export function SelectField({
   label,
@@ -42,6 +43,8 @@ export function SelectField({
 }
 
 // Shared option lists for edit dialogs.
+export const CASE_TYPE_OPTIONS = CASE_TYPES.map((t) => ({ value: t, label: t }))
+
 export const CASE_STATUS_OPTIONS = [
   { value: "onboarding", label: "Onboarding" },
   { value: "packet_prep", label: "Packet prep" },
