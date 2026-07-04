@@ -11,7 +11,7 @@ import { parseConsultationInput, type ConsultationStatus } from "@/lib/consultat
 import { recordLeadEvent } from "@/lib/leads/events"
 import { createClient } from "@/lib/supabase/server"
 
-export type ActionResult = { ok: true } | { error: string }
+import type { ActionResult } from "@/lib/actions/result"
 
 const PATH = "/consultations"
 const DEFAULT_TZ = "America/New_York"

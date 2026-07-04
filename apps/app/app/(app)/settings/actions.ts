@@ -6,7 +6,7 @@ import { getCurrentUser } from "@/lib/auth/session"
 import { isFirmTimezone } from "@/lib/firm/timezones"
 import { createClient } from "@/lib/supabase/server"
 
-export type ActionResult = { ok: true } | { error: string }
+import type { ActionResult } from "@/lib/actions/result"
 
 const SETTINGS_PATH = "/settings"
 const MAX = { name: 200, email: 254, phone: 40, language: 60, address: 300 }

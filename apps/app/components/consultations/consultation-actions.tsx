@@ -27,10 +27,10 @@ import {
   deleteConsultation,
   setConsultationOutcome,
   setConsultationStatus,
-  type ActionResult,
 } from "@/app/(app)/consultations/actions"
 import { EditConsultationDialog } from "@/components/consultations/edit-consultation-dialog"
 import { Field } from "@/components/form-field"
+import type { ActionResult } from "@/lib/actions/result"
 import type { ConsultationStatus } from "@/lib/consultations/validation"
 
 function useRun() {
