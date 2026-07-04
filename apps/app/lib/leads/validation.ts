@@ -3,6 +3,7 @@
 // picker vocabulary, not a hard constraint. Demographic/case fields live in `data` (see
 // data-schema.ts); this validates only the lean typed core.
 import type { LeadSource } from "@/data/types"
+import { isValidEmail } from "@/lib/validation"
 
 export const LEAD_SOURCES: LeadSource[] = [
   "WhatsApp",
@@ -12,11 +13,6 @@ export const LEAD_SOURCES: LeadSource[] = [
   "Referral",
   "Instagram",
 ]
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-export function isValidEmail(value: string): boolean {
-  return EMAIL_RE.test(value)
-}
 
 export type LeadCoreInput = {
   firstName: string

@@ -1,12 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import {
-  STAFF_ROLES,
-  isValidEmail,
-  normalizeEmail,
-  parseInviteInput,
-  parseRole,
-} from "./validation"
+import { STAFF_ROLES, normalizeEmail, parseInviteInput, parseRole } from "./validation"
 
 describe("parseRole", () => {
   test("accepts every staff role verbatim", () => {
@@ -33,24 +27,6 @@ describe("normalizeEmail", () => {
     expect(normalizeEmail(null)).toBe("")
     expect(normalizeEmail(undefined)).toBe("")
     expect(normalizeEmail(42)).toBe("")
-  })
-})
-
-describe("isValidEmail", () => {
-  test("accepts well-formed addresses", () => {
-    expect(isValidEmail("a@b.co")).toBe(true)
-    expect(isValidEmail("jordan.lee@chidoluelaw.com")).toBe(true)
-    expect(isValidEmail("x+tag@sub.domain.io")).toBe(true)
-  })
-
-  test("rejects malformed addresses", () => {
-    expect(isValidEmail("")).toBe(false)
-    expect(isValidEmail("plainaddress")).toBe(false)
-    expect(isValidEmail("no-at-sign.com")).toBe(false)
-    expect(isValidEmail("a@b")).toBe(false) // domain has no dot
-    expect(isValidEmail("two@@at.co")).toBe(false)
-    expect(isValidEmail("has space@x.co")).toBe(false)
-    expect(isValidEmail("trailing@x.co ")).toBe(false) // not pre-trimmed
   })
 })
 
