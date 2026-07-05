@@ -4,6 +4,7 @@
 // fields. Status is a fixed, universal booking lifecycle.
 import type { Database } from "@/lib/supabase/database.types"
 import { isValidTimeZone } from "./time"
+import { trimString } from "@/lib/validation"
 
 export type ConsultationStatus = Database["public"]["Enums"]["consultation_status"]
 export const CONSULTATION_STATUSES: ConsultationStatus[] = [
@@ -26,10 +27,6 @@ export type ConsultationCoreInput = {
   amount: number | null
 }
 
-function str(value: unknown): string {
-  return typeof value === "string" ? value.trim() : ""
-}
-
 // Amount is optional; when present it must be a non-negative number. Returns the parsed value or an
 // error string. (Payment is track-only in v1 — we store the figure, we don't charge a card.)
 function parseAmount(value: unknown): { ok: true; amount: number | null } | { ok: false; error: string } {
@@ -50,31 +47,31 @@ export function parseConsultationInput(raw: {
   paid?: unknown
   amount?: unknown
 }): { ok: true; value: ConsultationCoreInput } | { ok: false; error: string } {
-  const leadId = str(raw.leadId)
+  const leadId = trimString(raw.leadId)
   if (!leadId) return { ok: false, error: "Pick the lead this consultation is for." }
 
-  const type = str(raw.type)
+  const type = trimString(raw.type)
   if (!type) return { ok: false, error: "Choose a consultation type." }
 
-  const startAt = str(raw.startAt)
+  const startAt = trimString(raw.startAt)
   if (!startAt || Number.isNaN(Date.parse(startAt))) return { ok: false, error: "Choose a valid date and time." }
 
-  const durationMin = typeof raw.durationMin === "number" ? raw.durationMin : Number(str(raw.durationMin))
+  const durationMin = typeof raw.durationMin === "number" ? raw.durationMin : Number(trimString(raw.durationMin))
   if (!Number.isInteger(durationMin) || durationMin < 5 || durationMin > 1440) {
     return { ok: false, error: "Duration must be 5–1440 minutes." }
   }
 
-  // assignee/attorney: a non-string (e.g. a number) would str()→"" and silently drop — reject it.
+  // assignee/attorney: a non-string (e.g. a number) would trimString()→"" and silently drop — reject it.
   if (raw.attorneyId != null && typeof raw.attorneyId !== "string") {
     return { ok: false, error: "attorney_id must be a string or null." }
   }
-  const attorneyId = str(raw.attorneyId) || null
+  const attorneyId = trimString(raw.attorneyId) || null
 
   const paid = raw.paid === true || raw.paid === "true" || raw.paid === "on"
   const amount = parseAmount(raw.amount)
   if (!amount.ok) return amount
 
-  const timeZone = str(raw.timeZone) || "America/New_York"
+  const timeZone = trimString(raw.timeZone) || "America/New_York"
   if (!isValidTimeZone(timeZone)) return { ok: false, error: "Choose a valid time zone." }
 
   return { ok: true, value: { leadId, attorneyId, type, startAt, durationMin, timeZone, paid, amount: amount.amount } }
@@ -101,22 +98,22 @@ export function parseConsultationPatch(
   const patch: ConsultationPatch = {}
 
   if (has("type")) {
-    const v = str(raw.type)
+    const v = trimString(raw.type)
     if (!v) return { ok: false, error: "Consultation type can't be empty." }
     patch.type = v
   }
   if (has("startAt")) {
-    const v = str(raw.startAt)
+    const v = trimString(raw.startAt)
     if (!v || Number.isNaN(Date.parse(v))) return { ok: false, error: "Choose a valid date and time." }
     patch.startAt = v
   }
   if (has("durationMin")) {
-    const v = typeof raw.durationMin === "number" ? raw.durationMin : Number(str(raw.durationMin))
+    const v = typeof raw.durationMin === "number" ? raw.durationMin : Number(trimString(raw.durationMin))
     if (!Number.isInteger(v) || v < 5 || v > 1440) return { ok: false, error: "Duration must be 5–1440 minutes." }
     patch.durationMin = v
   }
   if (has("timeZone")) {
-    const v = str(raw.timeZone)
+    const v = trimString(raw.timeZone)
     if (!v) return { ok: false, error: "Time zone can't be empty." }
     if (!isValidTimeZone(v)) return { ok: false, error: "Choose a valid time zone." }
     patch.timeZone = v
@@ -125,7 +122,7 @@ export function parseConsultationPatch(
     if (raw.attorneyId !== null && typeof raw.attorneyId !== "string") {
       return { ok: false, error: "attorney_id must be a string or null." }
     }
-    patch.attorneyId = str(raw.attorneyId) || null
+    patch.attorneyId = trimString(raw.attorneyId) || null
   }
   if (has("paid")) patch.paid = raw.paid === true || raw.paid === "true" || raw.paid === "on"
   if (has("amount")) {
@@ -134,7 +131,7 @@ export function parseConsultationPatch(
     patch.amount = a.amount
   }
   if (has("status")) {
-    const v = str(raw.status) as ConsultationStatus
+    const v = trimString(raw.status) as ConsultationStatus
     if (!CONSULTATION_STATUSES.includes(v)) return { ok: false, error: "Unknown consultation status." }
     patch.status = v
   }
@@ -142,7 +139,7 @@ export function parseConsultationPatch(
     if (raw.outcome !== null && typeof raw.outcome !== "string") {
       return { ok: false, error: "outcome must be a string or null." }
     }
-    patch.outcome = str(raw.outcome) || null
+    patch.outcome = trimString(raw.outcome) || null
   }
 
   return { ok: true, value: patch }

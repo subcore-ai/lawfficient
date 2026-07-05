@@ -3,7 +3,7 @@
 // picker vocabulary, not a hard constraint. Demographic/case fields live in `data` (see
 // data-schema.ts); this validates only the lean typed core.
 import type { LeadSource } from "@/data/types"
-import { isValidEmail } from "@/lib/validation"
+import { isValidEmail, trimString } from "@/lib/validation"
 
 export const LEAD_SOURCES: LeadSource[] = [
   "WhatsApp",
@@ -23,10 +23,6 @@ export type LeadCoreInput = {
   assignedToId: string | null
 }
 
-function str(value: unknown): string {
-  return typeof value === "string" ? value.trim() : ""
-}
-
 // Required: first + last name, a source, and at least one of phone/email (a lead you can't
 // reach is useless). Used for both create and edit — the edit form submits the full core.
 export function parseLeadInput(raw: {
@@ -37,21 +33,21 @@ export function parseLeadInput(raw: {
   source?: unknown
   assignedToId?: unknown
 }): { ok: true; value: LeadCoreInput } | { ok: false; error: string } {
-  // Contact fields: a non-string (e.g. a numeric phone from an integration) would str()→"" and be
+  // Contact fields: a non-string (e.g. a numeric phone from an integration) would trimString()→"" and be
   // silently dropped, so reject it explicitly rather than lose the value.
   if (raw.phone != null && typeof raw.phone !== "string") return { ok: false, error: "phone must be a string." }
   if (raw.email != null && typeof raw.email !== "string") return { ok: false, error: "email must be a string." }
-  // Same for the assignee: a non-string (e.g. a JSON number) would str()→""→null and silently create
+  // Same for the assignee: a non-string (e.g. a JSON number) would trimString()→""→null and silently create
   // an unassigned lead, dropping the intended assignee. Reject it (mirrors parseLeadPatch).
   if (raw.assignedToId != null && typeof raw.assignedToId !== "string") {
     return { ok: false, error: "assignee_id must be a string or null." }
   }
-  const firstName = str(raw.firstName)
-  const lastName = str(raw.lastName)
-  const phone = str(raw.phone)
-  const email = str(raw.email).toLowerCase()
-  const source = str(raw.source)
-  const assignedToId = str(raw.assignedToId)
+  const firstName = trimString(raw.firstName)
+  const lastName = trimString(raw.lastName)
+  const phone = trimString(raw.phone)
+  const email = trimString(raw.email).toLowerCase()
+  const source = trimString(raw.source)
+  const assignedToId = trimString(raw.assignedToId)
 
   if (!firstName || !lastName) return { ok: false, error: "First and last name are required." }
   if (!phone && !email) return { ok: false, error: "Add a phone number or an email." }
@@ -89,17 +85,17 @@ export function parseLeadPatch(
   const patch: LeadCorePatch = {}
 
   if (has("first_name")) {
-    const v = str(raw.first_name)
+    const v = trimString(raw.first_name)
     if (!v) return { ok: false, error: "First name can't be empty." }
     patch.firstName = v
   }
   if (has("last_name")) {
-    const v = str(raw.last_name)
+    const v = trimString(raw.last_name)
     if (!v) return { ok: false, error: "Last name can't be empty." }
     patch.lastName = v
   }
   if (has("source")) {
-    const v = str(raw.source)
+    const v = trimString(raw.source)
     if (!v) return { ok: false, error: "Source can't be empty." }
     patch.source = v
   }
@@ -107,17 +103,17 @@ export function parseLeadPatch(
     if (raw.email !== null && typeof raw.email !== "string") {
       return { ok: false, error: "email must be a string." }
     }
-    const v = str(raw.email).toLowerCase()
+    const v = trimString(raw.email).toLowerCase()
     if (v && !isValidEmail(v)) return { ok: false, error: "Enter a valid email address." }
     patch.email = v
   }
   if (has("phone")) {
-    // Reject a non-string phone (e.g. a JSON number) — str() would blank it, silently clearing a
+    // Reject a non-string phone (e.g. a JSON number) — trimString() would blank it, silently clearing a
     // stored phone on PATCH.
     if (raw.phone !== null && typeof raw.phone !== "string") {
       return { ok: false, error: "phone must be a string." }
     }
-    patch.phone = str(raw.phone)
+    patch.phone = trimString(raw.phone)
   }
   // assignee_id: an explicit null (or "") unassigns; a non-empty string assigns. Its uuid shape is
   // checked at the mutation boundary (it's the assigned_to_id column), like the read API's filter.
