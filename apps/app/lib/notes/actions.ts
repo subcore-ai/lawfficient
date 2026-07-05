@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 
+import { recordAuditLog } from "@/lib/audit"
 import { requirePermission } from "@/lib/auth/gate"
 import { getCurrentUser } from "@/lib/auth/session"
 import type { NoteEntityType } from "@/lib/notes/queries"
@@ -29,26 +30,8 @@ function revalidateEntity(entityType: string, entityId: string) {
 const requireNotesEdit = () => requirePermission("leads.edit", "notes")
 
 // Best-effort audit under the PARENT entity (entity='lead'), so a lead's history stays in one place.
-async function audit(
-  supabase: NotesClient,
-  byUserId: string,
-  entityId: string,
-  label: string,
-  action: string
-) {
-  try {
-    const { error } = await supabase.from("audit_log").insert({
-      entity: "lead",
-      entity_id: entityId,
-      label,
-      action,
-      by_user_id: byUserId,
-    })
-    if (error) console.error("audit_log insert failed:", error.message)
-  } catch (err) {
-    console.error("audit_log insert threw:", err)
-  }
-}
+const audit = (supabase: NotesClient, byUserId: string, entityId: string, label: string, action: string) =>
+  recordAuditLog(supabase, { entity: "lead", entityId, label, action, byUserId })
 
 const preview = (body: string) => body.trim().slice(0, 80)
 

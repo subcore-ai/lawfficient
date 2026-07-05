@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 
 import { API_SCOPES } from "@/lib/api/scopes"
+import { recordAuditLog } from "@/lib/audit"
 import { requirePermission } from "@/lib/auth/gate"
 import { generateKey } from "@/lib/ingest/keys"
 import { createClient } from "@/lib/supabase/server"
@@ -18,15 +19,8 @@ type DbClient = Awaited<ReturnType<typeof createClient>>
 // RLS (authorize('settings.manage'), firm-scoped) is the real gate; this returns a clean error first.
 const requireAdmin = () => requirePermission("settings.manage", "integrations")
 
-async function audit(supabase: DbClient, byUserId: string, sourceId: string, label: string, action: string) {
-  try {
-    await supabase
-      .from("audit_log")
-      .insert({ entity: "lead_source", entity_id: sourceId, label, action, by_user_id: byUserId })
-  } catch {
-    // best-effort
-  }
-}
+const audit = (supabase: DbClient, byUserId: string, sourceId: string, label: string, action: string) =>
+  recordAuditLog(supabase, { entity: "lead_source", entityId: sourceId, label, action, byUserId })
 
 // "Website form" -> "website_form"; the lead's `source` column gets this key.
 function slugify(name: string): string {
@@ -146,15 +140,8 @@ export async function deleteSource(sourceId: string): Promise<ActionResult> {
 // create returns the raw key ONCE (never stored) so the UI can show it.
 export type ApiKeyResult = { ok: true; rawKey: string } | { error: string }
 
-async function auditApiKey(supabase: DbClient, byUserId: string, keyId: string, label: string, action: string) {
-  try {
-    await supabase
-      .from("audit_log")
-      .insert({ entity: "api_key", entity_id: keyId, label, action, by_user_id: byUserId })
-  } catch {
-    // best-effort
-  }
-}
+const auditApiKey = (supabase: DbClient, byUserId: string, keyId: string, label: string, action: string) =>
+  recordAuditLog(supabase, { entity: "api_key", entityId: keyId, label, action, byUserId })
 
 export async function createApiKey(formData: FormData): Promise<ApiKeyResult> {
   const gate = await requireAdmin()

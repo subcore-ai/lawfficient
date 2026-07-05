@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 
+import { recordAuditLog } from "@/lib/audit"
 import { requirePermission } from "@/lib/auth/gate"
 import { ALL_PERMISSIONS, type AppPermission } from "@/lib/rbac/permissions"
 import { createClient } from "@/lib/supabase/server"
@@ -17,21 +18,13 @@ const requireAdmin = () => requirePermission("settings.manage", "roles")
 
 // Best-effort: a logging failure must never roll back the actual change, and
 // 'role' only becomes a valid audit_entity once migration 0010 is applied.
-async function audit(
+const audit = (
   supabase: Awaited<ReturnType<typeof createClient>>,
   byUserId: string,
   roleId: string,
   label: string,
   action: string,
-) {
-  try {
-    await supabase
-      .from("audit_log")
-      .insert({ entity: "role", entity_id: roleId, label, action, by_user_id: byUserId })
-  } catch {
-    // non-critical
-  }
-}
+) => recordAuditLog(supabase, { entity: "role", entityId: roleId, label, action, byUserId })
 
 // "Client Care Lead" -> "client_care_lead"; the unique (firm_id, key) keeps it stable.
 function slugify(name: string): string {
