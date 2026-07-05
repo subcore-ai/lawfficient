@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 
+import { recordAuditLog } from "@/lib/audit"
 import { requirePermission } from "@/lib/auth/gate"
 import {
   buildLeadData,
@@ -30,28 +31,8 @@ const requireLeadsEdit = () => requirePermission("leads.edit", "leads")
 
 // Best-effort — an audit failure (incl. a thrown network/timeout error) must not fail the
 // user's action.
-async function audit(
-  supabase: LeadsClient,
-  byUserId: string,
-  leadId: string,
-  label: string,
-  action: string
-) {
-  try {
-    const { error } = await supabase.from("audit_log").insert({
-      entity: "lead",
-      entity_id: leadId,
-      label,
-      action,
-      by_user_id: byUserId,
-    })
-    // Best-effort: surface a returned error (RLS/constraint) in logs for visibility, but never
-    // block the user's action on it.
-    if (error) console.error("audit_log insert failed:", error.message)
-  } catch (err) {
-    console.error("audit_log insert threw:", err)
-  }
-}
+const audit = (supabase: LeadsClient, byUserId: string, leadId: string, label: string, action: string) =>
+  recordAuditLog(supabase, { entity: "lead", entityId: leadId, label, action, byUserId })
 
 // Emit a single lead.* outbound webhook event after a successful mutation. Thin wrapper over the
 // shared emitLeadEvents (lib/leads/mutations) — the ONE emission path both surfaces use, so an

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 
+import { recordAuditLog } from "@/lib/audit"
 import { requirePermission } from "@/lib/auth/gate"
 import { type OffDateRange } from "@/lib/availability/exceptions"
 import { loadOffDatesByAttorney } from "@/lib/availability/off-dates"
@@ -48,16 +49,8 @@ function bookingRuleError(error: { code?: string; message?: string } | null | un
   return BOOKING_RULE_ERRORS[error.message ?? ""] ?? "That time isn't available."
 }
 
-async function audit(supabase: DbClient, byUserId: string, id: string, label: string, action: string) {
-  try {
-    const { error } = await supabase
-      .from("audit_log")
-      .insert({ entity: "consultation", entity_id: id, label, action, by_user_id: byUserId })
-    if (error) console.error("audit_log insert failed:", error.message)
-  } catch (err) {
-    console.error("audit_log insert threw:", err)
-  }
-}
+const audit = (supabase: DbClient, byUserId: string, id: string, label: string, action: string) =>
+  recordAuditLog(supabase, { entity: "consultation", entityId: id, label, action, byUserId })
 
 // Consultation counts feed the dashboard (/), so revalidate it alongside the list. The consult's lead
 // page (its consultations card + activity timeline) is revalidated too when a lead is involved.

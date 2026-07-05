@@ -2,6 +2,7 @@
 
 import { revalidatePath, revalidateTag } from "next/cache"
 
+import { recordAuditLog } from "@/lib/audit"
 import { requirePermission } from "@/lib/auth/gate"
 import { taxonomiesTag } from "@/lib/reference"
 import { createAdminClient } from "@/lib/supabase/admin"
@@ -28,15 +29,8 @@ type DbClient = Awaited<ReturnType<typeof createClient>>
 // RLS (authorize('settings.manage'), firm-scoped) is the real gate; this returns a clean error first.
 const requireAdmin = () => requirePermission("settings.manage", "taxonomies")
 
-async function audit(supabase: DbClient, byUserId: string, id: string, label: string, action: string) {
-  try {
-    await supabase
-      .from("audit_log")
-      .insert({ entity: "taxonomy", entity_id: id, label, action, by_user_id: byUserId })
-  } catch {
-    // best-effort
-  }
-}
+const audit = (supabase: DbClient, byUserId: string, id: string, label: string, action: string) =>
+  recordAuditLog(supabase, { entity: "taxonomy", entityId: id, label, action, byUserId })
 
 function isCategory(v: unknown): v is TaxonomyCategory {
   return typeof v === "string" && (TAXONOMY_CATEGORIES as string[]).includes(v)
