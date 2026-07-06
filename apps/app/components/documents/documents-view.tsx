@@ -23,9 +23,7 @@ import { StatStrip } from "@/components/stat-strip"
 import { staffName } from "@/data"
 import { useStore } from "@/data/store"
 import type { DocItem } from "@/data/types"
-import { formatDate } from "@/lib/format"
-
-const statusLabel = (v: string) => DOC_STATUS_OPTIONS.find((o) => o.value === v)?.label ?? v
+import { formatDate, optionLabel } from "@/lib/format"
 
 export function DocumentsView() {
   const { documents, cases, updateDocument } = useStore()
@@ -108,7 +106,7 @@ export function DocumentsView() {
                     options={DOC_STATUS_OPTIONS}
                     ariaLabel="Status"
                     onValueChange={(v) =>
-                      updateDocument(d.id, { status: v as DocItem["status"] }, `Status → ${statusLabel(v)}`)
+                      updateDocument(d.id, { status: v as DocItem["status"] }, `Status → ${optionLabel(v, DOC_STATUS_OPTIONS)}`)
                     }
                   />
                 </TableCell>

@@ -58,3 +58,11 @@ export function initialsOf(name: string): string {
     .join("")
     .toUpperCase()
 }
+
+/** Look up an option's display label by value, falling back to the raw value. */
+export function optionLabel(
+  value: string,
+  options: readonly { value: string; label: string }[],
+): string {
+  return options.find((o) => o.value === value)?.label ?? value
+}
