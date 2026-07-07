@@ -22,10 +22,8 @@ import { StatusPill } from "@/components/status-pill"
 import { staffName } from "@/data"
 import { useStore } from "@/data/store"
 import type { ClientStatus } from "@/data/types"
-import { formatCurrency, formatDate } from "@/lib/format"
+import { formatCurrency, formatDate, optionLabel } from "@/lib/format"
 import { paymentStatusBadge } from "@/lib/status"
-
-const statusLabel = (v: string) => CLIENT_STATUS_OPTIONS.find((o) => o.value === v)?.label ?? v
 
 export function ClientsTable() {
   const { clients, updateClient } = useStore()
@@ -79,7 +77,7 @@ export function ClientsTable() {
                     options={CLIENT_STATUS_OPTIONS}
                     ariaLabel="Status"
                     onValueChange={(v) =>
-                      updateClient(c.id, { status: v as ClientStatus }, `Status → ${statusLabel(v)}`)
+                      updateClient(c.id, { status: v as ClientStatus }, `Status → ${optionLabel(v, CLIENT_STATUS_OPTIONS)}`)
                     }
                   />
                 </TableCell>

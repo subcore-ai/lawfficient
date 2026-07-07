@@ -24,9 +24,8 @@ import { StatusPill } from "@/components/status-pill"
 import { DEADLINES, staffName } from "@/data"
 import { useStore } from "@/data/store"
 import type { CaseStatus } from "@/data/types"
+import { optionLabel } from "@/lib/format"
 import { redFlagBadge } from "@/lib/status"
-
-const statusLabel = (v: string) => CASE_STATUS_OPTIONS.find((o) => o.value === v)?.label ?? v
 
 export function CasesTable() {
   const { cases, updateCase, packetPipeline } = useStore()
@@ -100,7 +99,7 @@ export function CasesTable() {
                       options={CASE_STATUS_OPTIONS}
                       ariaLabel="Status"
                       onValueChange={(v) =>
-                        updateCase(c.id, { status: v as CaseStatus }, `Status → ${statusLabel(v)}`)
+                        updateCase(c.id, { status: v as CaseStatus }, `Status → ${optionLabel(v, CASE_STATUS_OPTIONS)}`)
                       }
                     />
                   </TableCell>

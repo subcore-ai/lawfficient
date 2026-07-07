@@ -28,10 +28,8 @@ import { StatusPill } from "@/components/status-pill"
 import { DEADLINES, staffName, TASKS } from "@/data"
 import { useStore } from "@/data/store"
 import type { CaseStatus } from "@/data/types"
-import { formatDate } from "@/lib/format"
+import { formatDate, optionLabel } from "@/lib/format"
 import { deadlineBadge, priorityBadge, redFlagBadge } from "@/lib/status"
-
-const statusLabel = (v: string) => CASE_STATUS_OPTIONS.find((o) => o.value === v)?.label ?? v
 
 export function CaseDetail({ id }: { id: string }) {
   const { cases, updateCase, pipelineFor } = useStore()
@@ -75,7 +73,7 @@ export function CaseDetail({ id }: { id: string }) {
               value={c.status}
               options={CASE_STATUS_OPTIONS}
               ariaLabel="Status"
-              onValueChange={(v) => updateCase(c.id, { status: v as CaseStatus }, `Status → ${statusLabel(v)}`)}
+              onValueChange={(v) => updateCase(c.id, { status: v as CaseStatus }, `Status → ${optionLabel(v, CASE_STATUS_OPTIONS)}`)}
             />
             {flag ? <StatusPill {...flag} dot /> : null}
             {c.archived ? <StatusPill label="Archived" tone="neutral" /> : null}

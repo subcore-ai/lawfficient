@@ -21,10 +21,8 @@ import { ShowArchivedToggle } from "@/components/show-archived-toggle"
 import { StatStrip } from "@/components/stat-strip"
 import { StatusPill } from "@/components/status-pill"
 import { useStore } from "@/data/store"
-import { formatCurrency, formatDate } from "@/lib/format"
+import { formatCurrency, formatDate, optionLabel } from "@/lib/format"
 import { invoiceStatusBadge } from "@/lib/status"
-
-const typeLabel = (v: string) => PAYMENT_TYPE_OPTIONS.find((o) => o.value === v)?.label ?? v
 
 export function BillingView() {
   const { invoices } = useStore()
@@ -96,7 +94,7 @@ export function BillingView() {
               <TableRow key={i.id} className={cn("hover:bg-muted/40", i.archived && "opacity-50")}>
                 <TableCell className="font-medium tabular-nums">{i.number}</TableCell>
                 <TableCell>{i.clientName}</TableCell>
-                <TableCell className="text-muted-foreground hidden lg:table-cell">{typeLabel(i.type)}</TableCell>
+                <TableCell className="text-muted-foreground hidden lg:table-cell">{optionLabel(i.type, PAYMENT_TYPE_OPTIONS)}</TableCell>
                 <TableCell className="hidden text-sm tabular-nums sm:table-cell">{formatCurrency(i.total)}</TableCell>
                 <TableCell className="hidden text-sm tabular-nums md:table-cell">{formatCurrency(i.remaining)}</TableCell>
                 <TableCell className="text-muted-foreground hidden text-sm lg:table-cell">{formatDate(i.dueAt)}</TableCell>
