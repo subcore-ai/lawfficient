@@ -9,12 +9,18 @@ const row: AttorneyRow = {
 }
 
 describe("serializeAttorney", () => {
-  test("produces the stable public shape (id, name, schedulable)", () => {
-    expect(serializeAttorney(row)).toEqual({
+  test("produces the stable public shape (id, name, schedulable, has_office_hours)", () => {
+    expect(serializeAttorney(row, true)).toEqual({
       id: "att-1",
       name: "Ayesha Okafor",
       schedulable: true,
+      has_office_hours: true,
     })
+  })
+
+  test("reflects the passed has_office_hours flag (derived, not a row column)", () => {
+    expect(serializeAttorney(row, false).has_office_hours).toBe(false)
+    expect(serializeAttorney(row, true).has_office_hours).toBe(true)
   })
 
   test("does not leak internal profile fields (firm_id, email, role)", () => {
@@ -27,8 +33,8 @@ describe("serializeAttorney", () => {
       status: "active",
       calendar_color: "#abcdef",
     } as AttorneyRow
-    const out = serializeAttorney(full) as Record<string, unknown>
-    expect(Object.keys(out).sort()).toEqual(["id", "name", "schedulable"])
+    const out = serializeAttorney(full, true) as Record<string, unknown>
+    expect(Object.keys(out).sort()).toEqual(["has_office_hours", "id", "name", "schedulable"])
     expect(out.firm_id).toBeUndefined()
     expect(out.email).toBeUndefined()
     expect(out.role).toBeUndefined()

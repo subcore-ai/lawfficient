@@ -12,6 +12,11 @@ Only **schedulable, active** attorneys are listed — the same set the app offer
 the same set booking will accept. A staff member who isn't marked schedulable (or whose account is
 disabled) won't appear here and can't be booked.
 
+Being schedulable is only an admin toggle, though. An attorney with no **office hours** set up has no
+bookable time — booking one always fails with `outside_office_hours`. Each attorney therefore carries
+[`has_office_hours`](#the-attorney-object), and [`?has_office_hours=true`](/docs/attorneys/list) narrows
+the listing to the genuinely bookable subset.
+
 ## Endpoints
 
 | Method | Path | Scope | Description |
@@ -24,7 +29,8 @@ disabled) won't appear here and can't be booked.
 {
   "id": "a1b2c3d4-0000-4000-8000-000000000000",
   "name": "Ayesha Okafor",
-  "schedulable": true
+  "schedulable": true,
+  "has_office_hours": true
 }
 ```
 
@@ -33,3 +39,4 @@ disabled) won't appear here and can't be booked.
 | `id` | string | Staff UUID, stable. Pass as `attorney_id` when [booking](/docs/consultations/book). |
 | `name` | string | The attorney's display name. |
 | `schedulable` | boolean | Always `true` here — only schedulable attorneys are returned. |
+| `has_office_hours` | boolean | Whether the attorney has recurring office hours configured. `false` means booking will fail with `outside_office_hours` until hours are set. Filter with `?has_office_hours=true`. |

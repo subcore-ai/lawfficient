@@ -387,10 +387,23 @@ export const openapiDocument = {
         description:
           "Lists the firm's schedulable, active attorneys — the staff who can take consultations. Use " +
           "this to resolve an attorney's `id` for booking: the id returned here is exactly the " +
-          "`attorney_id` that POST /api/consultations accepts. The set is small, so this listing is " +
-          "not paginated — `next_cursor` is always null.",
+          "`attorney_id` that POST /api/consultations accepts. Each attorney carries `has_office_hours`; " +
+          "pass `?has_office_hours=true` to list only those with office hours configured (any other one " +
+          "would fail booking with `outside_office_hours`). The set is small, so this listing is not " +
+          "paginated — `next_cursor` is always null.",
         security: [{ apiKey: ["consultations:read"] }],
-        parameters: [{ $ref: "#/components/parameters/VersionHeader" }],
+        parameters: [
+          { $ref: "#/components/parameters/VersionHeader" },
+          {
+            name: "has_office_hours",
+            in: "query",
+            required: false,
+            schema: { type: "boolean" },
+            description:
+              "When `true`, return only attorneys who have recurring office hours configured (the " +
+              "genuinely bookable subset). Any other value lists all schedulable attorneys.",
+          },
+        ],
         responses: {
           "200": {
             description: "The firm's schedulable, active attorneys.",
@@ -677,7 +690,7 @@ export const openapiDocument = {
       Attorney: {
         type: "object",
         description: "A schedulable, active attorney — bookable via POST /api/consultations.",
-        required: ["id", "name", "schedulable"],
+        required: ["id", "name", "schedulable", "has_office_hours"],
         properties: {
           id: {
             type: "string",
@@ -688,6 +701,14 @@ export const openapiDocument = {
           schedulable: {
             type: "boolean",
             description: "Always true in this listing — only schedulable attorneys are returned.",
+          },
+          has_office_hours: {
+            type: "boolean",
+            description:
+              "Whether the attorney has recurring office hours configured. `schedulable` alone is " +
+              "just an admin toggle; without office hours every booking fails `outside_office_hours`, " +
+              "so this is the reliable 'actually bookable' signal. Filter to only these with " +
+              "`?has_office_hours=true`.",
           },
         },
       },

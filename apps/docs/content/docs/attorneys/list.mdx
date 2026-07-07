@@ -15,10 +15,22 @@ that endpoint accepts.
 The set is small and bounded, so this listing is **not paginated** — every schedulable attorney is
 returned in one response and `next_cursor` is always `null`.
 
+## Query parameters
+
+| Param | Type | Notes |
+| --- | --- | --- |
+| `has_office_hours` | boolean | When `true`, return only attorneys who have recurring office hours configured — the genuinely bookable subset. Any other value (absent, `false`) lists all schedulable attorneys. |
+
+Every attorney already carries a [`has_office_hours`](/docs/attorneys#the-attorney-object) field, so
+you can also list all of them and filter client-side. `schedulable` alone only means an admin marked
+the person as taking consultations; booking an attorney with no office hours fails with
+`outside_office_hours`, so prefer `?has_office_hours=true` when you intend to book.
+
 ## Example
 
 ```bash
-curl https://app.lawfficient.com/api/attorneys \
+# Only attorneys who can actually be booked right now
+curl "https://app.lawfficient.com/api/attorneys?has_office_hours=true" \
   -H "Authorization: Bearer $LAWFFICIENT_API_KEY"
 ```
 
@@ -28,7 +40,8 @@ curl https://app.lawfficient.com/api/attorneys \
     {
       "id": "a1b2c3d4-0000-4000-8000-000000000000",
       "name": "Ayesha Okafor",
-      "schedulable": true
+      "schedulable": true,
+      "has_office_hours": true
     }
   ],
   "next_cursor": null
