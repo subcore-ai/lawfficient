@@ -3,6 +3,7 @@
 import { headers } from "next/headers"
 import { revalidatePath, revalidateTag } from "next/cache"
 
+import { recordAuditLog } from "@/lib/audit"
 import { requirePermission } from "@/lib/auth/gate"
 import { staffTag } from "@/lib/reference"
 import type { AppPermission } from "@/lib/rbac/permissions"
@@ -18,6 +19,16 @@ const USERS_PATH = "/settings/users"
 // manage users. RLS is the real enforcement; this gives a clean error first.
 const requireAdmin = (perm: AppPermission = "users.manage", resource = "users") =>
   requirePermission(perm, resource)
+
+// Best-effort audit — a logging failure must never fail the user-management action
+// that already succeeded (recordAuditLog swallows + logs errors, never re-throws).
+const audit = (
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  byUserId: string,
+  userId: string,
+  label: string,
+  action: string,
+) => recordAuditLog(supabase, { entity: "user", entityId: userId, label, action, byUserId })
 
 // A firm's *other* active admins, or null if the query fails. Callers only
 // hard-block on a definitive 0, so a transient query error can't produce a
@@ -80,13 +91,7 @@ export async function inviteUser(formData: FormData): Promise<ActionResult> {
   }
 
   const supabase = await createClient()
-  await supabase.from("audit_log").insert({
-    entity: "user",
-    entity_id: invited.data.user.id,
-    label: name,
-    action: "invited",
-    by_user_id: admin.id,
-  })
+  await audit(supabase, admin.id, invited.data.user.id, name, "invited")
 
   revalidateTag(staffTag(gate.user.firmId), { expire: 0 }) // purge the per-firm staff cache (lib/reference.ts)
   revalidatePath(USERS_PATH)
@@ -135,13 +140,7 @@ export async function resendInvite(userId: string): Promise<ActionResult> {
     await supabase.from("profiles").update({ pod_id: target.pod_id }).eq("id", invited.data.user.id)
   }
 
-  await supabase.from("audit_log").insert({
-    entity: "user",
-    entity_id: invited.data.user.id,
-    label: target.name,
-    action: "invite_resent",
-    by_user_id: admin.id,
-  })
+  await audit(supabase, admin.id, invited.data.user.id, target.name, "invite_resent")
 
   revalidateTag(staffTag(gate.user.firmId), { expire: 0 }) // purge the per-firm staff cache (lib/reference.ts)
   revalidatePath(USERS_PATH)
@@ -163,13 +162,7 @@ export async function revokeInvite(userId: string): Promise<ActionResult> {
   if (target.status !== "invited") return { error: "Only pending invites can be revoked." }
 
   // Audit before the profile row cascades away with the auth user.
-  await supabase.from("audit_log").insert({
-    entity: "user",
-    entity_id: userId,
-    label: target.email || target.name,
-    action: "invite_revoked",
-    by_user_id: admin.id,
-  })
+  await audit(supabase, admin.id, userId, target.email || target.name, "invite_revoked")
 
   const adminClient = createAdminClient()
   const { error } = await adminClient.auth.admin.deleteUser(userId)
@@ -228,13 +221,7 @@ export async function setUserStatus(
     return { error: error.message }
   }
 
-  await supabase.from("audit_log").insert({
-    entity: "user",
-    entity_id: userId,
-    label: target.name,
-    action: status === "disabled" ? "disabled" : "enabled",
-    by_user_id: admin.id,
-  })
+  await audit(supabase, admin.id, userId, target.name, status === "disabled" ? "disabled" : "enabled")
 
   revalidateTag(staffTag(gate.user.firmId), { expire: 0 }) // purge the per-firm staff cache (lib/reference.ts)
   revalidatePath(USERS_PATH)
@@ -272,13 +259,7 @@ export async function updateUserProfile(
   const { error } = await supabase.from("profiles").update({ name, role }).eq("id", userId)
   if (error) return { error: error.message }
 
-  await supabase.from("audit_log").insert({
-    entity: "user",
-    entity_id: userId,
-    label: name,
-    action: "updated",
-    by_user_id: admin.id,
-  })
+  await audit(supabase, admin.id, userId, name, "updated")
 
   revalidateTag(staffTag(gate.user.firmId), { expire: 0 }) // purge the per-firm staff cache (lib/reference.ts)
   revalidatePath(USERS_PATH)
@@ -308,13 +289,7 @@ export async function setUserRoles(userId: string, roleIds: string[]): Promise<A
   })
   if (error) return { error: "Couldn't update the user's roles." }
 
-  await supabase.from("audit_log").insert({
-    entity: "user",
-    entity_id: userId,
-    label: target.name,
-    action: "roles_updated",
-    by_user_id: admin.id,
-  })
+  await audit(supabase, admin.id, userId, target.name, "roles_updated")
 
   revalidateTag(staffTag(gate.user.firmId), { expire: 0 }) // purge the per-firm staff cache (lib/reference.ts)
   revalidatePath(USERS_PATH)
