@@ -29,7 +29,7 @@ the person as taking consultations; booking an attorney with no office hours fai
 ## Example
 
 ```bash
-# Only attorneys who can actually be booked right now
+# Only attorneys with recurring office hours configured
 curl "https://app.lawfficient.com/api/attorneys?has_office_hours=true" \
   -H "Authorization: Bearer $LAWFFICIENT_API_KEY"
 ```
