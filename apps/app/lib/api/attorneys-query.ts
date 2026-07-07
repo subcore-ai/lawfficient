@@ -19,7 +19,11 @@ export async function getApiAttorneys(db: TenantDb): Promise<Page<ApiAttorney>> 
     .from("profiles")
     .eq("schedulable", true)
     .eq("status", "active")
+    // Name, then id as a tiebreaker so two attorneys sharing a display name get
+    // a stable, reproducible order across requests (same convention as the
+    // leads/consultations keyset).
     .order("name")
+    .order("id")
   if (error) throw error
 
   return { data: (data ?? []).map((row) => serializeAttorney(row)), next_cursor: null }
