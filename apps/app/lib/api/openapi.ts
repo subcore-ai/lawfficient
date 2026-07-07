@@ -380,6 +380,42 @@ export const openapiDocument = {
         },
       },
     },
+    "/attorneys": {
+      get: {
+        operationId: "listAttorneys",
+        summary: "List attorneys",
+        description:
+          "Lists the firm's schedulable, active attorneys — the staff who can take consultations. Use " +
+          "this to resolve an attorney's `id` for booking: the id returned here is exactly the " +
+          "`attorney_id` that POST /api/consultations accepts. The set is small, so this listing is " +
+          "not paginated — `next_cursor` is always null.",
+        security: [{ apiKey: ["consultations:read"] }],
+        parameters: [{ $ref: "#/components/parameters/VersionHeader" }],
+        responses: {
+          "200": {
+            description: "The firm's schedulable, active attorneys.",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["data", "next_cursor"],
+                  properties: {
+                    data: { type: "array", items: { $ref: "#/components/schemas/Attorney" } },
+                    next_cursor: {
+                      type: ["string", "null"],
+                      description: "Always null — the attorney listing is not paginated.",
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "401": { $ref: "#/components/responses/Error" },
+          "403": { $ref: "#/components/responses/Error" },
+          "429": { $ref: "#/components/responses/Error" },
+        },
+      },
+    },
   },
   components: {
     securitySchemes: {
@@ -636,6 +672,23 @@ export const openapiDocument = {
           attorney_id: { type: "string", format: "uuid", description: "Reassign to another attorney." },
           time_zone: { type: "string", description: "Update the display time zone." },
           status: { type: "string", enum: ["canceled"], description: "Set to \"canceled\" to cancel." },
+        },
+      },
+      Attorney: {
+        type: "object",
+        description: "A schedulable, active attorney — bookable via POST /api/consultations.",
+        required: ["id", "name", "schedulable"],
+        properties: {
+          id: {
+            type: "string",
+            format: "uuid",
+            description: "Staff UUID — pass as `attorney_id` when booking a consultation.",
+          },
+          name: { type: "string", description: "The attorney's display name." },
+          schedulable: {
+            type: "boolean",
+            description: "Always true in this listing — only schedulable attorneys are returned.",
+          },
         },
       },
       Error: {

@@ -1,0 +1,38 @@
+---
+title: List attorneys
+description: GET /api/attorneys — list your firm's schedulable, active attorneys.
+---
+
+```http
+GET /api/attorneys
+```
+
+Lists the firm's **schedulable, active** attorneys — the staff who can take consultations. Requires
+the `consultations:read` scope. Use it to resolve an attorney's `id` before
+[booking a consultation](/docs/consultations/book): the id returned here is exactly the `attorney_id`
+that endpoint accepts.
+
+The set is small and bounded, so this listing is **not paginated** — every schedulable attorney is
+returned in one response and `next_cursor` is always `null`.
+
+## Example
+
+```bash
+curl https://app.lawfficient.com/api/attorneys \
+  -H "Authorization: Bearer $LAWFFICIENT_API_KEY"
+```
+
+```json title="200 OK"
+{
+  "data": [
+    {
+      "id": "a1b2c3d4-0000-4000-8000-000000000000",
+      "name": "Ayesha Okafor",
+      "schedulable": true
+    }
+  ],
+  "next_cursor": null
+}
+```
+
+See the [attorney object](/docs/attorneys) for every field.
