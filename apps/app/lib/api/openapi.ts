@@ -689,18 +689,39 @@ export const openapiDocument = {
       },
       Attorney: {
         type: "object",
-        description: "A schedulable, active attorney — bookable via POST /api/consultations.",
-        required: ["id", "name", "schedulable", "has_office_hours"],
+        description:
+          "A schedulable, active staff member — bookable via POST /api/consultations. Named " +
+          "'attorney' for the common case, but the listing filters on `schedulable`, not `role`, so " +
+          "check `role` to distinguish an actual attorney from other schedulable staff.",
+        required: ["id", "name", "email", "role", "schedulable", "has_office_hours"],
         properties: {
           id: {
             type: "string",
             format: "uuid",
             description: "Staff UUID — pass as `attorney_id` when booking a consultation.",
           },
-          name: { type: "string", description: "The attorney's display name." },
+          name: { type: "string", description: "The staff member's display name." },
+          email: { type: "string", format: "email", description: "The staff member's email." },
+          role: {
+            type: "string",
+            enum: [
+              "admin",
+              "attorney",
+              "la_lead",
+              "legal_assistant",
+              "qa_lead",
+              "creative_writer",
+              "sales",
+              "accounts_receivable",
+              "file_clerk",
+            ],
+            description:
+              "Staff role. The listing returns everyone marked schedulable regardless of role, so " +
+              "use this to tell an actual `attorney` from a schedulable `legal_assistant`, etc.",
+          },
           schedulable: {
             type: "boolean",
-            description: "Always true in this listing — only schedulable attorneys are returned.",
+            description: "Always true in this listing — only schedulable staff are returned.",
           },
           has_office_hours: {
             type: "boolean",

@@ -1,12 +1,20 @@
 // The STABLE public JSON shape for an attorney (spec 26) — the API contract, decoupled from the
 // `profiles` DB columns. The public API otherwise exposes no way to discover staff, so an
 // integration (e.g. a voice booking agent) can resolve its own attorney labels to the staff UUID
-// that POST /api/consultations requires as `attorney_id`. Only the fields an integration needs are
-// exposed; the rest of a profile (email, role, calendar color, firm_id) stays internal. ids are UUIDs.
+// that POST /api/consultations requires as `attorney_id`. The listing is firm-scoped (a firm's own
+// key reading its own staff directory), so `email` and `role` are exposed; internal-only columns
+// (calendar color, firm_id, pod) stay out. ids are UUIDs.
+import type { Role } from "@/data/types"
 
 export type ApiAttorney = {
   id: string
   name: string
+  email: string
+  // The staff member's role (staff_role enum). This listing filters on `schedulable`, NOT on role:
+  // a firm can mark ANY staff member schedulable to take consultations, so "attorney" here is a loose
+  // label for the schedulable set. `role` is how a caller tells an actual `attorney` apart from a
+  // schedulable `legal_assistant`, `la_lead`, etc.
+  role: Role
   schedulable: boolean
   // Whether the attorney has ≥1 recurring office-hours window configured
   // (`attorney_availability`). `schedulable` is only an admin toggle — "takes
@@ -23,6 +31,8 @@ export type ApiAttorney = {
 export type AttorneyRow = {
   id: string
   name: string
+  email: string
+  role: Role
   schedulable: boolean
 }
 
@@ -30,6 +40,8 @@ export function serializeAttorney(row: AttorneyRow, hasOfficeHours: boolean): Ap
   return {
     id: row.id,
     name: row.name,
+    email: row.email,
+    role: row.role,
     schedulable: row.schedulable,
     has_office_hours: hasOfficeHours,
   }

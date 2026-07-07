@@ -8,9 +8,14 @@ An **attorney** is a schedulable, active member of your firm — the staff who t
 attorney's display name into the `id` you pass as `attorney_id` when you
 [book a consultation](/docs/consultations/book).
 
-Only **schedulable, active** attorneys are listed — the same set the app offers when booking, and
-the same set booking will accept. A staff member who isn't marked schedulable (or whose account is
+Only **schedulable, active** staff are listed — the same set the app offers when booking, and the
+same set booking will accept. A staff member who isn't marked schedulable (or whose account is
 disabled) won't appear here and can't be booked.
+
+"Attorney" is a loose label here: the listing filters on **schedulable**, not on job title, and a
+firm can mark *any* staff member schedulable (a senior legal assistant who takes intake consults, for
+example). Each row carries [`role`](#the-attorney-object) so you can tell an actual `attorney` apart
+from other schedulable staff — filter client-side on it if you only want licensed attorneys.
 
 Being schedulable is only an admin toggle, though. An attorney with no **office hours** set up has no
 bookable time — booking one always fails with `outside_office_hours`. Each attorney therefore carries
@@ -29,6 +34,8 @@ the listing to the genuinely bookable subset.
 {
   "id": "a1b2c3d4-0000-4000-8000-000000000000",
   "name": "Ayesha Okafor",
+  "email": "ayesha@chidoluelaw.com",
+  "role": "attorney",
   "schedulable": true,
   "has_office_hours": true
 }
@@ -37,6 +44,8 @@ the listing to the genuinely bookable subset.
 | Field | Type | Notes |
 | --- | --- | --- |
 | `id` | string | Staff UUID, stable. Pass as `attorney_id` when [booking](/docs/consultations/book). |
-| `name` | string | The attorney's display name. |
-| `schedulable` | boolean | Always `true` here — only schedulable attorneys are returned. |
+| `name` | string | The staff member's display name. |
+| `email` | string | The staff member's email. |
+| `role` | string | Staff role — one of `admin`, `attorney`, `la_lead`, `legal_assistant`, `qa_lead`, `creative_writer`, `sales`, `accounts_receivable`, `file_clerk`. The listing isn't filtered by role, so use this to tell an actual `attorney` from other schedulable staff. |
+| `schedulable` | boolean | Always `true` here — only schedulable staff are returned. |
 | `has_office_hours` | boolean | Whether the attorney has recurring office hours configured. `false` means booking will fail with `outside_office_hours` until hours are set. Filter with `?has_office_hours=true`. |
