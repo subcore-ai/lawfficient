@@ -10,13 +10,15 @@ import { isSupabaseConfigured, SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "./
 // Unauthenticated (no-session) requests are allowed on these path prefixes. The /api routes do
 // their own Bearer-key auth in the route handler (not via session): /api/leads is the ingestion
 // webhook + the public leads read API; /api/consultations is the public consultations API
-// (book/list/get/reschedule/cancel); /api/openapi.json is the public, read-only API contract.
+// (book/list/get/reschedule/cancel); /api/attorneys is the public schedulable-attorney listing;
+// /api/openapi.json is the public, read-only API contract.
 const PUBLIC_PREFIXES = [
   "/login",
   "/forgot-password",
   "/auth",
   "/api/leads",
   "/api/consultations",
+  "/api/attorneys",
   "/api/openapi.json",
 ]
 
