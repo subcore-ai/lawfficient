@@ -3,6 +3,9 @@
 // `created_at` + `id` — so the ordering key stays an implementation detail and ties never
 // straddle a page boundary (the keyset filter compares the pair, not just the timestamp).
 // Responses are `{ "data": [...], "next_cursor": string | null }`.
+import type { NextResponse } from "next/server"
+
+import { apiError } from "./errors"
 import { isIsoTimestamp, isUuid } from "./validation"
 
 export const DEFAULT_LIMIT = 50
@@ -41,6 +44,22 @@ export function decodeCursor(raw: string | null): Cursor | null {
   // 500 on cast — decodes to null → a clean 400 at the call site.
   if (!isIsoTimestamp(createdAt) || !isUuid(id)) return null
   return { createdAt, id }
+}
+
+// Parse the shared `?limit` + `?cursor` query params for a paginated list endpoint. `?limit` is
+// always clamped (never rejected); a PRESENT-but-malformed `?cursor` is the one hard error → the
+// caller returns `response` (a 400) directly. Absent cursor is fine (first page). Keeps the two
+// list routes from re-deriving the same parse + 400 by hand.
+export function parseListParams(
+  params: URLSearchParams,
+): { ok: true; limit: number; cursor: Cursor | null } | { ok: false; response: NextResponse } {
+  const limit = parseLimit(params.get("limit"))
+  const rawCursor = params.get("cursor")
+  const cursor = decodeCursor(rawCursor)
+  if (rawCursor && !cursor) {
+    return { ok: false, response: apiError("invalid_cursor", "The cursor is invalid.", 400) }
+  }
+  return { ok: true, limit, cursor }
 }
 
 // PostgREST `.or()` expression selecting rows strictly AFTER `cursor` in (created_at desc, id desc)

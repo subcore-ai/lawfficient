@@ -7,7 +7,7 @@ import { withApi } from "@/lib/api/handler"
 import { parseIdempotencyKey } from "@/lib/api/idempotency"
 import { resolveApiKey, touchApiKey } from "@/lib/api/keys"
 import { getApiLeadsPage, type LeadFilters } from "@/lib/api/leads-query"
-import { decodeCursor, parseLimit } from "@/lib/api/pagination"
+import { parseListParams } from "@/lib/api/pagination"
 import { rateLimitByKey } from "@/lib/api/rate-limit"
 import { tenantScoped } from "@/lib/api/tenant-db"
 import { resolveVersion, withVersion } from "@/lib/api/version"
@@ -269,13 +269,8 @@ async function createLeadFromApiKey(
 export async function GET(request: NextRequest) {
   return withApi(request, "leads:read", async ({ admin, context }) => {
     const params = request.nextUrl.searchParams
-    const limit = parseLimit(params.get("limit"))
-
-    const rawCursor = params.get("cursor")
-    const cursor = decodeCursor(rawCursor)
-    if (rawCursor && !cursor) {
-      return apiError("invalid_cursor", "The cursor is invalid.", 400)
-    }
+    const parsed = parseListParams(params)
+    if (!parsed.ok) return parsed.response
 
     const filters: LeadFilters = {
       status: params.get("status") ?? undefined,
@@ -284,7 +279,7 @@ export async function GET(request: NextRequest) {
       q: params.get("q") ?? undefined,
     }
 
-    const page = await getApiLeadsPage(tenantScoped(admin, context.firmId), limit, cursor, filters)
+    const page = await getApiLeadsPage(tenantScoped(admin, context.firmId), parsed.limit, parsed.cursor, filters)
     return apiJson(page)
   })
 }

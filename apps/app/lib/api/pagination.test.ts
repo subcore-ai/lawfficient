@@ -7,6 +7,7 @@ import {
   encodeCursor,
   MAX_LIMIT,
   parseLimit,
+  parseListParams,
   type Cursor,
 } from "./pagination"
 
@@ -92,5 +93,31 @@ describe("buildPage", () => {
 
   test("empty result → empty page, null cursor", () => {
     expect(buildPage([], 50, toCursor)).toEqual({ data: [], next_cursor: null })
+  })
+})
+
+describe("parseListParams", () => {
+  const uuid = "11111111-1111-4111-8111-111111111111"
+
+  test("no params → default limit, null cursor", () => {
+    const result = parseListParams(new URLSearchParams())
+    expect(result).toEqual({ ok: true, limit: DEFAULT_LIMIT, cursor: null })
+  })
+
+  test("clamps limit and decodes a valid cursor", () => {
+    const cursor: Cursor = { createdAt: "2026-06-23T10:00:00.000Z", id: uuid }
+    const params = new URLSearchParams({ limit: "500", cursor: encodeCursor(cursor) })
+    const result = parseListParams(params)
+    expect(result).toEqual({ ok: true, limit: MAX_LIMIT, cursor })
+  })
+
+  test("present-but-malformed cursor → 400 response, not ok", async () => {
+    const result = parseListParams(new URLSearchParams({ cursor: "not-a-cursor" }))
+    expect(result.ok).toBe(false)
+    if (result.ok) throw new Error("expected not ok")
+    expect(result.response.status).toBe(400)
+    expect(await result.response.json()).toEqual({
+      error: { code: "invalid_cursor", message: "The cursor is invalid." },
+    })
   })
 })
