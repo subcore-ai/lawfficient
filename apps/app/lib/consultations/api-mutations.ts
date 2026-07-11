@@ -6,16 +6,13 @@
 //
 // The API authenticates a KEY (no user session → RLS does not apply), so every call uses the service-role
 // admin client and scopes firm_id EXPLICITLY (and asserts it), the same fail-safe discipline as leads.
-import { after } from "next/server"
-
 import { getApiConsultationById } from "@/lib/api/consultations-query"
 import type { ApiConsultation } from "@/lib/api/consultations"
-import { tenantScoped } from "@/lib/api/tenant-db"
 import { isUuid } from "@/lib/api/validation"
 import { jsonRecord } from "@/lib/json"
 import { createAdminClient } from "@/lib/supabase/admin"
 import type { Database, Json } from "@/lib/supabase/database.types"
-import { emitEvent } from "@/lib/webhooks/emit"
+import { emitEntityEvents } from "@/lib/webhooks/emit-entity"
 import type { WebhookEventType } from "@/lib/webhooks/events"
 import { parseConsultationInput, parseConsultationPatch } from "./validation"
 
@@ -33,22 +30,11 @@ export type ConsultationMutationResult =
   | { ok: false; status: number; code: string; message: string }
 
 // ── Shared emission ───────────────────────────────────────────────────────────────────────────────
-// Emit consultation.* events AFTER the response is sent (next/server `after`) so webhook delivery never
-// adds latency. Best-effort: loads the consult in the public API shape, delivers via the admin client,
-// and NEVER throws — a webhook failure must never fail the write. No-ops on an empty event list.
+// The ONE consultation.* emission path (shared with the leads core via emitEntityEvents): loads the
+// consult in the public API shape and delivers after the response, best-effort. No-ops on an empty
+// event list.
 export function emitConsultationEvents(firmId: string, consultationId: string, types: WebhookEventType[]) {
-  if (types.length === 0) return
-  if (!firmId) return // best-effort: never run a firm-scoped read without firm context
-  after(async () => {
-    try {
-      const admin = createAdminClient()
-      const consult = await getApiConsultationById(tenantScoped(admin, firmId), consultationId)
-      if (!consult) return // deleted out from under us, or not this firm's — nothing to emit
-      for (const type of types) await emitEvent(admin, firmId, type, consult as unknown as Json)
-    } catch (err) {
-      console.error("emitConsultationEvents failed:", err)
-    }
-  })
+  emitEntityEvents("emitConsultationEvents", firmId, consultationId, types, getApiConsultationById)
 }
 
 // The row shape both RPCs return (they share the same `returns table (...)`). Derived from the generated

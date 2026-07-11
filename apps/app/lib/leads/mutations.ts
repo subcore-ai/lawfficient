@@ -14,8 +14,6 @@
 //     uses the service-role admin client and scopes firm_id EXPLICITLY (and asserts it on every read
 //     and write), the same fail-safe discipline as the ingestion path. (The Server Actions keep their
 //     RLS-scoped user client — RLS is their enforcement — and reuse the validation + event rules here.)
-import { after } from "next/server"
-
 import { getApiLeadById } from "@/lib/api/leads-query"
 import { serializeLead, type ApiLead } from "@/lib/api/leads"
 import { tenantScoped } from "@/lib/api/tenant-db"
@@ -24,7 +22,7 @@ import { jsonRecord } from "@/lib/json"
 import { createAdminClient } from "@/lib/supabase/admin"
 import type { Database, Json } from "@/lib/supabase/database.types"
 import { groupTaxonomies, toLeadVocabAll } from "@/lib/taxonomies/queries"
-import { emitEvent } from "@/lib/webhooks/emit"
+import { emitEntityEvents } from "@/lib/webhooks/emit-entity"
 import type { WebhookEventType } from "@/lib/webhooks/events"
 import { mapLeadRow, mapLeadStatus, type LeadStatusView } from "./queries"
 import {
@@ -63,22 +61,11 @@ export function decideUpdateEvents(changed: {
 }
 
 // ── Shared emission ───────────────────────────────────────────────────────────────────────────
-// Emit lead.* events AFTER the response is sent (next/server `after`) so webhook delivery never adds
-// latency to the write. Best-effort: loads the lead in the public API shape, delivers via the admin
-// client, and NEVER throws — a webhook failure must never fail the write. Both surfaces call this so
-// the event payload is identical whichever caused it. No-ops on an empty event list.
+// The ONE lead.* emission path (shared with the consultations core via emitEntityEvents): loads the
+// lead in the public API shape and delivers after the response, best-effort. Both surfaces call this
+// so the event payload is identical whichever caused it. No-ops on an empty event list.
 export function emitLeadEvents(firmId: string, leadId: string, types: WebhookEventType[]) {
-  if (types.length === 0) return
-  after(async () => {
-    try {
-      const admin = createAdminClient()
-      const lead = await getApiLeadById(tenantScoped(admin, firmId), leadId)
-      if (!lead) return // deleted out from under us, or not this firm's — nothing to emit
-      for (const type of types) await emitEvent(admin, firmId, type, lead)
-    } catch (err) {
-      console.error("emitLeadEvents failed:", err)
-    }
-  })
+  emitEntityEvents("emitLeadEvents", firmId, leadId, types, getApiLeadById)
 }
 
 // ── API write primitives (admin client, explicit firm scope) ────────────────────────────────────
