@@ -28,6 +28,7 @@ import type { ConsultationType } from "@/lib/consultations/consultation-types"
 import { consultationStatusMeta } from "@/lib/consultations/queries"
 import { addMinutesToTime, formatConsultationWhen, minutesBetween, splitWall, utcToZonedInput } from "@/lib/consultations/time"
 import type { ConsultationStatus } from "@/lib/consultations/validation"
+import { toLocalYmd } from "@/lib/format"
 import type { CalendarConsult } from "@/lib/scheduling/day-calendar"
 
 type Option = { id: string; name: string }
@@ -38,11 +39,6 @@ const UNASSIGNED = "__none__"
 // picker icon only appears on hover).
 const INLINE =
   "border-input/0 hover:border-input focus:border-input focus:bg-muted/40 -mx-1 rounded border bg-transparent px-1 py-0.5 transition-colors outline-none [&::-webkit-calendar-picker-indicator]:opacity-0 hover:[&::-webkit-calendar-picker-indicator]:opacity-60 focus:[&::-webkit-calendar-picker-indicator]:opacity-60"
-
-// A LOCAL Date → "YYYY-MM-DD" (local components, so the calendar day isn't shifted by the viewer's zone).
-function dateToYmd(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
-}
 
 // Compact human duration, e.g. 85 → "1h 25m", 30 → "30m", 60 → "1h".
 function formatDuration(min: number): string {
@@ -188,7 +184,7 @@ export function ConsultPreviewDialog({
   // Gray out the selected attorney's full days off (own time off + firm holidays) in the reschedule date
   // picker. Reads from the CURRENTLY selected attorney, since "Edit all fields" can reassign it.
   const attorneyOff = attorney !== UNASSIGNED ? offDatesByAttorney?.[attorney] : undefined
-  const disabledDay = attorneyOff?.length ? (d: Date) => isDateOff(attorneyOff, dateToYmd(d)) : undefined
+  const disabledDay = attorneyOff?.length ? (d: Date) => isDateOff(attorneyOff, toLocalYmd(d)) : undefined
   // The picker only blocks NEW picks; if the day was already set when the attorney changed (or off-data
   // loaded), it can still be off — treat that as invalid too so Save can't stay enabled (server re-checks).
   const dayIsOff = Boolean(day && attorneyOff?.length && isDateOff(attorneyOff, day))

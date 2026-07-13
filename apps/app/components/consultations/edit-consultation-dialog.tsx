@@ -28,14 +28,10 @@ import { Field } from "@/components/form-field"
 import { isDateOff, type OffDateRange } from "@/lib/availability/exceptions"
 import type { ConsultationType } from "@/lib/consultations/consultation-types"
 import { addMinutesToTime, minutesBetween, splitWall, utcToZonedInput } from "@/lib/consultations/time"
+import { toLocalYmd } from "@/lib/format"
 
 type Option = { id: string; name: string }
 const UNASSIGNED = "__none__"
-
-// A LOCAL Date → "YYYY-MM-DD" (local components, so the calendar day isn't shifted by the viewer's zone).
-function dateToYmd(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
-}
 
 // Edit a booked consultation with the same fields as creating one — type, attorney, day + from/to, fee —
 // except the lead (which is fixed). The consult + the attorney/type lists are loaded on open, so the
@@ -136,7 +132,7 @@ export function EditConsultationDialog({
   // Gray out days the selected attorney is fully off (own time off + firm holidays). Only when an attorney
   // is selected and we have their ranges; the server (0051 trigger) still re-checks on save — friendly guard.
   const attorneyOff = attorney !== UNASSIGNED ? offDatesByAttorney[attorney] : undefined
-  const disabledDay = attorneyOff?.length ? (d: Date) => isDateOff(attorneyOff, dateToYmd(d)) : undefined
+  const disabledDay = attorneyOff?.length ? (d: Date) => isDateOff(attorneyOff, toLocalYmd(d)) : undefined
   // The picker only blocks NEW picks; if the chosen attorney is off on the already-picked day (e.g. after
   // switching attorneys), treat it as invalid so Save can't proceed — the server (0051 trigger) re-checks.
   const dayIsOff = Boolean(day && attorneyOff?.length && isDateOff(attorneyOff, day))

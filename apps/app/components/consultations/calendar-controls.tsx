@@ -10,6 +10,7 @@ import { Input } from "@workspace/ui/components/input"
 import { Popover, PopoverContent, PopoverTrigger } from "@workspace/ui/components/popover"
 import { cn } from "@workspace/ui/lib/utils"
 
+import { toLocalYmd } from "@/lib/format"
 import { MAX_CALENDAR_COLUMNS } from "@/lib/scheduling/day-calendar"
 
 type Option = { id: string; name: string }
@@ -47,8 +48,6 @@ export function CalendarControls({
   // Parse the YYYY-MM-DD (firm-tz calendar day) into a LOCAL Date for the picker and back, using local
   // calendar components so the round-trip never shifts a day across time zones.
   const pickedDate = new Date(Number(date.slice(0, 4)), Number(date.slice(5, 7)) - 1, Number(date.slice(8, 10)))
-  const toYmd = (d: Date) =>
-    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
 
   const dateLabel = new Intl.DateTimeFormat("en-US", {
     timeZone: "UTC",
@@ -141,7 +140,7 @@ export function CalendarControls({
             defaultMonth={pickedDate}
             onSelect={(d) => {
               if (d) {
-                onGo(toYmd(d))
+                onGo(toLocalYmd(d))
                 setPickerOpen(false)
               }
             }}

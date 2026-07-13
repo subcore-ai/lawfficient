@@ -48,6 +48,15 @@ export function formatTime(iso: string): string {
   return `${h12}:${String(mm).padStart(2, "0")} ${period}`
 }
 
+/**
+ * A local `Date` → "YYYY-MM-DD" from its LOCAL calendar components, so a calendar day is never
+ * shifted by the viewer's time zone (the inverse of parsing "YYYY-MM-DD" with `new Date(y, m-1, d)`).
+ * Client-side date pickers use this to serialize the picked day.
+ */
+export function toLocalYmd(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+}
+
 export function initialsOf(name: string): string {
   return name
     .trim()
