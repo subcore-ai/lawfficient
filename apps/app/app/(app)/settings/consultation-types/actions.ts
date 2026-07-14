@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 
-import { getCurrentUser, type CurrentUser } from "@/lib/auth/session"
+import { requirePermission } from "@/lib/auth/gate"
 import { parseConsultationTypeInput } from "@/lib/consultations/consultation-types"
 import { createClient } from "@/lib/supabase/server"
 
@@ -17,16 +17,8 @@ function revalidateTypeViews() {
   revalidatePath("/leads/[id]", "page")
 }
 
-type Gate = { ok: true; user: CurrentUser } | { ok: false; error: string }
-
-async function requireAdmin(): Promise<Gate> {
-  const user = await getCurrentUser()
-  if (!user) return { ok: false, error: "You're not signed in." }
-  if (!user.firmId) return { ok: false, error: "Your session is missing firm context." }
-  if (!(user.permissions?.includes("settings.manage") ?? false))
-    return { ok: false, error: "You don't have permission to manage consultation types." }
-  return { ok: true, user }
-}
+// RLS (authorize('settings.manage'), firm-scoped) is the real gate; this returns a clean error first.
+const requireAdmin = () => requirePermission("settings.manage", "consultation types")
 
 function readInput(formData: FormData) {
   return parseConsultationTypeInput({

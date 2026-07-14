@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache"
 
-import { getCurrentUser, type CurrentUser } from "@/lib/auth/session"
+import { requirePermission } from "@/lib/auth/gate"
+import { getCurrentUser } from "@/lib/auth/session"
 import { parseTimeOffInput } from "@/lib/availability/exceptions"
 import { validateWindows, type WindowInput } from "@/lib/availability/validation"
 import { isValidColorKey } from "@/lib/scheduling/calendar-colors"
@@ -16,19 +17,9 @@ const MY_PATH = "/profile/office-hours"
 // The calendar subtracts time off, so a change there must invalidate it too.
 const CALENDAR_PATH = "/consultations"
 
-type Gate = { ok: true; user: CurrentUser } | { ok: false; error: string }
-
 // RLS (authorize('settings.manage'), firm-scoped) is the real gate; this returns a clean error first.
-async function requireAdmin(): Promise<Gate> {
-  const user = await getCurrentUser()
-  if (!user) return { ok: false, error: "You're not signed in." }
-  // Never run a firm-scoped query with an empty firm id: PostgREST drops an `.eq(col, undefined)`
-  // predicate, which on the service-role client (no RLS) would be cross-tenant. Fail closed.
-  if (!user.firmId) return { ok: false, error: "Your session is missing firm context." }
-  if (!(user.permissions?.includes("settings.manage") ?? false))
-    return { ok: false, error: "You don't have permission to manage scheduling." }
-  return { ok: true, user }
-}
+// requirePermission also guards a missing firm id, so gate.user.firmId is safe for the service-role reads below.
+const requireAdmin = () => requirePermission("settings.manage", "scheduling")
 
 // Replace an attorney's full weekly office hours (delete-all + insert). Admin-only + low-frequency, so
 // the two-step replace (non-atomic) is acceptable; we validate first so the insert can't fail on shape.
