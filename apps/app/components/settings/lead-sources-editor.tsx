@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Activity, KeyRound, Plus, Trash2 } from "lucide-react"
+import { Activity, KeyRound, Plus } from "lucide-react"
 
 import { Button } from "@workspace/ui/components/button"
 import {
@@ -34,6 +34,7 @@ import {
 import { CopyButton } from "@/components/copy-button"
 import { Field } from "@/components/form-field"
 import { InlineSelect } from "@/components/inline-select"
+import { DeleteConfirmButton } from "@/components/settings/delete-confirm-button"
 import { StatusPill } from "@/components/status-pill"
 import type { AssigneeOption } from "@/lib/leads/queries"
 import { formatDateTime } from "@/lib/format"
@@ -220,43 +221,6 @@ function ActivityDialog({ source }: { source: LeadSourceRow }) {
   )
 }
 
-function DeleteSourceButton({ source }: { source: LeadSourceRow }) {
-  const [open, setOpen] = React.useState(false)
-  const [pending, startTransition] = React.useTransition()
-  function onDelete() {
-    startTransition(async () => {
-      const res = await deleteSource(source.id)
-      if ("error" in res) {
-        toast.error(res.error)
-        return
-      }
-      toast.success("Source deleted")
-      setOpen(false)
-    })
-  }
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button variant="ghost" size="sm" aria-label={`Delete ${source.name}`} />}>
-        <Trash2 className="size-4" />
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-sm">
-        <DialogHeader>
-          <DialogTitle>Delete {source.name}?</DialogTitle>
-          <DialogDescription>
-            The webhook URL + key stop working immediately. Existing leads are unaffected.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
-          <Button type="button" variant="destructive" onClick={onDelete} disabled={pending}>
-            {pending ? "Deleting…" : "Delete source"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
 function SourceCard({
   source,
   assignees,
@@ -329,7 +293,14 @@ function SourceCard({
             <Button variant="ghost" size="sm" onClick={toggleEnabled} disabled={pending}>
               {source.enabled ? "Disable" : "Enable"}
             </Button>
-            <DeleteSourceButton source={source} />
+            <DeleteConfirmButton
+              entityLabel={source.name}
+              title={`Delete ${source.name}?`}
+              description="The webhook URL + key stop working immediately. Existing leads are unaffected."
+              confirmLabel="Delete source"
+              successMessage="Source deleted"
+              action={() => deleteSource(source.id)}
+            />
           </>
         ) : null}
       </div>

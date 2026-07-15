@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Pencil, Plus, Trash2 } from "lucide-react"
+import { Pencil, Plus } from "lucide-react"
 
 import { Button } from "@workspace/ui/components/button"
 import { Checkbox } from "@workspace/ui/components/checkbox"
@@ -20,6 +20,7 @@ import { Label } from "@workspace/ui/components/label"
 import { toast } from "@workspace/ui/components/sonner"
 
 import { Field } from "@/components/form-field"
+import { DeleteConfirmButton } from "@/components/settings/delete-confirm-button"
 import { PERMISSION_GROUPS, type AppPermission } from "@/lib/rbac/permissions"
 import {
   createRole,
@@ -221,45 +222,6 @@ function RenameRoleDialog({ role }: { role: RoleRow }) {
   )
 }
 
-function DeleteRoleButton({ role }: { role: RoleRow }) {
-  const [open, setOpen] = React.useState(false)
-  const [pending, startTransition] = React.useTransition()
-
-  function onDelete() {
-    startTransition(async () => {
-      const res = await deleteRole(role.id)
-      if ("error" in res) {
-        toast.error(res.error)
-        return
-      }
-      toast.success("Role deleted")
-      setOpen(false)
-    })
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button variant="ghost" size="sm" aria-label={`Delete ${role.name}`} />}>
-        <Trash2 className="size-4" />
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-sm">
-        <DialogHeader>
-          <DialogTitle>Delete {role.name}?</DialogTitle>
-          <DialogDescription>
-            This removes the role for your firm. Members assigned to it must be reassigned first.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
-          <Button type="button" variant="destructive" onClick={onDelete} disabled={pending}>
-            {pending ? "Deleting…" : "Delete role"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
 // System roles are locked (rename/delete hidden); their permissions stay editable.
 export function RoleRowActions({ role }: { role: RoleRow }) {
   return (
@@ -268,7 +230,14 @@ export function RoleRowActions({ role }: { role: RoleRow }) {
       {!role.isSystem ? (
         <>
           <RenameRoleDialog role={role} />
-          <DeleteRoleButton role={role} />
+          <DeleteConfirmButton
+            entityLabel={role.name}
+            title={`Delete ${role.name}?`}
+            description="This removes the role for your firm. Members assigned to it must be reassigned first."
+            confirmLabel="Delete role"
+            successMessage="Role deleted"
+            action={() => deleteRole(role.id)}
+          />
         </>
       ) : null}
     </div>

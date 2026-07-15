@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Pencil, Trash2 } from "lucide-react"
+import { Pencil } from "lucide-react"
 
 import { Button } from "@workspace/ui/components/button"
 import {
@@ -19,6 +19,7 @@ import { toast } from "@workspace/ui/components/sonner"
 
 import { deleteTaxonomy, editTaxonomy, setTaxonomyActive } from "@/app/(app)/settings/taxonomies/actions"
 import { Field } from "@/components/form-field"
+import { DeleteConfirmButton } from "@/components/settings/delete-confirm-button"
 import { StatusPill } from "@/components/status-pill"
 import type { TaxonomyOption } from "@/lib/taxonomies/queries"
 
@@ -69,7 +70,15 @@ export function TaxonomyRowContent({
             {option.isActive ? "Deactivate" : "Activate"}
           </Button>
           <EditTaxonomyDialog option={option} />
-          {!option.isSystem ? <DeleteTaxonomyButton option={option} /> : null}
+          {!option.isSystem ? (
+            <DeleteConfirmButton
+              entityLabel={option.label}
+              title={`Delete ${option.label}?`}
+              description="You can't delete a value that leads are using — deactivate it instead to keep it for reference while hiding it from new leads."
+              successMessage="Deleted"
+              action={() => deleteTaxonomy(option.id)}
+            />
+          ) : null}
         </div>
       ) : null}
     </>
@@ -148,44 +157,6 @@ function EditTaxonomyDialog({ option }: { option: TaxonomyOption }) {
             </Button>
           </DialogFooter>
         </form>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-function DeleteTaxonomyButton({ option }: { option: TaxonomyOption }) {
-  const [open, setOpen] = React.useState(false)
-  const [pending, startTransition] = React.useTransition()
-  function onDelete() {
-    startTransition(async () => {
-      const res = await deleteTaxonomy(option.id)
-      if ("error" in res) {
-        toast.error(res.error)
-        return
-      }
-      toast.success("Deleted")
-      setOpen(false)
-    })
-  }
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button variant="ghost" size="sm" aria-label={`Delete ${option.label}`} />}>
-        <Trash2 className="size-4" />
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-sm">
-        <DialogHeader>
-          <DialogTitle>Delete {option.label}?</DialogTitle>
-          <DialogDescription>
-            You can&apos;t delete a value that leads are using — deactivate it instead to keep it for reference
-            while hiding it from new leads.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
-          <Button type="button" variant="destructive" onClick={onDelete} disabled={pending}>
-            {pending ? "Deleting…" : "Delete"}
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   )
