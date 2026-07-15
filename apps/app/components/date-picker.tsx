@@ -8,6 +8,8 @@ import { Calendar } from "@workspace/ui/components/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@workspace/ui/components/popover"
 import { cn } from "@workspace/ui/lib/utils"
 
+import { toLocalYmd } from "@/lib/format"
+
 // A date picker on the shadcn Calendar (in a Popover) — the standard replacement for a native
 // <input type="date"> in scheduling UI. `value` / `onChange` are plain "YYYY-MM-DD" strings; the
 // round-trip goes through LOCAL calendar components (not Date parsing of the ISO string), so the picked
@@ -19,11 +21,6 @@ function parseLocalDate(value: string): Date | null {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
   if (!m) return null
   return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
-}
-
-// A LOCAL Date → "YYYY-MM-DD" from its local calendar components (the inverse of parseLocalDate).
-function toYmd(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
 }
 
 export function DatePicker({
@@ -85,7 +82,7 @@ export function DatePicker({
           disabled={disabled}
           onSelect={(d) => {
             if (d) {
-              onChange(toYmd(d))
+              onChange(toLocalYmd(d))
               setOpen(false)
             }
           }}

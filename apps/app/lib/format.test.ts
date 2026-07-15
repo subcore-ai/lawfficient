@@ -8,6 +8,7 @@ import {
   formatDateTime,
   formatTime,
   initialsOf,
+  toLocalYmd,
 } from "./format"
 
 describe("formatCurrency", () => {
@@ -79,6 +80,19 @@ describe("formatTime", () => {
 
   test("returns an empty string when the time is malformed", () => {
     expect(formatTime("2026-06-05Tinvalid")).toBe("")
+  })
+})
+
+describe("toLocalYmd", () => {
+  test("formats a Date's local calendar components as zero-padded YYYY-MM-DD", () => {
+    expect(toLocalYmd(new Date(2026, 5, 5))).toBe("2026-06-05") // month is 0-indexed → June
+    expect(toLocalYmd(new Date(2026, 11, 31))).toBe("2026-12-31")
+    expect(toLocalYmd(new Date(2026, 0, 1))).toBe("2026-01-01")
+  })
+
+  test("round-trips with new Date(y, m-1, d)", () => {
+    const d = new Date(2026, 6, 13)
+    expect(toLocalYmd(d)).toBe("2026-07-13")
   })
 })
 

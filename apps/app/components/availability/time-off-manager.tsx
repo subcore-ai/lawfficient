@@ -10,11 +10,7 @@ import { addFirmHoliday, addTimeOff, removeTimeOff } from "@/app/(app)/settings/
 import { DatePicker } from "@/components/date-picker"
 import { Field } from "@/components/form-field"
 import type { TimeOff } from "@/lib/availability/exceptions"
-
-// A LOCAL Date → "YYYY-MM-DD" (local components, so a calendar day isn't shifted by the viewer's zone).
-function dateToYmd(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
-}
+import { toLocalYmd } from "@/lib/format"
 
 function fmtDate(d: string): string {
   // Noon UTC + UTC formatter so a YYYY-MM-DD never slips a day across the viewer's zone.
@@ -124,7 +120,7 @@ export function TimeOffManager({
               value={endDate}
               onChange={setEndDate}
               // Can't end before it starts (the action also enforces end >= start).
-              disabled={startDate ? (d) => dateToYmd(d) < startDate : undefined}
+              disabled={startDate ? (d) => toLocalYmd(d) < startDate : undefined}
               disabledControl={pending}
               aria-label="To"
               buttonClassName="w-40"

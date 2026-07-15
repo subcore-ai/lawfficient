@@ -34,13 +34,9 @@ import { isDateOff, type OffDateRange } from "@/lib/availability/exceptions"
 import type { ConsultationType } from "@/lib/consultations/consultation-types"
 import { addMinutesToTime, minutesBetween, splitWall } from "@/lib/consultations/time"
 import { FIRM_TIMEZONES } from "@/lib/firm/timezones"
+import { toLocalYmd } from "@/lib/format"
 
 type Option = { id: string; name: string }
-
-// A LOCAL Date → "YYYY-MM-DD" (local components, so the calendar day isn't shifted by the viewer's zone).
-function dateToYmd(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
-}
 
 const UNASSIGNED = "__none__"
 const DEFAULT_TZ = "America/New_York"
@@ -123,7 +119,7 @@ export function BookConsultationDialog({
   // is selected and we have their ranges; the server still re-checks (the 0051 trigger) — friendly guardrail.
   const attorneyOff = attorney !== UNASSIGNED ? offDatesByAttorney?.[attorney] : undefined
   const disabledDay = attorneyOff?.length
-    ? (d: Date) => isDateOff(attorneyOff, dateToYmd(d))
+    ? (d: Date) => isDateOff(attorneyOff, toLocalYmd(d))
     : undefined
   // The picker only blocks NEW picks; if the chosen attorney is off on the already-picked day (e.g. after
   // switching attorneys), treat it as invalid so submit can't proceed — the server (0051 trigger) re-checks.
