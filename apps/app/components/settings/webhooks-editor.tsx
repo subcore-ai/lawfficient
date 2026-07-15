@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Activity, Plus, Trash2, Webhook } from "lucide-react"
+import { Activity, Plus, Webhook } from "lucide-react"
 
 import { Button } from "@workspace/ui/components/button"
 import { Checkbox } from "@workspace/ui/components/checkbox"
@@ -25,6 +25,7 @@ import {
 } from "@/app/(app)/settings/integrations/webhooks-actions"
 import { CopyButton } from "@/components/copy-button"
 import { Field } from "@/components/form-field"
+import { DeleteConfirmButton } from "@/components/settings/delete-confirm-button"
 import { StatusPill } from "@/components/status-pill"
 import { formatDateTime } from "@/lib/format"
 
@@ -224,43 +225,6 @@ function DeliveriesDialog({ endpoint }: { endpoint: WebhookEndpointRow }) {
   )
 }
 
-function DeleteEndpointButton({ endpoint }: { endpoint: WebhookEndpointRow }) {
-  const [open, setOpen] = React.useState(false)
-  const [pending, startTransition] = React.useTransition()
-  function onDelete() {
-    startTransition(async () => {
-      const res = await deleteWebhookEndpoint(endpoint.id)
-      if ("error" in res) {
-        toast.error(res.error)
-        return
-      }
-      toast.success("Endpoint deleted")
-      setOpen(false)
-    })
-  }
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button variant="ghost" size="sm" aria-label={`Delete ${endpoint.url}`} />}>
-        <Trash2 className="size-4" />
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-sm">
-        <DialogHeader>
-          <DialogTitle className="truncate">Delete this endpoint?</DialogTitle>
-          <DialogDescription>
-            Deliveries to {endpoint.url} stop immediately and its history is removed.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
-          <Button type="button" variant="destructive" onClick={onDelete} disabled={pending}>
-            {pending ? "Deleting…" : "Delete endpoint"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
 function EndpointCard({
   endpoint,
   canManage,
@@ -306,7 +270,15 @@ function EndpointCard({
             <Button variant="ghost" size="sm" onClick={toggleEnabled} disabled={pending}>
               {endpoint.enabled ? "Disable" : "Enable"}
             </Button>
-            <DeleteEndpointButton endpoint={endpoint} />
+            <DeleteConfirmButton
+              entityLabel={endpoint.url}
+              title="Delete this endpoint?"
+              titleClassName="truncate"
+              description={`Deliveries to ${endpoint.url} stop immediately and its history is removed.`}
+              confirmLabel="Delete endpoint"
+              successMessage="Endpoint deleted"
+              action={() => deleteWebhookEndpoint(endpoint.id)}
+            />
           </>
         ) : null}
       </div>

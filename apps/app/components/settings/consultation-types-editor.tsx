@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Pencil, Plus, Trash2 } from "lucide-react"
+import { Pencil, Plus } from "lucide-react"
 
 import { Button } from "@workspace/ui/components/button"
 import {
@@ -32,6 +32,7 @@ import {
   setConsultationTypeActive,
 } from "@/app/(app)/settings/consultation-types/actions"
 import { Field } from "@/components/form-field"
+import { DeleteConfirmButton } from "@/components/settings/delete-confirm-button"
 import { StatusPill } from "@/components/status-pill"
 import type { ConsultationType } from "@/lib/consultations/consultation-types"
 
@@ -157,48 +158,6 @@ function EditTypeDialog({ type }: { type: ConsultationType }) {
   )
 }
 
-function DeleteTypeButton({ type }: { type: ConsultationType }) {
-  const [open, setOpen] = React.useState(false)
-  const [pending, startTransition] = React.useTransition()
-  function onDelete() {
-    startTransition(async () => {
-      try {
-        const res = await deleteConsultationType(type.id)
-        if ("error" in res) {
-          toast.error(res.error)
-          return
-        }
-        toast.success("Deleted")
-        setOpen(false)
-      } catch {
-        toast.error(GENERIC_ERROR)
-      }
-    })
-  }
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button variant="ghost" size="sm" aria-label={`Delete ${type.name}`} />}>
-        <Trash2 className="size-4" />
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-sm">
-        <DialogHeader>
-          <DialogTitle>Delete {type.name}?</DialogTitle>
-          <DialogDescription>
-            Past consultations keep their type and price — deleting only removes it from the booking
-            picker. Or deactivate it to hide it while keeping it here.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
-          <Button type="button" variant="destructive" onClick={onDelete} disabled={pending}>
-            {pending ? "Deleting…" : "Delete"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
 function TypeRow({ type, canManage }: { type: ConsultationType; canManage: boolean }) {
   const [pending, startTransition] = React.useTransition()
   function toggleActive() {
@@ -228,7 +187,13 @@ function TypeRow({ type, canManage }: { type: ConsultationType; canManage: boole
             {type.isActive ? "Deactivate" : "Activate"}
           </Button>
           <EditTypeDialog type={type} />
-          <DeleteTypeButton type={type} />
+          <DeleteConfirmButton
+            entityLabel={type.name}
+            title={`Delete ${type.name}?`}
+            description="Past consultations keep their type and price — deleting only removes it from the booking picker. Or deactivate it to hide it while keeping it here."
+            successMessage="Deleted"
+            action={() => deleteConsultationType(type.id)}
+          />
         </div>
       ) : null}
     </div>

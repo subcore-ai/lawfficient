@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { KeyRound, Plus, Trash2 } from "lucide-react"
+import { KeyRound, Plus } from "lucide-react"
 
 import { Button } from "@workspace/ui/components/button"
 import { Checkbox } from "@workspace/ui/components/checkbox"
@@ -21,6 +21,7 @@ import { toast } from "@workspace/ui/components/sonner"
 import { createApiKey, deleteApiKey, setApiKeyEnabled } from "@/app/(app)/settings/integrations/actions"
 import { CopyButton } from "@/components/copy-button"
 import { Field } from "@/components/form-field"
+import { DeleteConfirmButton } from "@/components/settings/delete-confirm-button"
 import { StatusPill } from "@/components/status-pill"
 import { API_SCOPES, type ApiScope } from "@/lib/api/scopes"
 import { formatDateTime } from "@/lib/format"
@@ -160,41 +161,6 @@ function NewApiKeyDialog({ onCreated }: { onCreated: (rawKey: string) => void })
   )
 }
 
-function DeleteApiKeyButton({ apiKey }: { apiKey: ApiKeyRow }) {
-  const [open, setOpen] = React.useState(false)
-  const [pending, startTransition] = React.useTransition()
-  function onDelete() {
-    startTransition(async () => {
-      const res = await deleteApiKey(apiKey.id)
-      if ("error" in res) {
-        toast.error(res.error)
-        return
-      }
-      toast.success("API key deleted")
-      setOpen(false)
-    })
-  }
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button variant="ghost" size="sm" aria-label={`Delete ${apiKey.name}`} />}>
-        <Trash2 className="size-4" />
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-sm">
-        <DialogHeader>
-          <DialogTitle>Delete {apiKey.name}?</DialogTitle>
-          <DialogDescription>The key stops working immediately. This can&apos;t be undone.</DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
-          <Button type="button" variant="destructive" onClick={onDelete} disabled={pending}>
-            {pending ? "Deleting…" : "Delete key"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
 function ApiKeyCard({ apiKey, canManage }: { apiKey: ApiKeyRow; canManage: boolean }) {
   const [pending, startTransition] = React.useTransition()
   function toggleEnabled() {
@@ -229,7 +195,14 @@ function ApiKeyCard({ apiKey, canManage }: { apiKey: ApiKeyRow; canManage: boole
           <Button variant="ghost" size="sm" onClick={toggleEnabled} disabled={pending}>
             {apiKey.enabled ? "Disable" : "Enable"}
           </Button>
-          <DeleteApiKeyButton apiKey={apiKey} />
+          <DeleteConfirmButton
+            entityLabel={apiKey.name}
+            title={`Delete ${apiKey.name}?`}
+            description="The key stops working immediately. This can't be undone."
+            confirmLabel="Delete key"
+            successMessage="API key deleted"
+            action={() => deleteApiKey(apiKey.id)}
+          />
         </div>
       ) : null}
     </div>
