@@ -5,7 +5,7 @@ import { getApiConsultationsPage, type ConsultationFilters } from "@/lib/api/con
 import { apiError, apiJson } from "@/lib/api/errors"
 import { withApi } from "@/lib/api/handler"
 import { parseIdempotencyKey } from "@/lib/api/idempotency"
-import { decodeCursor, parseLimit } from "@/lib/api/pagination"
+import { parseListParams } from "@/lib/api/pagination"
 import { tenantScoped } from "@/lib/api/tenant-db"
 import { createConsultationViaApi, emitConsultationEvents } from "@/lib/consultations/api-mutations"
 import type { Json } from "@/lib/supabase/database.types"
@@ -19,13 +19,8 @@ export const runtime = "nodejs"
 export async function GET(request: NextRequest) {
   return withApi(request, "consultations:read", async ({ admin, context }) => {
     const params = request.nextUrl.searchParams
-    const limit = parseLimit(params.get("limit"))
-
-    const rawCursor = params.get("cursor")
-    const cursor = decodeCursor(rawCursor)
-    if (rawCursor && !cursor) {
-      return apiError("invalid_cursor", "The cursor is invalid.", 400)
-    }
+    const parsed = parseListParams(params)
+    if (!parsed.ok) return parsed.response
 
     const filters: ConsultationFilters = {
       attorney: params.get("attorney") ?? undefined,
@@ -34,7 +29,7 @@ export async function GET(request: NextRequest) {
       archived: params.get("archived") ?? undefined,
     }
 
-    const page = await getApiConsultationsPage(tenantScoped(admin, context.firmId), limit, cursor, filters)
+    const page = await getApiConsultationsPage(tenantScoped(admin, context.firmId), parsed.limit, parsed.cursor, filters)
     return apiJson(page)
   })
 }
