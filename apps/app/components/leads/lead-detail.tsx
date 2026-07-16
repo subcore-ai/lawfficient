@@ -36,12 +36,14 @@ import type {
   LeadView,
 } from "@/lib/leads/queries"
 import type { NoteView } from "@/lib/notes/queries"
+import {
+  NONE,
+  noneToEmpty,
+  noneToNull,
+  personOptions,
+} from "@/lib/select-sentinel"
 import { qualificationBadge } from "@/lib/status"
 import type { FirmTaxonomies } from "@/lib/taxonomies/queries"
-
-const UNASSIGNED = "none"
-// Sentinel for "clear qualification" — the reserved "__" prefix can't collide with a taxonomy label.
-const NO_QUALIFICATION = "__none__"
 
 type Result = { ok: true } | { error: string }
 type Edits = {
@@ -104,10 +106,7 @@ export function LeadDetail({
   const name = `${lead.firstName} ${lead.lastName}`
   const { data } = lead
   const statusOptions = statuses.map((s) => ({ value: s.id, label: s.name }))
-  const inlineAssignee = [
-    { value: UNASSIGNED, label: "Unassigned" },
-    ...assignees.map((a) => ({ value: a.id, label: a.name })),
-  ]
+  const inlineAssignee = personOptions(assignees)
   const assigneeName = lead.assignedToId
     ? (assignees.find((a) => a.id === lead.assignedToId)?.name ?? "—")
     : "Unassigned"
@@ -115,7 +114,7 @@ export function LeadDetail({
   // Qualification options = the firm's active labels, plus the lead's current value if it's been
   // deactivated, so it still renders.
   const qualificationOptions = [
-    { value: NO_QUALIFICATION, label: "Not set" },
+    { value: NONE, label: "Not set" },
     ...taxonomies.qualification
       .filter((o) => o.isActive)
       .map((o) => ({ value: o.label, label: o.label })),
@@ -282,12 +281,12 @@ export function LeadDetail({
                 </span>
                 {canEdit ? (
                   <InlineSelect
-                    value={edits.assignedToId ?? UNASSIGNED}
+                    value={edits.assignedToId ?? NONE}
                     options={inlineAssignee}
                     ariaLabel="Assignee"
                     onValueChange={(v) =>
-                      run({ assignedToId: v === UNASSIGNED ? null : v }, () =>
-                        assignLead(lead.id, v === UNASSIGNED ? "" : v),
+                      run({ assignedToId: noneToNull(v) }, () =>
+                        assignLead(lead.id, noneToEmpty(v)),
                       )
                     }
                   />
@@ -301,17 +300,12 @@ export function LeadDetail({
                 </span>
                 {canEdit ? (
                   <InlineSelect
-                    value={edits.qualification ?? NO_QUALIFICATION}
+                    value={edits.qualification ?? NONE}
                     options={qualificationOptions}
                     ariaLabel="Qualification"
                     onValueChange={(v) =>
-                      run(
-                        { qualification: v === NO_QUALIFICATION ? null : v },
-                        () =>
-                          setLeadQualification(
-                            lead.id,
-                            v === NO_QUALIFICATION ? "" : v,
-                          ),
+                      run({ qualification: noneToNull(v) }, () =>
+                        setLeadQualification(lead.id, noneToEmpty(v)),
                       )
                     }
                   />

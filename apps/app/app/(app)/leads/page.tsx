@@ -11,13 +11,13 @@ import {
   type LeadView,
 } from "@/lib/leads/queries"
 import { getFirmStaff, getFirmStatusRows, getFirmTaxonomyRows } from "@/lib/reference"
+import { NONE } from "@/lib/select-sentinel"
 import { createClient } from "@/lib/supabase/server"
 import { groupTaxonomies } from "@/lib/taxonomies/queries"
 
 export const metadata = { title: "Leads" }
 
 const PAGE_SIZE = 50
-const UNASSIGNED = "__none__" // mirrors the table's "Unassigned" sentinel
 
 type Search = Record<string, string | string[] | undefined>
 function one(sp: Search, key: string): string | undefined {
@@ -55,7 +55,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
   if (!showArchived) leadsQuery = leadsQuery.eq("archived", false)
   if (status) leadsQuery = leadsQuery.eq("status_id", status)
   if (source) leadsQuery = leadsQuery.eq("source", source)
-  if (assignee === UNASSIGNED) leadsQuery = leadsQuery.is("assigned_to_id", null)
+  if (assignee === NONE) leadsQuery = leadsQuery.is("assigned_to_id", null)
   else if (assignee) leadsQuery = leadsQuery.eq("assigned_to_id", assignee)
   if (q) leadsQuery = leadsQuery.ilike("search_text", `%${qPattern}%`)
   leadsQuery = leadsQuery.range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1)
