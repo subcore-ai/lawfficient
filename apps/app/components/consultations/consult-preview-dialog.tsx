@@ -30,9 +30,9 @@ import { addMinutesToTime, formatConsultationWhen, minutesBetween, splitWall, ut
 import type { ConsultationStatus } from "@/lib/consultations/validation"
 import { toLocalYmd } from "@/lib/format"
 import type { CalendarConsult } from "@/lib/scheduling/day-calendar"
+import { NONE, noneToEmpty, personOptions } from "@/lib/select-sentinel"
 
 type Option = { id: string; name: string }
-const UNASSIGNED = "__none__"
 
 // A field input styled to read like static text until you hover/focus it — the dialog is both the detail
 // view and the editor, so the time/date look read-only but are live (hover shows a border; the native
@@ -78,7 +78,7 @@ export function ConsultPreviewDialog({
   const [attorneys, setAttorneys] = React.useState<Option[]>([])
   const [types, setTypes] = React.useState<ConsultationType[]>([])
   const [leadId, setLeadId] = React.useState("")
-  const [attorney, setAttorney] = React.useState(UNASSIGNED)
+  const [attorney, setAttorney] = React.useState(NONE)
   const [amount, setAmount] = React.useState(0)
   const [paid, setPaid] = React.useState(false)
 
@@ -147,7 +147,7 @@ export function ConsultPreviewDialog({
         setFromTime(when.time)
         setToTime(to)
         setType(c.type)
-        setAttorney(c.attorneyId ?? UNASSIGNED)
+        setAttorney(c.attorneyId ?? NONE)
         setAmount(c.amount ?? 0)
         setPaid(c.paid)
         setOriginal({
@@ -155,7 +155,7 @@ export function ConsultPreviewDialog({
           from: when.time,
           to,
           type: c.type,
-          attorney: c.attorneyId ?? UNASSIGNED,
+          attorney: c.attorneyId ?? NONE,
           amount: c.amount ?? 0,
           paid: c.paid,
         })
@@ -183,7 +183,7 @@ export function ConsultPreviewDialog({
   const validTime = Boolean(day) && durationMin >= 5
   // Gray out the selected attorney's full days off (own time off + firm holidays) in the reschedule date
   // picker. Reads from the CURRENTLY selected attorney, since "Edit all fields" can reassign it.
-  const attorneyOff = attorney !== UNASSIGNED ? offDatesByAttorney?.[attorney] : undefined
+  const attorneyOff = attorney !== NONE ? offDatesByAttorney?.[attorney] : undefined
   const disabledDay = attorneyOff?.length ? (d: Date) => isDateOff(attorneyOff, toLocalYmd(d)) : undefined
   // The picker only blocks NEW picks; if the day was already set when the attorney changed (or off-data
   // loaded), it can still be off — treat that as invalid too so Save can't stay enabled (server re-checks).
@@ -217,7 +217,7 @@ export function ConsultPreviewDialog({
     if (!consult) return
     const fd = new FormData()
     fd.set("leadId", leadId) // fixed — updateConsultation validates it but never reassigns the lead
-    fd.set("attorneyId", attorney === UNASSIGNED ? "" : attorney)
+    fd.set("attorneyId", noneToEmpty(attorney))
     fd.set("type", type)
     fd.set("durationMin", String(durationMin))
     fd.set("startAt", day && fromTime ? `${day}T${fromTime}` : "")
@@ -336,12 +336,12 @@ export function ConsultPreviewDialog({
                     </div>
                     <div className="grid gap-1.5">
                       <Label className="text-muted-foreground text-xs">Attorney</Label>
-                      <Select value={attorney} onValueChange={(v) => setAttorney(v ?? UNASSIGNED)} items={[{ value: UNASSIGNED, label: "Unassigned" }, ...attorneys.map((a) => ({ value: a.id, label: a.name }))]} disabled={!ready}>
+                      <Select value={attorney} onValueChange={(v) => setAttorney(v ?? NONE)} items={personOptions(attorneys)} disabled={!ready}>
                         <SelectTrigger className="w-full">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
+                          <SelectItem value={NONE}>Unassigned</SelectItem>
                           {attorneys.map((a) => (
                             <SelectItem key={a.id} value={a.id}>
                               {a.name}

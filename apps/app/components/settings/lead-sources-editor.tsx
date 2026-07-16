@@ -37,6 +37,7 @@ import { InlineSelect } from "@/components/inline-select"
 import { StatusPill } from "@/components/status-pill"
 import type { AssigneeOption } from "@/lib/leads/queries"
 import { formatDateTime } from "@/lib/format"
+import { NONE, noneToEmpty, noneToNull, personOptions } from "@/lib/select-sentinel"
 
 export type LeadSourceRow = {
   id: string
@@ -51,7 +52,6 @@ export type LeadSourceRow = {
 }
 
 type Revealed = { rawKey: string; sourceKey: string }
-const UNASSIGNED = "__none__"
 // The fields a firm maps their source to inside Zapier (the canonical contract).
 const CONTRACT_FIELDS =
   "externalId, firstName, lastName, email, phone, caseType, hierarchy, qualification, preferredLanguage, countryOfOrigin, city, state, zip, gender, dob, referralSource, notes"
@@ -115,13 +115,13 @@ function NewSourceDialog({
   onCreated: (r: Revealed) => void
 }) {
   const [open, setOpen] = React.useState(false)
-  const [assignee, setAssignee] = React.useState(UNASSIGNED)
+  const [assignee, setAssignee] = React.useState(NONE)
   const [pending, startTransition] = React.useTransition()
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const fd = new FormData(e.currentTarget)
-    fd.set("defaultAssigneeId", assignee === UNASSIGNED ? "" : assignee)
+    fd.set("defaultAssigneeId", noneToEmpty(assignee))
     startTransition(async () => {
       const res = await createSource(fd)
       if ("error" in res) {
@@ -129,12 +129,12 @@ function NewSourceDialog({
         return
       }
       setOpen(false)
-      setAssignee(UNASSIGNED)
+      setAssignee(NONE)
       onCreated({ rawKey: res.rawKey, sourceKey: res.sourceKey })
     })
   }
 
-  const items = [{ value: UNASSIGNED, label: "Unassigned" }, ...assignees.map((a) => ({ value: a.id, label: a.name }))]
+  const items = personOptions(assignees)
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -154,7 +154,7 @@ function NewSourceDialog({
               <Input name="name" required placeholder="Website form (Zapier)" autoComplete="off" />
             </Field>
             <Field label="Default assignee">
-              <Select value={assignee} onValueChange={(v) => setAssignee(v ?? UNASSIGNED)} items={items}>
+              <Select value={assignee} onValueChange={(v) => setAssignee(v ?? NONE)} items={items}>
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
@@ -269,7 +269,7 @@ function SourceCard({
   onRotated: (r: Revealed) => void
 }) {
   const [pending, startTransition] = React.useTransition()
-  const assigneeItems = [{ value: UNASSIGNED, label: "Unassigned" }, ...assignees.map((a) => ({ value: a.id, label: a.name }))]
+  const assigneeItems = personOptions(assignees)
 
   function toggleEnabled() {
     startTransition(async () => {
@@ -289,7 +289,7 @@ function SourceCard({
   }
   function assign(value: string) {
     startTransition(async () => {
-      const res = await setDefaultAssignee(source.id, value === UNASSIGNED ? null : value)
+      const res = await setDefaultAssignee(source.id, noneToNull(value))
       if ("error" in res) toast.error(res.error)
     })
   }
@@ -312,7 +312,7 @@ function SourceCard({
         <div className="flex items-center justify-between gap-2">
           <span className="text-muted-foreground text-xs">Assignee</span>
           <InlineSelect
-            value={source.defaultAssigneeId ?? UNASSIGNED}
+            value={source.defaultAssigneeId ?? NONE}
             options={assigneeItems}
             ariaLabel="Default assignee"
             onValueChange={assign}

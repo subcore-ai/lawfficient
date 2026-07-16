@@ -39,12 +39,12 @@ import { StatusPill } from "@/components/status-pill"
 import { formatDate } from "@/lib/format"
 import { LEAD_SOURCES } from "@/lib/leads/validation"
 import type { AssigneeOption, LeadStatusView, LeadView } from "@/lib/leads/queries"
+import { NONE, noneToEmpty, personOptions } from "@/lib/select-sentinel"
 import { qualificationBadge } from "@/lib/status"
 import type { FirmTaxonomies } from "@/lib/taxonomies/queries"
 
-// Distinctive sentinels so a free-text lead source (or assignee) can't collide with them.
+// Distinctive sentinel so a free-text lead source can't collide with it.
 const ALL = "__all__"
-const UNASSIGNED = "__none__"
 
 export type LeadsFilters = {
   status: string
@@ -132,10 +132,7 @@ export function LeadsTable({
 
   const statusOptions = statuses.map((s) => ({ value: s.id, label: s.name }))
   const assigneeName = new Map(assignees.map((a) => [a.id, a.name]))
-  const inlineAssignee = [
-    { value: UNASSIGNED, label: "Unassigned" },
-    ...assignees.map((a) => ({ value: a.id, label: a.name })),
-  ]
+  const inlineAssignee = personOptions(assignees)
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const start = total === 0 ? 0 : (page - 1) * pageSize + 1
@@ -149,7 +146,7 @@ export function LeadsTable({
   }
   function onAssign(id: string, value: string) {
     startTransition(async () => {
-      const result = await assignLead(id, value === UNASSIGNED ? "" : value)
+      const result = await assignLead(id, noneToEmpty(value))
       if ("error" in result) toast.error(result.error)
     })
   }
@@ -236,18 +233,14 @@ export function LeadsTable({
           <Select
             value={filters.assignee || ALL}
             onValueChange={(v) => setParams({ assignee: !v || v === ALL ? null : v })}
-            items={[
-              { value: ALL, label: "All assignees" },
-              { value: UNASSIGNED, label: "Unassigned" },
-              ...assignees.map((a) => ({ value: a.id, label: a.name })),
-            ]}
+            items={[{ value: ALL, label: "All assignees" }, ...inlineAssignee]}
           >
             <SelectTrigger className="h-8" aria-label="Filter by assignee">
               <SelectValue placeholder="Assigned" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={ALL}>All assignees</SelectItem>
-              <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
+              <SelectItem value={NONE}>Unassigned</SelectItem>
               {assignees.map((a) => (
                 <SelectItem key={a.id} value={a.id}>
                   {a.name}
@@ -357,7 +350,7 @@ export function LeadsTable({
                 <TableCell className="hidden lg:table-cell">
                   {canEdit ? (
                     <InlineSelect
-                      value={l.assignedToId ?? UNASSIGNED}
+                      value={l.assignedToId ?? NONE}
                       options={inlineAssignee}
                       ariaLabel="Assignee"
                       onValueChange={(v) => onAssign(l.id, v)}

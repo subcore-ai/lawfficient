@@ -17,11 +17,8 @@ import { Field } from "@/components/form-field"
 import { TaxonomySelect } from "@/components/taxonomy-select"
 import type { AssigneeOption, LeadView } from "@/lib/leads/queries"
 import { LEAD_SOURCES } from "@/lib/leads/validation"
+import { NONE, noneToEmpty, personOptions } from "@/lib/select-sentinel"
 import type { FirmTaxonomies, TaxonomyOption } from "@/lib/taxonomies/queries"
-
-// Distinctive sentinel so a firm-defined taxonomy label (e.g. literally "none") can't collide with
-// the "Not set" option. Taxonomy create/rename rejects "__"-prefixed labels (see settings actions).
-const NONE = "__none__"
 
 // Active taxonomy labels as select items; keep a deactivated/legacy value the lead still carries
 // visible so it still renders.
@@ -64,7 +61,7 @@ export function LeadFormFields({
   const isEditing = Boolean(lead)
 
   const sourceItems = LEAD_SOURCES.map((s) => ({ value: s, label: s }))
-  const assigneeItems = [{ value: NONE, label: "Unassigned" }, ...assignees.map((a) => ({ value: a.id, label: a.name }))]
+  const assigneeItems = personOptions(assignees)
 
   return (
     <div className="grid gap-4 sm:grid-cols-2">
@@ -110,7 +107,7 @@ export function LeadFormFields({
               ))}
             </SelectContent>
           </Select>
-          <input type="hidden" name="assignedToId" value={assignee === NONE ? "" : assignee} />
+          <input type="hidden" name="assignedToId" value={noneToEmpty(assignee)} />
         </Field>
       ) : null}
 
@@ -124,7 +121,7 @@ export function LeadFormFields({
           addLabel="+ New case type"
           noneValue={NONE}
         />
-        <input type="hidden" name="caseType" value={caseType === NONE ? "" : caseType} />
+        <input type="hidden" name="caseType" value={noneToEmpty(caseType)} />
       </Field>
       <Field label="Case hierarchy">
         <TaxonomySelect
@@ -136,7 +133,7 @@ export function LeadFormFields({
           addLabel="+ New hierarchy"
           noneValue={NONE}
         />
-        <input type="hidden" name="hierarchy" value={hierarchy === NONE ? "" : hierarchy} />
+        <input type="hidden" name="hierarchy" value={noneToEmpty(hierarchy)} />
       </Field>
 
       {!isEditing ? (
@@ -150,7 +147,7 @@ export function LeadFormFields({
             addLabel="+ New qualification"
             noneValue={NONE}
           />
-          <input type="hidden" name="qualification" value={qualification === NONE ? "" : qualification} />
+          <input type="hidden" name="qualification" value={noneToEmpty(qualification)} />
         </Field>
       ) : null}
       <Field label="Preferred language">

@@ -29,9 +29,9 @@ import { isDateOff, type OffDateRange } from "@/lib/availability/exceptions"
 import type { ConsultationType } from "@/lib/consultations/consultation-types"
 import { addMinutesToTime, minutesBetween, splitWall, utcToZonedInput } from "@/lib/consultations/time"
 import { toLocalYmd } from "@/lib/format"
+import { NONE, noneToEmpty, personOptions } from "@/lib/select-sentinel"
 
 type Option = { id: string; name: string }
-const UNASSIGNED = "__none__"
 
 // Edit a booked consultation with the same fields as creating one — type, attorney, day + from/to, fee —
 // except the lead (which is fixed). The consult + the attorney/type lists are loaded on open, so the
@@ -62,7 +62,7 @@ export function EditConsultationDialog({
   const [leadName, setLeadName] = React.useState("")
 
   const [type, setType] = React.useState("")
-  const [attorney, setAttorney] = React.useState(UNASSIGNED)
+  const [attorney, setAttorney] = React.useState(NONE)
   const [amount, setAmount] = React.useState(0)
   const [paid, setPaid] = React.useState(false)
   const [day, setDay] = React.useState("")
@@ -101,7 +101,7 @@ export function EditConsultationDialog({
         setLeadId(c.leadId)
         setLeadName(c.leadName)
         setType(c.type)
-        setAttorney(c.attorneyId ?? UNASSIGNED)
+        setAttorney(c.attorneyId ?? NONE)
         setAmount(c.amount ?? 0)
         setPaid(c.paid)
         const when = splitWall(utcToZonedInput(c.startAtIso, c.timeZone))
@@ -131,7 +131,7 @@ export function EditConsultationDialog({
 
   // Gray out days the selected attorney is fully off (own time off + firm holidays). Only when an attorney
   // is selected and we have their ranges; the server (0051 trigger) still re-checks on save — friendly guard.
-  const attorneyOff = attorney !== UNASSIGNED ? offDatesByAttorney[attorney] : undefined
+  const attorneyOff = attorney !== NONE ? offDatesByAttorney[attorney] : undefined
   const disabledDay = attorneyOff?.length ? (d: Date) => isDateOff(attorneyOff, toLocalYmd(d)) : undefined
   // The picker only blocks NEW picks; if the chosen attorney is off on the already-picked day (e.g. after
   // switching attorneys), treat it as invalid so Save can't proceed — the server (0051 trigger) re-checks.
@@ -157,7 +157,7 @@ export function EditConsultationDialog({
     e.preventDefault()
     const fd = new FormData()
     fd.set("leadId", leadId) // fixed — updateConsultation validates it but never reassigns the lead
-    fd.set("attorneyId", attorney === UNASSIGNED ? "" : attorney)
+    fd.set("attorneyId", noneToEmpty(attorney))
     fd.set("type", type)
     fd.set("durationMin", String(durationMin))
     fd.set("startAt", day && fromTime ? `${day}T${fromTime}` : "")
@@ -240,14 +240,14 @@ export function EditConsultationDialog({
               <Field label="Attorney" htmlFor={attorneySelectId}>
                 <Select
                   value={attorney}
-                  onValueChange={(v) => setAttorney(v ?? UNASSIGNED)}
-                  items={[{ value: UNASSIGNED, label: "Unassigned" }, ...attorneys.map((a) => ({ value: a.id, label: a.name }))]}
+                  onValueChange={(v) => setAttorney(v ?? NONE)}
+                  items={personOptions(attorneys)}
                 >
                   <SelectTrigger id={attorneySelectId} className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
+                    <SelectItem value={NONE}>Unassigned</SelectItem>
                     {attorneys.map((a) => (
                       <SelectItem key={a.id} value={a.id}>
                         {a.name}

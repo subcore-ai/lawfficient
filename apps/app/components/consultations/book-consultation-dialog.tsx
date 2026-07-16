@@ -35,10 +35,10 @@ import type { ConsultationType } from "@/lib/consultations/consultation-types"
 import { addMinutesToTime, minutesBetween, splitWall } from "@/lib/consultations/time"
 import { FIRM_TIMEZONES } from "@/lib/firm/timezones"
 import { toLocalYmd } from "@/lib/format"
+import { NONE, noneToEmpty, personOptions } from "@/lib/select-sentinel"
 
 type Option = { id: string; name: string }
 
-const UNASSIGNED = "__none__"
 const DEFAULT_TZ = "America/New_York"
 
 export function BookConsultationDialog({
@@ -95,7 +95,7 @@ export function BookConsultationDialog({
   // No global preselect: an unset lead forces an explicit choice so a missed selection can't silently
   // book onto whichever lead loaded first.
   const [leadId, setLeadId] = React.useState(triggerLeadId ?? "")
-  const [attorney, setAttorney] = React.useState(prefillAttorneyId ?? UNASSIGNED)
+  const [attorney, setAttorney] = React.useState(prefillAttorneyId ?? NONE)
   const initialWhen = splitWall(prefillStart ?? "")
   const [type, setType] = React.useState(firstType?.name ?? "")
   const [amount, setAmount] = React.useState(firstType?.price ?? 0)
@@ -117,7 +117,7 @@ export function BookConsultationDialog({
 
   // Gray out days the chosen attorney is fully off (own time off + firm holidays). Only when an attorney
   // is selected and we have their ranges; the server still re-checks (the 0051 trigger) — friendly guardrail.
-  const attorneyOff = attorney !== UNASSIGNED ? offDatesByAttorney?.[attorney] : undefined
+  const attorneyOff = attorney !== NONE ? offDatesByAttorney?.[attorney] : undefined
   const disabledDay = attorneyOff?.length
     ? (d: Date) => isDateOff(attorneyOff, toLocalYmd(d))
     : undefined
@@ -146,7 +146,7 @@ export function BookConsultationDialog({
 
   function reset() {
     setLeadId(triggerLeadId ?? "")
-    setAttorney(prefillAttorneyId ?? UNASSIGNED)
+    setAttorney(prefillAttorneyId ?? NONE)
     setType(firstType?.name ?? "")
     setAmount(firstType?.price ?? 0)
     setDay(initialWhen.day)
@@ -166,7 +166,7 @@ export function BookConsultationDialog({
     e.preventDefault()
     const fd = new FormData(e.currentTarget)
     fd.set("leadId", leadId)
-    fd.set("attorneyId", attorney === UNASSIGNED ? "" : attorney)
+    fd.set("attorneyId", noneToEmpty(attorney))
     fd.set("type", type)
     fd.set("durationMin", String(durationMin))
     const startWall = day && fromTime ? `${day}T${fromTime}` : ""
@@ -240,12 +240,12 @@ export function BookConsultationDialog({
               </Select>
             </Field>
             <Field label="Attorney" htmlFor={attorneySelectId}>
-              <Select value={attorney} onValueChange={(v) => setAttorney(v ?? UNASSIGNED)} items={[{ value: UNASSIGNED, label: "Unassigned" }, ...attorneys.map((a) => ({ value: a.id, label: a.name }))]}>
+              <Select value={attorney} onValueChange={(v) => setAttorney(v ?? NONE)} items={personOptions(attorneys)}>
                 <SelectTrigger id={attorneySelectId} className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
+                  <SelectItem value={NONE}>Unassigned</SelectItem>
                   {attorneys.map((a) => (
                     <SelectItem key={a.id} value={a.id}>
                       {a.name}
